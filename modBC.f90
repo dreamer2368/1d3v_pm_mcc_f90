@@ -106,7 +106,8 @@ contains
 		!apply refluxing BC
 		do i=1,p%np
 			if( p%xp(i).le.0.0_mp ) then
-				temp = abs(vT*randn(3))
+				temp = (vT*randn(3))
+				temp(1) = abs(temp(1))
 				p%vp(i,:) = temp
 				call RANDOM_NUMBER(temp)
 				p%xp(i) = temp(1)*dt*p%vp(i,1)

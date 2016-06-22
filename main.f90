@@ -9,8 +9,8 @@ program main
 	print *, 'calling program main'
 
 !	call cross_section
-!	call Procassini
-	call test_refluxing_boundary
+	call Procassini
+!	call test_refluxing_boundary
 
 	! print to screen
 	print *, 'program main...done.'
