@@ -9,8 +9,9 @@ program main
 	print *, 'calling program main'
 
 !	call cross_section
-	call Procassini
+!	call Procassini
 !	call test_refluxing_boundary
+	call test_anewvel
 
 	! print to screen
 	print *, 'program main...done.'
@@ -18,6 +19,24 @@ program main
 contains
 
 	! You can add custom subroutines/functions here later, if you want
+
+	subroutine test_anewvel
+		integer, parameter :: N = 10000
+		real(mp) :: input(3) = (/ 0.0_mp, 1.0_mp, 0.0_mp /)
+		real(mp), dimension(N,3) :: output
+		real(mp) :: energy = 10.0_mp			!eV
+		integer :: i
+
+		do i=1,N
+			output(i,:) = input
+			call anewvel(energy, 1.0_mp, 1.0_mp, output(i,:),.false.)
+		end do
+
+		call system('mkdir -p data/scattering')
+		open(unit=301,file='data/scattering/output.bin',status='replace',form='unformatted',access='stream')
+		write(301) output
+		close(301)
+	end subroutine
 
 	subroutine cross_section
 		integer, parameter :: N=10000

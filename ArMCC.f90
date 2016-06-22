@@ -7,6 +7,57 @@ module ArMCC
 contains
 
 !=======================================================
+!  e + Ar Differential cross section: determine scattered velocity
+!=======================================================
+	subroutine anewvel(energy, m1, m2, vp, elastic_flag)
+		real(mp), intent(in) :: energy, m1, m2
+		real(mp), intent(inout) :: vp(3)
+		logical, intent(in) :: elastic_flag
+		real(mp) :: random
+		real(mp) :: coschi, sinchi, phi1, cosphi, sinphi, up(3)
+		real(mp) :: vel
+		real(mp) :: r1(3), r2(3), r3(3)
+
+		if( energy < 1E-30 ) then
+			coschi = 1.0_mp
+		else
+			call RANDOM_NUMBER(random)
+			coschi = ( 2.0_mp + energy - 2.0_mp*( 1.0_mp+energy )**random )/energy
+		end if
+		sinchi = sqrt( abs( 1.0_mp - coschi**2 ) )
+
+		call RANDOM_NUMBER(random)
+		phi1 = 2*pi*random
+		cosphi = cos(phi1)
+		sinphi = sin(phi1)
+
+		vel = sqrt( sum( vp**2 ) )
+		if( elastic_flag ) then
+			vel = vel*sqrt( 1.0_mp - 2.0_mp*m1/m2*(1.0_mp-coschi) )
+		end if
+
+		r3 = vp
+
+		up = 0.0_mp
+		if( r3(3) .eq. 1.0_mp ) then
+			up(2) = 1.0_mp
+		else
+			up(3) = 1.0_mp
+		end if
+
+		r2(1) = r3(2)*up(3) - r3(3)*up(2)
+		r2(2) = r3(3)*up(1) - r3(1)*up(3)
+		r2(3) = r3(1)*up(2) - r3(2)*up(1)
+		r2 = r2/sqrt( sum( r2**2 ) )
+
+		r1(1) = r2(2)*r3(3) - r2(3)*r3(2)
+		r1(2) = r2(3)*r3(1) - r2(1)*r3(3)
+		r1(3) = r2(1)*r3(2) - r2(2)*r3(1)
+
+		vp = vel*(r1*sinchi*cosphi + r2*sinchi*sinphi + r3*coschi)
+	end subroutine
+
+!=======================================================
 !  e + Ar -> e + Ar  Elastic      (with Ramseur minimum)
 !=======================================================
 	function asigma1(energy) result(sig1)
