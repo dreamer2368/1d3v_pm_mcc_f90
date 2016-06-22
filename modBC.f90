@@ -48,7 +48,7 @@ contains
 		type(species), intent(inout) :: p
 		type(mesh), intent(inout) :: m
 		integer :: i, np1
-		real(mp), allocatable :: vec(:)
+		real(mp), allocatable :: vec(:), vec2(:,:)
 
 		np1 = p%np
 		i = 1
@@ -56,14 +56,14 @@ contains
 		do while( i .le. np1 )
 			if( p%xp(i).le.0.0_mp ) then
 				p%xp(i) = p%xp(np1)					!replacement with the last particle
-				p%vp(i) = p%vp(np1)
+				p%vp(i,:) = p%vp(np1,:)
 				p%Ep(i) = p%Ep(np1)
 				m%rho_back(1) = m%rho_back(1) + p%spwt*p%qs
 				np1 = np1-1
 				i = i-1
 			elseif( p%xp(i).ge.m%L ) then
 				p%xp(i) = p%xp(np1)
-				p%vp(i) = p%vp(np1)
+				p%vp(i,:) = p%vp(np1,:)
 				p%Ep(i) = p%Ep(np1)
 				m%rho_back(m%ng) = m%rho_back(m%ng) + p%spwt*p%qs
 				np1 = np1-1
@@ -74,16 +74,17 @@ contains
 		p%np = np1
 
 		allocate(vec(np1))
+		allocate(vec2(np1,3))
 
 		vec = p%xp(1:np1)
 		deallocate(p%xp)
 		allocate(p%xp(np1))
 		p%xp = vec
 
-		vec = p%vp(1:np1)
+		vec2 = p%vp(1:np1,:)
 		deallocate(p%vp)
-		allocate(p%vp(np1))
-		p%vp = vec
+		allocate(p%vp(np1,3))
+		p%vp = vec2
 
 		vec = p%Ep(1:np1)
 		deallocate(p%Ep)
@@ -91,23 +92,24 @@ contains
 		p%Ep = vec
 
 		deallocate(vec)
+		deallocate(vec2)
 	end subroutine
 
 	subroutine applyBC_refluxing_absorbing(p,m,dt,vT)			!refluxing at the left plane, absorbing at the right plane
 		type(species), intent(inout) :: p
 		type(mesh), intent(inout) :: m
 		real(mp), intent(in) :: dt, vT
-		real(mp) :: temp(1)
+		real(mp) :: temp(3)
 		integer :: i, np1
-		real(mp), allocatable :: vec(:)
+		real(mp), allocatable :: vec(:), vec2(:,:)
 
 		!apply refluxing BC
 		do i=1,p%np
 			if( p%xp(i).le.0.0_mp ) then
-				temp = abs(vT*randn(1))
-				p%vp(i) = temp(1)
+				temp = abs(vT*randn(3))
+				p%vp(i,:) = temp
 				call RANDOM_NUMBER(temp)
-				p%xp(i) = temp(1)*dt*p%vp(i)
+				p%xp(i) = temp(1)*dt*p%vp(i,1)
 			end if
 		end do
 
@@ -117,7 +119,7 @@ contains
 		do while( i .le. np1 )
 			if( p%xp(i).ge.m%L ) then
 				p%xp(i) = p%xp(np1)
-				p%vp(i) = p%vp(np1)
+				p%vp(i,:) = p%vp(np1,:)
 				p%Ep(i) = p%Ep(np1)
 				m%rho_back(m%ng) = m%rho_back(m%ng) + p%spwt*p%qs
 				np1 = np1-1
@@ -128,16 +130,17 @@ contains
 		p%np = np1
 
 		allocate(vec(np1))
+		allocate(vec2(np1,3))
 
 		vec = p%xp(1:np1)
 		deallocate(p%xp)
 		allocate(p%xp(np1))
 		p%xp = vec
 
-		vec = p%vp(1:np1)
+		vec2 = p%vp(1:np1,:)
 		deallocate(p%vp)
-		allocate(p%vp(np1))
-		p%vp = vec
+		allocate(p%vp(np1,3))
+		p%vp = vec2
 
 		vec = p%Ep(1:np1)
 		deallocate(p%Ep)
@@ -145,6 +148,7 @@ contains
 		p%Ep = vec
 
 		deallocate(vec)
+		deallocate(vec2)
 	end subroutine
 
 !===========================grid adjustment for BC=============================

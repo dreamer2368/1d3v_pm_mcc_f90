@@ -1,6 +1,7 @@
 *.o
 *.mod
 exec
-data/*.bin
-data/*.out
+data/**/*.bin
+data/**/*.out
+data/**/record
 .DS_Store

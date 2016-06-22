@@ -6,8 +6,6 @@ module ArMCC
 
 contains
 
-subroutine 
-
 !=======================================================
 !  e + Ar -> e + Ar  Elastic      (with Ramseur minimum)
 !=======================================================

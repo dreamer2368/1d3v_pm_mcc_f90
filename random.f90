@@ -4,9 +4,19 @@ MODULE random
 
 	implicit none
 
+	interface randn
+		procedure randn_rank1
+		procedure randn_rank2
+	end interface
+
+	interface randr
+		procedure randr_rank1
+		procedure randr_rank2
+	end interface
+
 contains
 
-	function randn(N) result(x)
+	function randn_rank1(N) result(x)
 		integer, intent(in) :: N
 		real(mp) :: r1(N), r2(N), x(N)
 
@@ -15,7 +25,16 @@ contains
 		x = sqrt( -2.0_mp*log(r1) )*cos( 2.0_mp*pi*r2 )
 	end function
 
-	function randr(N) result(x)
+	function randn_rank2(N1,N2) result(x)
+		integer, intent(in) :: N1, N2
+		real(mp) :: r1(N1,N2), r2(N1,N2), x(N1,N2)
+
+		call RANDOM_NUMBER(r1)
+		call RANDOM_NUMBER(r2)
+		x = sqrt( -2.0_mp*log(r1) )*cos( 2.0_mp*pi*r2 )
+	end function
+
+	function randr_rank1(N) result(x)
 		integer, intent(in) :: N
 		real(mp) :: r1(N/2), r2(N-N/2), x(N)
 
@@ -23,6 +42,16 @@ contains
 		call RANDOM_NUMBER(r2)
 		x(1:N/2) = sqrt( -2.0_mp*log(r1) )
 		x(N/2+1:N) = -sqrt( -2.0_mp*log(r2) )
+	end function
+
+	function randr_rank2(N1,N2) result(x)
+		integer, intent(in) :: N1, N2
+		real(mp) :: r1(N1/2,N2), r2(N1-N1/2,N2), x(N1,N2)
+
+		call RANDOM_NUMBER(r1)
+		call RANDOM_NUMBER(r2)
+		x(1:N1/2,:) = sqrt( -2.0_mp*log(r1) )
+		x(N1/2+1:N1,:) = -sqrt( -2.0_mp*log(r2) )
 	end function
 
 END MODULE random

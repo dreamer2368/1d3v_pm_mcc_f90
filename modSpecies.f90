@@ -7,7 +7,7 @@ module modSpecies
 	type species
 		integer :: np
 		real(mp), allocatable :: xp(:)
-		real(mp), allocatable :: vp(:)
+		real(mp), allocatable :: vp(:,:)
 		real(mp), allocatable :: Ep(:)
 
 		real(mp) :: ms, qs, spwt
@@ -30,11 +30,11 @@ contains
 		type(species), intent(inout) :: this
 		integer, intent(in) :: np0
 		real(mp), intent(in) :: xp0(np0)
-		real(mp), intent(in) :: vp0(np0)
+		real(mp), intent(in) :: vp0(np0,3)
 
 		this%np = np0
 		allocate(this%xp(np0))
-		allocate(this%vp(np0))
+		allocate(this%vp(np0,3))
 		allocate(this%Ep(np0))
 
 		this%xp = xp0
@@ -53,14 +53,14 @@ contains
 		type(species), intent(inout) :: this
 		real(mp), intent(in) :: dt
 
-		this%xp = this%xp + dt*this%vp
+		this%xp = this%xp + dt*this%vp(:,1)
 	end subroutine
 
 	subroutine accelSpecies(this,dt)
 		type(species), intent(inout) :: this
 		real(mp), intent(in) :: dt
 
-		this%vp = this%vp + dt*this%qs/this%ms*this%Ep
+		this%vp(:,1) = this%vp(:,1) + dt*this%qs/this%ms*this%Ep
 	end subroutine
 
 end module

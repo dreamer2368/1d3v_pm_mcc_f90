@@ -10,7 +10,7 @@ contains
 		type(PM1D), intent(inout) :: this
 		integer, intent(in) :: Np, mode
 		real(mp), intent(in) :: v0, vT
-		real(mp) :: xp0(Np), vp0(Np),rho_back
+		real(mp) :: xp0(Np), vp0(Np,3),rho_back
 		real(mp) :: L,qs,ms
 		integer :: i,j,N,pm(Np)
 		L = this%L
@@ -21,10 +21,10 @@ contains
 		rho_back = -qs*this%n*Np/L
 
 		!velocity distribution initialize
-		vp0 = vT*randn(Np)
+		vp0 = vT*randn(Np,3)
 		pm = (/ ( i, i=1,Np ) /)
 		pm = 1 - 2*MOD(pm,2)
-		vp0 = vp0 + pm*v0
+		vp0(:,1) = vp0(:,1) + pm*v0
 
 		do i=1,this%n
 			!spatial distribution initialize
@@ -42,7 +42,7 @@ contains
 		integer, intent(in) :: Ne, Ni
 		real(mp), intent(in) :: Te, Ti, Kb
 		real(mp) :: Vth_e, Vth_i
-		real(mp) :: xpe(Ne), vpe(Ne), xpi(Ni), vpi(Ni)
+		real(mp) :: xpe(Ne), vpe(Ne,3), xpi(Ni), vpi(Ni,3)
 		integer :: i,nseed,clock
 		integer, allocatable :: seed(:)
 
@@ -59,8 +59,8 @@ contains
 		Vth_e = sqrt(2.0_mp*Kb*Te/this%p(1)%ms)
 		Vth_i = sqrt(2.0_mp*Kb*Ti/this%p(2)%ms)
 		print *, 'Vth_e: ',Vth_e,', Vth_i: ',Vth_i
-		vpe = Vth_e/sqrt(2.0_mp)*randn(Ne)
-		vpi = Vth_i/sqrt(2.0_mp)*randn(Ni)
+		vpe = Vth_e/sqrt(2.0_mp)*randn(Ne,3)
+		vpi = Vth_i/sqrt(2.0_mp)*randn(Ni,3)
 
 		call setSpecies(this%p(1),Ne,xpe,vpe)
 		call setSpecies(this%p(2),Ni,xpi,vpi)
