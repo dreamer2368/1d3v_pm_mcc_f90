@@ -1,0 +1,6 @@
+*.o
+*.mod
+exec
+data/*.bin
+data/*.out
+.DS_Store
