@@ -4,12 +4,53 @@ module ArMCC
 	use random
 	implicit none
 
+	real(mp), parameter :: max_sig_e = 1.6022E-19, max_sig_Ar = 1.7955E-18
+
 contains
+
+!=======================================================
+!  Ar+ + Ar Differential cross section(isotropic): determine scattered velocity
+!=======================================================
+	subroutine anewvel_Ar(vp)
+		real(mp), intent(inout) :: vp(3)
+		real(mp) :: random, coschi, sinchi, phi1, cosphi, sinphi, up(3)
+		real(mp) :: vel, r1(3), r2(3), r3(3)
+
+		call RANDOM_NUMBER(random)
+		coschi = sqrt(random)
+		sinchi = sqrt( abs(1.0_mp - coschi**2) )
+
+		call RANDOM_NUMBER(random)
+		phi1 = 2.0_mp*pi*random
+		cosphi = cos(phi1)
+		sinphi = sin(phi1)
+
+		vel = sqrt( sum( vp**2 ) )
+		r3 = vp/vel
+
+		up = 0.0_mp
+		if( r3(3) .eq. 1.0_mp ) then
+			up(2) = 1.0_mp
+		else
+			up(3) = 1.0_mp
+		end if
+
+		r2(1) = r3(2)*up(3) - r3(3)*up(2)
+		r2(2) = r3(3)*up(1) - r3(1)*up(3)
+		r2(3) = r3(1)*up(2) - r3(2)*up(1)
+		r2 = r2/sqrt( sum( r2**2 ) )
+
+		r1(1) = r2(2)*r3(3) - r2(3)*r3(2)
+		r1(2) = r2(3)*r3(1) - r2(1)*r3(3)
+		r1(3) = r2(1)*r3(2) - r2(2)*r3(1)
+
+		vp = vel*coschi*(r1*sinchi*cosphi + r2*sinchi*sinphi + r3*coschi)
+	end subroutine
 
 !=======================================================
 !  e + Ar Differential cross section: determine scattered velocity
 !=======================================================
-	subroutine anewvel(energy, m1, m2, vp, elastic_flag)
+	subroutine anewvel_e(energy, m1, m2, vp, elastic_flag)
 		real(mp), intent(in) :: energy, m1, m2
 		real(mp), intent(inout) :: vp(3)
 		logical, intent(in) :: elastic_flag
@@ -27,16 +68,16 @@ contains
 		sinchi = sqrt( abs( 1.0_mp - coschi**2 ) )
 
 		call RANDOM_NUMBER(random)
-		phi1 = 2*pi*random
+		phi1 = 2.0_mp*pi*random
 		cosphi = cos(phi1)
 		sinphi = sin(phi1)
 
 		vel = sqrt( sum( vp**2 ) )
+		r3 = vp/vel
+
 		if( elastic_flag ) then
 			vel = vel*sqrt( 1.0_mp - 2.0_mp*m1/m2*(1.0_mp-coschi) )
 		end if
-
-		r3 = vp
 
 		up = 0.0_mp
 		if( r3(3) .eq. 1.0_mp ) then
