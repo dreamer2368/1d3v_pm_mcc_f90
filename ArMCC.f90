@@ -4,12 +4,221 @@ module ArMCC
 	use random
 	implicit none
 
-	real(mp), parameter :: max_sig_e = 1.6022E-19, max_sig_Ar = 1.7955E-18
+	real(mp), parameter :: q_e = 1.602E-19, m_e = 9.10938356e-31, m_Ar = 6.6335209e-26			!kg
+	real(mp), parameter :: max_sigmav_e = 6.6038e-13, max_sigmav_Ar = 2.8497e-14				!m3/s
+	real(mp), parameter :: extengy0 = 11.55, ionengy0 = 15.76									!eV (excitation, ionization)
+	real(mp) :: col_prob_e = 0.0_mp, col_prob_Ar = 0.0_mp
 
 contains
 
+	subroutine set_Ar_discharge(pm, spwt, A)
+		type(PM1D), intent(inout) :: pm
+		real(mp), intent(in) :: A(2)						!A(1): temperature of neutral(eV),	A(2): density of neutral(m-3)
+		real(mp), intent(in) :: spwt(2)
+		if( pm%n .ne. 2 ) then
+			print *, 'ERROR : the number of species should be two corresponding to electon and Argon+. stopped the simulation.'
+			stop
+		end if
+
+		!Electron species
+		call buildSpecies(pm%p(1),-q_e,m_e,spwt(1))
+		!Argon cation species
+		call buildSpecies(pm%p(2),q_e,m_e,spwt(2))
+
+		deallocate(pm%A0)
+		allocate(pm%A0(2))
+		pm%A0 = A
+	end subroutine
+
 !=======================================================
-!  Ar+ + Ar Differential cross section(isotropic): determine scattered velocity
+!	Compute null collision for each species (e, Ar+)
+!=======================================================
+	subroutine null_collision(gden, dt)
+		real(mp), intent(in) :: gden, dt
+
+		col_prob_e = 1.0_mp - exp( -max_sigmav_e*gden*dt )
+		col_prob_Ar = 1.0_mp - exp( -max_sigmav_Ar*gden*dt )
+	end subroutine
+
+!=======================================================
+!	MCC for each species
+!=======================================================
+	subroutine mcc_electron(pm,k)						!electron species
+		type(PM1D), intent(inout) :: pm
+		integer, intent(in) :: k
+		integer :: n_coll, nnp, idx
+		real(mp) :: rnd, rnd_ion, temp_x, temp_v(3)
+		real(mp) :: engy, rengy, vel, nu_total_vel, sum_sigma(3)
+		integer :: new_e, new_Ar
+		real(mp), allocatable :: vec1_e(:), vec2_e(:,:), vec1_Ar(:), vec2_Ar(:,:), temp1(:), temp2(:,:)
+		real(mp) :: vT
+		integer :: i
+		!only for test
+		integer :: n_elastic=0, n_excite=0, n_ionize=0
+		character(len=100) :: kstr
+		n_coll = 0
+		n_elastic=0
+		n_excite=0
+		n_ionize=0
+
+		!Pick particles for collisions
+		n_coll = floor( pm%p(1)%np*col_prob_e )
+		nnp = pm%p(1)%np
+		do i=1,n_coll
+			call RANDOM_NUMBER(rnd)
+			idx = ceiling( nnp*rnd )
+			if( idx>nnp ) then
+				idx = nnp
+			end if
+
+			!sort them into the tail of arrays
+			temp_x = pm%p(1)%xp(nnp)
+			temp_v = pm%p(1)%vp(nnp,:)
+			pm%p(1)%xp(nnp) = pm%p(1)%xp(idx)
+			pm%p(1)%vp(nnp,:) = pm%p(1)%vp(idx,:)
+			pm%p(1)%xp(idx) = temp_x
+			pm%p(1)%vp(idx,:) = temp_v
+			nnp = nnp-1
+		end do
+
+		!Pick the type of collision for each particle
+		!Note: we don't consider the velocity of the neutral, assuming that it is much smaller than that of electron species
+		vT = sqrt( pm%A0(1)*q_e/m_Ar )
+		new_e = 0
+		new_Ar = 0
+		allocate(vec1_e(n_coll))
+		allocate(vec2_e(n_coll,3))
+		allocate(vec1_Ar(n_coll))
+		allocate(vec2_Ar(n_coll,3))
+		do i=nnp+1,nnp+n_coll
+			vel = sqrt( sum( pm%p(1)%vp(i,:)**2 ) )
+			engy = 0.5_mp*pm%p(1)%ms*vel**2/q_e			!scale in eV
+			nu_total_vel = max_sigmav_e/vel
+
+			call RANDOM_NUMBER(rnd)
+			sum_sigma(1) = asigma1(engy)
+			sum_sigma(2) = asigma1(engy) + asigma2(engy)
+			sum_sigma(3) = asigma1(engy) + asigma2(engy) + asigma3(engy)
+			!Elastic
+			if( rnd .le. sum_sigma(1)/nu_total_vel ) then
+
+				call anewvel_e(engy,m_e,m_Ar,pm%p(1)%vp(i,:),.true.)
+				!only for test
+				n_elastic = n_elastic+1
+
+			!Excitation
+			elseif( (engy.ge.extengy0) .and. (rnd.le.sum_sigma(2)/nu_total_vel) ) then
+
+				engy = engy - extengy0
+				pm%p(1)%vp(i,:) = pm%p(1)%vp(i,:)/vel
+				vel = sqrt( 2.0_mp/pm%p(1)%ms*q_e*engy )
+				pm%p(1)%vp(i,:) = pm%p(1)%vp(i,:)*vel
+				call anewvel_e(engy,m_e,m_Ar,pm%p(1)%vp(i,:),.false.)
+				!only for test
+				n_excite = n_excite+1
+
+			!Ionization
+			elseif( (engy.ge.ionengy0) .and. (rnd.le.sum_sigma(3)/nu_total_vel) ) then
+
+				!subtract ionization energy
+				!and partition the energy between created and scattered electron
+				engy = engy-ionengy0
+				call RANDOM_NUMBER(rnd_ion)
+				rengy = 10.0_mp*tan( rnd_ion*atan(engy/20.0_mp) )
+				engy = engy - rengy
+
+				!scatter the created electron
+				new_e = new_e+1
+				vec1_e(new_e) = pm%p(1)%xp(i)
+				vec2_e(new_e,:) = pm%p(1)%vp(i,:)/vel*sqrt( 2.0_mp/pm%p(1)%ms*q_e*rengy )
+				call anewvel_e(rengy,m_e,m_Ar,vec2_e(new_e,:),.false.)
+
+				!assign velocity to the created Ar ion
+				new_Ar = new_Ar+1
+				vec1_Ar(new_Ar) = pm%p(1)%xp(i)
+				vec2_Ar(new_Ar,:) = vT*randn(3)
+
+				!scatter the incident electron
+				pm%p(1)%vp(i,:) = pm%p(1)%vp(i,:)/vel*sqrt( 2.0_mp/pm%p(1)%ms*q_e*engy )
+				call anewvel_e(engy,m_e,m_Ar,pm%p(1)%vp(i,:),.false.)
+				!only for test
+				n_ionize = n_ionize+1
+			end if
+		end do
+		!only for test
+		write(kstr,*) k
+		open(unit=301,file='data/test_mcc_electron/ncoll'//	&
+			trim(adjustl(kstr))//'.bin',status='replace',form='unformatted',access='stream')
+		write(301) n_coll, n_elastic, n_excite, n_ionize
+		close(301)
+
+		!Add newly created particles
+		pm%p(1)%np = pm%p(1)%np + new_e
+		allocate(temp1(pm%p(1)%np))
+		allocate(temp2(pm%p(1)%np,3))
+		temp1(1:pm%p(1)%np-new_e) = pm%p(1)%xp
+		temp1(pm%p(1)%np-new_e+1:pm%p(1)%np) = vec1_e(1:new_e)
+		temp2(1:pm%p(1)%np-new_e,:) = pm%p(1)%vp
+		temp2(pm%p(1)%np-new_e+1:pm%p(1)%np,:) = vec2_e(1:new_e,:)
+		deallocate(pm%p(1)%xp)
+		deallocate(pm%p(1)%vp)
+		allocate(pm%p(1)%xp(pm%p(1)%np))
+		allocate(pm%p(1)%vp(pm%p(1)%np,3))
+		pm%p(1)%xp = temp1
+		pm%p(1)%vp = temp2
+		deallocate(temp1)
+		deallocate(temp2)
+
+		pm%p(2)%np = pm%p(2)%np + new_Ar
+		allocate(temp1(pm%p(2)%np))
+		allocate(temp2(pm%p(2)%np,3))
+		temp1(1:pm%p(2)%np-new_Ar) = pm%p(2)%xp
+		temp1(pm%p(2)%np-new_Ar+1:pm%p(2)%np) = vec1_Ar(1:new_Ar)
+		temp2(1:pm%p(2)%np-new_Ar,:) = pm%p(2)%vp
+		temp2(pm%p(2)%np-new_Ar+1:pm%p(2)%np,:) = vec2_Ar(1:new_Ar,:)
+		deallocate(pm%p(2)%xp)
+		deallocate(pm%p(2)%vp)
+		allocate(pm%p(2)%xp(pm%p(2)%np))
+		allocate(pm%p(2)%vp(pm%p(2)%np,3))
+		pm%p(2)%xp = temp1
+		pm%p(2)%vp = temp2
+		deallocate(temp1)
+		deallocate(temp2)
+
+		deallocate(vec1_e)
+		deallocate(vec2_e)
+		deallocate(vec1_Ar)
+		deallocate(vec2_Ar)
+	end subroutine
+
+	subroutine mcc_Argon(pm)
+		type(PM1D), intent(inout) :: pm
+		integer :: n_coll, nnp, idx
+		real(mp) :: rnd, temp_x, temp_v(3)
+		integer :: i
+
+		!Argon species
+		n_coll = floor( pm%p(2)%np*col_prob_Ar )
+		nnp = pm%p(2)%np
+		do i=1,n_coll
+			call RANDOM_NUMBER(rnd)
+			idx = ceiling( nnp*rnd )
+			if( idx>nnp ) then
+				idx = nnp
+			end if
+
+			temp_x = pm%p(2)%xp(nnp)
+			temp_v = pm%p(2)%vp(nnp,:)
+			pm%p(2)%xp(nnp) = pm%p(2)%xp(idx)
+			pm%p(2)%vp(nnp,:) = pm%p(2)%vp(idx,:)
+			pm%p(2)%xp(idx) = temp_x
+			pm%p(2)%vp(idx,:) = temp_v
+			nnp = nnp-1
+		end do
+	end subroutine
+
+!=======================================================
+!  Ar+ + Ar Differential cross section(isotropic, hard-sphere): determine scattered velocity
 !=======================================================
 	subroutine anewvel_Ar(vp)
 		real(mp), intent(inout) :: vp(3)
@@ -50,7 +259,7 @@ contains
 !=======================================================
 !  e + Ar Differential cross section: determine scattered velocity
 !=======================================================
-	subroutine anewvel_e(energy, m1, m2, vp, elastic_flag)
+	subroutine anewvel_e(energy, m1, m2, vp, elastic_flag)					!m1: electron mass, m2: Argon mass
 		real(mp), intent(in) :: energy, m1, m2
 		real(mp), intent(inout) :: vp(3)
 		logical, intent(in) :: elastic_flag
