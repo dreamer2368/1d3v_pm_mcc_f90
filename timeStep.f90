@@ -130,6 +130,8 @@ contains
 		do i=1, this%n
 			call accelSpecies(this%p(i),dt)
 		end do
+
+		call mcc_collision(this)
 	end subroutine
 !
 !	subroutine QOI(this,J)
