@@ -13,7 +13,8 @@ program main
 !	call test_refluxing_boundary
 !	call test_anewvel_Ar
 !	call test_mcc_electron
-	call test_mcc_Argon
+!	call test_mcc_Argon
+	call test_ext_voltage_Poisson
 
 	! print to screen
 	print *, 'program main...done.'
@@ -21,6 +22,38 @@ program main
 contains
 
 	! You can add custom subroutines/functions here later, if you want
+
+	subroutine test_ext_voltage_Poisson
+		type(mesh) :: m
+		integer, parameter :: N=128
+		real(mp) :: xg(N), rho_back(N), rho(N), sol(N)
+		integer :: i
+
+		xg = (/ (i-1, i=1,N) /)*1.0_mp/(N-1)
+		rho = exp(3.0_mp*xg)
+		rho_back = 0.0_mp
+		rho_back(N) = 1.0_mp
+
+		sol = ( 1.0_mp-exp(3.0_mp*xg) )/9.0_mp + ( 1.0_mp - (1.0_mp-exp(3.0_mp))/9.0_mp )*xg
+
+		call buildMesh(m,1.0_mp,N,1)
+		call setMesh(m,rho_back)
+		m%rho = rho
+		call solveMesh(m,1.0_mp)
+
+		call system('mkdir -p data/test_DD_poisson')
+		open(unit=301,file='data/test_DD_poisson/xg.bin',status='replace',form='unformatted',access='stream')
+		open(unit=302,file='data/test_DD_poisson/phi.bin',status='replace',form='unformatted',access='stream')
+		open(unit=303,file='data/test_DD_poisson/phi_sol.bin',status='replace',form='unformatted',access='stream')
+		write(301) xg
+		write(302) m%phi
+		write(303) sol
+		close(301)
+		close(302)
+		close(303)
+
+		print *, 'error: ', maxval( abs(sol - m%phi) )
+	end subroutine
 
 	subroutine test_mcc_Argon
 		type(PM1D) :: pm
@@ -148,7 +181,8 @@ contains
 		close(304)
 		close(305)
 
-		call mcc_electron(pm,0)
+!		call mcc_electron(pm,0)
+		call mcc_electron(pm)
 
 		call system('mkdir -p data/test_mcc_electron/after')
 		open(unit=301,file='data/test_mcc_electron/after/np_e.bin',status='replace',form='unformatted',access='stream')
@@ -199,7 +233,8 @@ contains
 						1.0_mp - exp( -asigma3(energy)*vel*dt(4)*gden )
 			close(301)
 
-			call mcc_electron(pm,i)
+!			call mcc_electron(pm,i)
+			call mcc_electron(pm)
 
 			deallocate(xp0)
 			deallocate(vp0)
@@ -231,7 +266,8 @@ contains
 			1.0_mp - exp( -asigma3(energy)*vel*dt(i)*gden )
 			close(301)
 
-			call mcc_electron(pm,i+4)
+!			call mcc_electron(pm,i+4)
+			call mcc_electron(pm)
 
 			deallocate(xp0)
 			deallocate(vp0)

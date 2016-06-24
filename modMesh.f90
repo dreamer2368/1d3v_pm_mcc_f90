@@ -93,13 +93,19 @@ contains
 	subroutine solveMesh_D_D(this,eps)
 		type(mesh), intent(inout) :: this
 		real(mp), intent(in) :: eps
-		real(mp), dimension(this%ng-2) :: rhs, phi1
+		real(mp), dimension(this%ng-1) :: rhs, phi1, co1, co2, co3
+		co1 = 1.0_mp/this%dx/this%dx
+		co2 = -2.0_mp/this%dx/this%dx
+		co3 = 1.0_mp/this%dx/this%dx
+		co2(this%ng-1) = 1.0_mp
+		co1(this%ng-1) = 0.0_mp
 
-		rhs = -( this%rho(2:this%ng-1) + this%rho_back(1:this%ng-1) )/eps
-		call CG_K(multiplyK,phi1,rhs,this%dx)
-		this%phi(2:this%ng-1) = phi1
+		rhs(1:this%ng-2) = -( this%rho(2:this%ng-1) + this%rho_back(2:this%ng-1) )/eps
+		!Don't need surface charge: rho_back(ng) will be equal to external voltage
+		rhs(this%ng-1) = this%rho_back(this%ng)
+		call solve_tridiag(co1,co2,co3,rhs,phi1,this%ng-1)
+		this%phi(2:this%ng) = phi1
 		this%phi(1) = 0.0_mp
-		this%phi(this%ng) = 0.0_mp
 	end subroutine
 
 	subroutine solveMesh_D_N(this,eps)						!D(i=1), N(i=N)

@@ -30,19 +30,27 @@ contains
 		end interface
 
 		!Time stepping
-		call halfStep(this)
+		call halfStep(this,target_input)
 		do k=1,this%nt
 			call updatePlasma(this,r,target_input,source,k)
 		end do
 	end subroutine
 
-	subroutine halfStep(this)
+	subroutine halfStep(this,target_input)
 		type(PM1D), intent(inout) :: this
 		integer :: i, j
 		real(mp) :: rhs(this%ng-1)
 		real(mp) :: phi1(this%ng-1)
 		real(mp) :: dt, L
 		integer :: N,Ng
+		interface
+			subroutine target_input(pm,k,str)
+				use modPM1D
+				type(PM1D), intent(inout) :: pm
+				integer, intent(in) :: k
+				character(len=*), intent(in) :: str
+			end subroutine
+		end interface
 		dt = this%dt
 		L = this%L
 		N = this%N
@@ -57,6 +65,7 @@ contains
 		!charge assignment
 		call chargeAssign(this%a,this%p,this%m)
 
+		call target_input(this,0,'rho_back')
 		call solveMesh(this%m,this%eps0)
 
 		!Electric field : -D*phi
@@ -117,6 +126,7 @@ contains
 		!charge assignment
 		call chargeAssign(this%a,this%p,this%m)
 
+		call target_input(this,k,'rho_back')
 		call solveMesh(this%m,this%eps0)
 
 		!Electric field : -D*phi
