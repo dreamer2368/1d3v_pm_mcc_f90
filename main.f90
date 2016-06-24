@@ -12,7 +12,8 @@ program main
 !	call Procassini
 !	call test_refluxing_boundary
 !	call test_anewvel_Ar
-	call test_mcc_electron
+!	call test_mcc_electron
+	call test_mcc_Argon
 
 	! print to screen
 	print *, 'program main...done.'
@@ -20,6 +21,82 @@ program main
 contains
 
 	! You can add custom subroutines/functions here later, if you want
+
+	subroutine test_mcc_Argon
+		type(PM1D) :: pm
+		integer :: np = 100000
+		real(mp) :: dt = log(100.0_mp/99.0_mp)
+		real(mp) :: gden = 1.0_mp/max_sigmav_Ar, TN = 0.026_mp		!neutral temperature TN: scale in eV
+		real(mp) :: energy = 6.0_mp, vel										!argon energy
+		real(mp), allocatable :: xp0(:), vp0(:,:)
+		integer :: i
+		character(len=100) :: istr
+
+		call null_collision(gden,dt)
+		call buildPM1D(pm,30.0_mp, 15.0_mp,16,2,0,0,1,dt,L=1.0_mp)
+		call set_Ar_discharge(pm,(/1.0_mp, 1.0_mp/),(/TN,gden/))
+
+		vel = sqrt(2.0_mp/pm%p(2)%ms*q_e*energy)
+		allocate(xp0(np))
+		allocate(vp0(np,3))
+		xp0 = (/ (i-0.5_mp,i=1,np) /)*(1.0_mp/np)
+		vp0(:,1) = 0.0_mp
+		vp0(:,2) = vel
+		vp0(:,3) = 0.0_mp
+		call setSpecies(pm%p(2),np,xp0,vp0)
+		vp0 = 0.0_mp
+		call setSpecies(pm%p(1),np,xp0,vp0)
+
+		call system('mkdir -p data/test_mcc_argon')
+		open(unit=301,file='data/test_mcc_argon/prob.bin',status='replace',form='unformatted',access='stream')
+		write(301)	col_prob_Ar,	&
+					1.0_mp - exp( -asigma4(energy)*vel*dt*gden ),	&
+					1.0_mp - exp( -asigma5(energy)*vel*dt*gden )
+		close(301)
+
+		call system('mkdir -p data/test_mcc_argon/before')
+		open(unit=301,file='data/test_mcc_argon/before/np.bin',status='replace',form='unformatted',access='stream')
+		open(unit=302,file='data/test_mcc_argon/before/xp_e.bin',status='replace',form='unformatted',access='stream')
+		open(unit=303,file='data/test_mcc_argon/before/vp_e.bin',status='replace',form='unformatted',access='stream')
+		open(unit=304,file='data/test_mcc_argon/before/xp_Ar.bin',status='replace',form='unformatted',access='stream')
+		open(unit=305,file='data/test_mcc_argon/before/vp_Ar.bin',status='replace',form='unformatted',access='stream')
+		write(301) np
+		write(302) pm%p(1)%xp
+		write(303) pm%p(1)%vp
+		write(304) pm%p(2)%xp
+		write(305) pm%p(2)%vp
+		close(301)
+		close(302)
+		close(303)
+		close(304)
+		close(305)
+
+		call mcc_argon(pm)
+
+		call system('mkdir -p data/test_mcc_argon/after')
+		open(unit=301,file='data/test_mcc_argon/after/np_e.bin',status='replace',form='unformatted',access='stream')
+		open(unit=302,file='data/test_mcc_argon/after/xp_e.bin',status='replace',form='unformatted',access='stream')
+		open(unit=303,file='data/test_mcc_argon/after/vp_e.bin',status='replace',form='unformatted',access='stream')
+		open(unit=304,file='data/test_mcc_argon/after/xp_Ar.bin',status='replace',form='unformatted',access='stream')
+		open(unit=305,file='data/test_mcc_argon/after/vp_Ar.bin',status='replace',form='unformatted',access='stream')
+		open(unit=306,file='data/test_mcc_argon/after/np_Ar.bin',status='replace',form='unformatted',access='stream')
+		write(301) pm%p(1)%np
+		write(302) pm%p(1)%xp
+		write(303) pm%p(1)%vp
+		write(304) pm%p(2)%xp
+		write(305) pm%p(2)%vp
+		write(306) pm%p(2)%np
+		close(301)
+		close(302)
+		close(303)
+		close(304)
+		close(305)
+		close(306)
+
+		deallocate(xp0)
+		deallocate(vp0)
+		call destroyPM1D(pm)
+	end subroutine
 
 	subroutine test_mcc_electron
 		type(PM1D) :: pm

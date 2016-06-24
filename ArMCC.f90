@@ -23,7 +23,7 @@ contains
 		!Electron species
 		call buildSpecies(pm%p(1),-q_e,m_e,spwt(1))
 		!Argon cation species
-		call buildSpecies(pm%p(2),q_e,m_e,spwt(2))
+		call buildSpecies(pm%p(2),q_e,m_Ar,spwt(2))
 
 		deallocate(pm%A0)
 		allocate(pm%A0(2))
@@ -54,7 +54,7 @@ contains
 		real(mp) :: vT
 		integer :: i
 		!only for test
-		integer :: n_elastic=0, n_excite=0, n_ionize=0
+		integer :: n_elastic, n_excite, n_ionize
 		character(len=100) :: kstr
 		n_coll = 0
 		n_elastic=0
@@ -194,10 +194,13 @@ contains
 	subroutine mcc_Argon(pm)
 		type(PM1D), intent(inout) :: pm
 		integer :: n_coll, nnp, idx
-		real(mp) :: rnd, temp_x, temp_v(3)
+		real(mp) :: rnd, temp_x, temp_v(3), vT, vn(3)
+		real(mp) :: vel, engy, nu_total_vel, sum_sigma(2)
 		integer :: i
+		!only for test
+		integer :: n_elastic, n_exchange
 
-		!Argon species
+		!Pick particles for collisions
 		n_coll = floor( pm%p(2)%np*col_prob_Ar )
 		nnp = pm%p(2)%np
 		do i=1,n_coll
@@ -215,6 +218,44 @@ contains
 			pm%p(2)%vp(idx,:) = temp_v
 			nnp = nnp-1
 		end do
+
+		!Pick the type of collision for each particle
+		!Note: we consider the velocity of the neutral here
+		n_elastic = 0
+		n_exchange = 0
+		vT = sqrt( pm%A0(1)*q_e/m_Ar )
+		do i=nnp+1,nnp+n_coll
+			vn = vT*randn(3)
+			pm%p(2)%vp(i,:) = pm%p(2)%vp(i,:) - vn
+			vel = sqrt( sum( pm%p(2)%vp(i,:)**2 ) )
+			engy = 0.5_mp*pm%p(2)%ms*vel**2/q_e			!scale in eV
+			nu_total_vel = max_sigmav_Ar/vel
+
+			call RANDOM_NUMBER(rnd)
+			sum_sigma(1) = asigma4(engy)
+			sum_sigma(2) = asigma4(engy) + asigma5(engy)
+			!Charge Exchange
+			if( rnd .le. sum_sigma(1)/nu_total_vel ) then
+
+				pm%p(2)%vp(i,:) = 0.0_mp
+				!only for test
+				n_elastic = n_elastic+1
+
+			!Elastic scattering
+			elseif( rnd .le. sum_sigma(2)/nu_total_vel ) then
+
+				call anewvel_Ar(pm%p(2)%vp(i,:))
+				!only for test
+				n_exchange = n_exchange+1
+
+			end if
+			pm%p(2)%vp(i,:) = pm%p(2)%vp(i,:) + vn
+		end do
+
+		!only for test
+		open(unit=301,file='data/test_mcc_argon/ncoll.bin',status='replace',form='unformatted',access='stream')
+		write(301) n_coll, n_exchange, n_elastic
+		close(301)
 	end subroutine
 
 !=======================================================
