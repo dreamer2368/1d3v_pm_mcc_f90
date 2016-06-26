@@ -13,8 +13,8 @@ program main
 !	call test_refluxing_boundary
 !	call test_anewvel_Ar
 !	call test_mcc_electron
-!	call test_mcc_Argon
-	call test_ext_voltage_Poisson
+	call test_mcc_Argon
+!	call test_ext_voltage_Poisson
 
 	! print to screen
 	print *, 'program main...done.'
@@ -57,21 +57,20 @@ contains
 
 	subroutine test_mcc_Argon
 		type(PM1D) :: pm
-		integer :: np = 100000
+		integer, parameter :: np = 100000, Nsample=10000
 		real(mp) :: dt = log(100.0_mp/99.0_mp)
 		real(mp) :: gden = 1.0_mp/max_sigmav_Ar, TN = 0.026_mp		!neutral temperature TN: scale in eV
 		real(mp) :: energy = 6.0_mp, vel										!argon energy
-		real(mp), allocatable :: xp0(:), vp0(:,:)
-		integer :: i
-		character(len=100) :: istr
+		real(mp) :: xp0(np), vp0(np,3)
+		integer :: i, N_coll(Nsample,3)
+
+      call init_random_seed
 
 		call null_collision(gden,dt)
 		call buildPM1D(pm,30.0_mp, 15.0_mp,16,2,0,0,1,dt,L=1.0_mp)
 		call set_Ar_discharge(pm,(/1.0_mp, 1.0_mp/),(/TN,gden/))
 
 		vel = sqrt(2.0_mp/pm%p(2)%ms*q_e*energy)
-		allocate(xp0(np))
-		allocate(vp0(np,3))
 		xp0 = (/ (i-0.5_mp,i=1,np) /)*(1.0_mp/np)
 		vp0(:,1) = 0.0_mp
 		vp0(:,2) = vel
@@ -81,11 +80,6 @@ contains
 		call setSpecies(pm%p(1),np,xp0,vp0)
 
 		call system('mkdir -p data/test_mcc_argon')
-		open(unit=301,file='data/test_mcc_argon/prob.bin',status='replace',form='unformatted',access='stream')
-		write(301)	col_prob_Ar,	&
-					1.0_mp - exp( -asigma4(energy)*vel*dt*gden ),	&
-					1.0_mp - exp( -asigma5(energy)*vel*dt*gden )
-		close(301)
 
 		call system('mkdir -p data/test_mcc_argon/before')
 		open(unit=301,file='data/test_mcc_argon/before/np.bin',status='replace',form='unformatted',access='stream')
@@ -126,43 +120,65 @@ contains
 		close(305)
 		close(306)
 
-		deallocate(xp0)
-		deallocate(vp0)
 		call destroyPM1D(pm)
+
+		call null_collision(gden,dt)
+		vel = sqrt(2.0_mp/m_Ar*q_e*energy)
+		xp0 = (/ (i-0.5_mp,i=1,np) /)*(1.0_mp/np)
+		vp0(:,1) = 0.0_mp
+		vp0(:,2) = vel
+		vp0(:,3) = 0.0_mp
+
+		open(unit=301,file='data/test_mcc_Argon/prob.bin',status='replace',form='unformatted',access='stream')
+		write(301)	col_prob_Ar,	&
+                 col_prob_Ar*( asigma4(energy)*vel/max_sigmav_Ar ),   &
+                 col_prob_Ar*( asigma5(energy)*vel/max_sigmav_Ar )
+		close(301)
+
+		do i=1,Nsample
+         print *, ' '
+         print *, '================',i,'-th Sample=================='
+         print *, ' '
+   		call buildPM1D(pm,30.0_mp, 15.0_mp,16,2,0,0,1,dt,L=1.0_mp)
+   		call set_Ar_discharge(pm,(/1.0_mp, 1.0_mp/),(/TN,gden/))
+			call setSpecies(pm%p(1),np,xp0,vp0)
+			call setSpecies(pm%p(2),np,xp0,vp0)
+         pm%p(1)%vp = 0.0_mp
+
+			call mcc_argon(pm,N_coll(i,:))
+
+			call destroyPM1D(pm)
+		end do
+
+		open(unit=301,file='data/test_mcc_Argon/coll_sample.bin',status='replace',form='unformatted',access='stream')
+      write(301) N_coll
+      close(301)
 	end subroutine
 
 	subroutine test_mcc_electron
 		type(PM1D) :: pm
-		integer :: np(4)
-		real(mp) :: dt(4)
+		integer, parameter :: np = 100000, Nsample = 10000
+		real(mp) :: dt = log(100.0_mp/99.0_mp)
 		real(mp) :: gden = 1.0_mp/max_sigmav_e, TN = 0.026_mp		!neutral temperature TN: scale in eV
 		real(mp) :: energy = 20.0_mp, vel										!electron energy
-		real(mp), allocatable :: xp0(:), vp0(:,:)
-		integer :: i
+		real(mp) :: xp0(np), vp0(np,3)
+		integer :: i, N_coll(Nsample,4)
 		character(len=100) :: istr
 
-		np = (/ 1, 4, 16,64 /)*100000
-		dt = (/ 8.0_mp, 4.0_mp, 2.0_mp, 1.0_mp /)*log(100.0_mp/99.0_mp)
-		open(unit=301,file='data/test_mcc_electron/npk.bin',status='replace',form='unformatted',access='stream')
-		open(unit=302,file='data/test_mcc_electron/dtk.bin',status='replace',form='unformatted',access='stream')
-		write(301) np
-		write(302) dt
-		close(301)
-		close(302)
-		call null_collision(gden,dt(4))
-		call buildPM1D(pm,30.0_mp, 15.0_mp,16,2,0,0,1,dt(4),L=1.0_mp)
+      call init_random_seed
+
+		call null_collision(gden,dt)
+		call buildPM1D(pm,30.0_mp, 15.0_mp,16,2,0,0,1,dt,L=1.0_mp)
 		call set_Ar_discharge(pm,(/1.0_mp, 1.0_mp/),(/TN,gden/))
 
 		vel = sqrt(2.0_mp/pm%p(1)%ms*q_e*energy)
-		allocate(xp0(np(1)))
-		allocate(vp0(np(1),3))
-		xp0 = (/ (i-0.5_mp,i=1,np(1)) /)*(1.0_mp/np(1))
+		xp0 = (/ (i-0.5_mp,i=1,np) /)*(1.0_mp/np)
 		vp0(:,1) = 0.0_mp
 		vp0(:,2) = vel
 		vp0(:,3) = 0.0_mp
-		call setSpecies(pm%p(1),np(1),xp0,vp0)
+		call setSpecies(pm%p(1),np,xp0,vp0)
 		vp0 = 0.0_mp
-		call setSpecies(pm%p(2),np(1),xp0,vp0)
+		call setSpecies(pm%p(2),np,xp0,vp0)
 
 		call system('mkdir -p data/test_mcc_electron/before')
 		open(unit=301,file='data/test_mcc_electron/before/np.bin',status='replace',form='unformatted',access='stream')
@@ -170,7 +186,7 @@ contains
 		open(unit=303,file='data/test_mcc_electron/before/vp_e.bin',status='replace',form='unformatted',access='stream')
 		open(unit=304,file='data/test_mcc_electron/before/xp_Ar.bin',status='replace',form='unformatted',access='stream')
 		open(unit=305,file='data/test_mcc_electron/before/vp_Ar.bin',status='replace',form='unformatted',access='stream')
-		write(301) np(1)
+		write(301) np
 		write(302) pm%p(1)%xp
 		write(303) pm%p(1)%vp
 		write(304) pm%p(2)%xp
@@ -181,7 +197,6 @@ contains
 		close(304)
 		close(305)
 
-!		call mcc_electron(pm,0)
 		call mcc_electron(pm)
 
 		call system('mkdir -p data/test_mcc_electron/after')
@@ -203,76 +218,40 @@ contains
 		close(304)
 		close(305)
 		close(306)
-
-		deallocate(xp0)
-		deallocate(vp0)
 		call destroyPM1D(pm)
 
-		do i=1,4
-			call null_collision(gden,dt(4))
-			call buildPM1D(pm,30.0_mp, 15.0_mp,16,2,0,0,1,dt(4),L=1.0_mp)
-			call set_Ar_discharge(pm,(/1.0_mp, 1.0_mp/),(/TN,gden/))
+		call null_collision(gden,dt)
+		vel = sqrt(2.0_mp/m_e*q_e*energy)
+		xp0 = (/ (i-0.5_mp,i=1,np) /)*(1.0_mp/np)
+		vp0(:,1) = 0.0_mp
+		vp0(:,2) = vel
+		vp0(:,3) = 0.0_mp
 
-			vel = sqrt(2.0_mp/pm%p(1)%ms*q_e*energy)
-			allocate(xp0(np(i)))
-			allocate(vp0(np(i),3))
-			xp0 = (/ (i-0.5_mp,i=1,np(i)) /)*(1.0_mp/np(i))
-			vp0(:,1) = 0.0_mp
-			vp0(:,2) = vel
-			vp0(:,3) = 0.0_mp
-			call setSpecies(pm%p(1),np(i),xp0,vp0)
-			vp0 = 0.0_mp
-			call setSpecies(pm%p(2),np(i),xp0,vp0)
+		open(unit=301,file='data/test_mcc_electron/prob.bin',status='replace',form='unformatted',access='stream')
+		write(301)	col_prob_e,	&
+                 col_prob_e*( asigma1(energy)*vel/max_sigmav_e ),   &
+                 col_prob_e*( asigma2(energy)*vel/max_sigmav_e ),   &
+                 col_prob_e*( asigma3(energy)*vel/max_sigmav_e )
+		close(301)
 
-			write(istr,*) i
-			open(unit=301,file='data/test_mcc_electron/Nprob_'//	&
-					trim(adjustl(istr))//'.bin',status='replace',form='unformatted',access='stream')
-			write(301)	col_prob_e,	&
-						1.0_mp - exp( -asigma1(energy)*vel*dt(4)*gden ),	&
-						1.0_mp - exp( -asigma2(energy)*vel*dt(4)*gden ),	&
-						1.0_mp - exp( -asigma3(energy)*vel*dt(4)*gden )
-			close(301)
+		do i=1,Nsample
+         print *, ' '
+         print *, '================',i,'-th Sample=================='
+         print *, ' '
+   		call buildPM1D(pm,30.0_mp, 15.0_mp,16,2,0,0,1,dt,L=1.0_mp)
+   		call set_Ar_discharge(pm,(/1.0_mp, 1.0_mp/),(/TN,gden/))
+			call setSpecies(pm%p(1),np,xp0,vp0)
+			call setSpecies(pm%p(2),np,xp0,vp0)
+         pm%p(2)%vp = 0.0_mp
 
-!			call mcc_electron(pm,i)
-			call mcc_electron(pm)
+			call mcc_electron(pm,N_coll(i,:))
 
-			deallocate(xp0)
-			deallocate(vp0)
 			call destroyPM1D(pm)
 		end do
 
-		do i=1,4
-			call null_collision(gden,dt(i))
-			call buildPM1D(pm,30.0_mp, 15.0_mp,16,2,0,0,1,dt(i),L=1.0_mp)
-			call set_Ar_discharge(pm,(/1.0_mp, 1.0_mp/),(/TN,gden/))
-
-			vel = sqrt(2.0_mp/pm%p(1)%ms*q_e*energy)
-			allocate(xp0(np(4)))
-			allocate(vp0(np(4),3))
-			xp0 = (/ (i-0.5_mp,i=1,np(4)) /)*(1.0_mp/np(4))
-			vp0(:,1) = 0.0_mp
-			vp0(:,2) = vel
-			vp0(:,3) = 0.0_mp
-			call setSpecies(pm%p(1),np(4),xp0,vp0)
-			vp0 = 0.0_mp
-			call setSpecies(pm%p(2),np(4),xp0,vp0)
-
-			write(istr,*) i
-			open(unit=301,file='data/test_mcc_electron/DTprob_'//	&
-			trim(adjustl(istr))//'.bin',status='replace',form='unformatted',access='stream')
-			write(301)	col_prob_e,	&
-			1.0_mp - exp( -asigma1(energy)*vel*dt(i)*gden ),	&
-			1.0_mp - exp( -asigma2(energy)*vel*dt(i)*gden ),	&
-			1.0_mp - exp( -asigma3(energy)*vel*dt(i)*gden )
-			close(301)
-
-!			call mcc_electron(pm,i+4)
-			call mcc_electron(pm)
-
-			deallocate(xp0)
-			deallocate(vp0)
-			call destroyPM1D(pm)
-		end do
+		open(unit=301,file='data/test_mcc_electron/coll_sample.bin',status='replace',form='unformatted',access='stream')
+      write(301) N_coll
+      close(301)
 	end subroutine
 
 	subroutine test_anewvel_Ar
