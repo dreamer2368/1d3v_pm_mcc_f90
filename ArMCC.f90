@@ -201,14 +201,19 @@ contains
 		deallocate(vec2_Ar)
 	end subroutine
 
-	subroutine mcc_Argon(pm)
+	subroutine mcc_Argon(pm,N_diag)
 		type(PM1D), intent(inout) :: pm
+      integer, intent(out), optional :: N_diag(3)
 		integer :: n_coll, nnp, idx
 		real(mp) :: rnd, temp_x, temp_v(3), vT, vn(3)
 		real(mp) :: vel, engy, nu_total_vel, sum_sigma(2)
 		integer :: i
-		!only for test
 		integer :: n_elastic, n_exchange
+      if( present(N_diag) ) then
+         n_coll = 0
+         n_elastic = 0
+         n_exchange = 0
+      end if
 
 		!Pick particles for collisions
 		n_coll = floor( pm%p(2)%np*col_prob_Ar )
@@ -231,8 +236,6 @@ contains
 
 		!Pick the type of collision for each particle
 		!Note: we consider the velocity of the neutral here
-		n_elastic = 0
-		n_exchange = 0
 		vT = sqrt( pm%A0(1)*q_e/m_Ar )
 		do i=nnp+1,nnp+n_coll
 			vn = vT*randn(3)
@@ -248,24 +251,25 @@ contains
 			if( rnd .le. sum_sigma(1)/nu_total_vel ) then
 
 				pm%p(2)%vp(i,:) = 0.0_mp
-				!only for test
-				n_elastic = n_elastic+1
+            if( present(N_diag) ) then
+   				n_elastic = n_elastic+1
+            end if
 
 			!Elastic scattering
 			elseif( rnd .le. sum_sigma(2)/nu_total_vel ) then
 
 				call anewvel_Ar(pm%p(2)%vp(i,:))
-				!only for test
-				n_exchange = n_exchange+1
+            if( present(N_diag) ) then
+   				n_exchange = n_exchange+1
+            end if
 
 			end if
 			pm%p(2)%vp(i,:) = pm%p(2)%vp(i,:) + vn
 		end do
 
-		!only for test
-		open(unit=301,file='data/test_mcc_argon/ncoll.bin',status='replace',form='unformatted',access='stream')
-		write(301) n_coll, n_exchange, n_elastic
-		close(301)
+      if( present(N_diag) ) then
+		   N_diag = (/ n_coll, n_elastic, n_exchange /)
+      end if
 	end subroutine
 
 !=======================================================
