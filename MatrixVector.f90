@@ -4,7 +4,7 @@ module MatrixVector
 
 	implicit none
 
-	include 'fftw3.f'
+!	include 'fftw3.f'
 
 contains
 
@@ -217,17 +217,17 @@ contains
 		integer :: N
 		N = size(rhs)
 
-		call dfftw_plan_r2r_1d(plan,N,rhs,rhsFFT,FFTW_RODFT11,FFTW_ESTIMATE)
-		call dfftw_execute_r2r(plan,rhs,rhsFFT)
-		call dfftw_destroy_plan(plan)
+!		call dfftw_plan_r2r_1d(plan,N,rhs,rhsFFT,FFTW_RODFT11,FFTW_ESTIMATE)
+!		call dfftw_execute_r2r(plan,rhs,rhsFFT)
+!		call dfftw_destroy_plan(plan)
 
-		xFFT = rhsFFT/REALPART(W)
+!		xFFT = rhsFFT/REALPART(W)
 
-		call dfftw_plan_r2r_1d(plan,N,xFFT,x,FFTW_RODFT11,FFTW_ESTIMATE)
-		call dfftw_execute_r2r(plan,xFFT,x)
-		call dfftw_destroy_plan(plan)
+!		call dfftw_plan_r2r_1d(plan,N,xFFT,x,FFTW_RODFT11,FFTW_ESTIMATE)
+!		call dfftw_execute_r2r(plan,xFFT,x)
+!		call dfftw_destroy_plan(plan)
 
-		x = x/2/N
+!		x = x/2/N
 	end subroutine
 
 end module
