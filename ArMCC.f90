@@ -13,7 +13,8 @@ contains
 
 	subroutine set_Ar_discharge(pm, spwt, A)
 		type(PM1D), intent(inout) :: pm
-		real(mp), intent(in) :: A(2)						!A(1): temperature of neutral(eV),	A(2): density of neutral(m-3)
+		real(mp), intent(in) :: A(4)						!A(1): temperature of neutral(eV),	A(2): density of neutral(m-3),
+                                                   !A(3): discharge current density(A/m2), A(4): discharge frequency(Hz)
 		real(mp), intent(in) :: spwt(2)
 		if( pm%n .ne. 2 ) then
 			print *, 'ERROR : the number of species should be two corresponding to electon and Argon+. stopped the simulation.'
@@ -26,7 +27,7 @@ contains
 		call buildSpecies(pm%p(2),q_e,m_Ar,spwt(2))
 
 		deallocate(pm%A0)
-		allocate(pm%A0(2))
+		allocate(pm%A0(4))
 		pm%A0 = A
 	end subroutine
 

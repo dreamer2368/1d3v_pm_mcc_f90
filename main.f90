@@ -68,7 +68,7 @@ contains
 
 		call null_collision(gden,dt)
 		call buildPM1D(pm,30.0_mp, 15.0_mp,16,2,0,0,1,dt,L=1.0_mp)
-		call set_Ar_discharge(pm,(/1.0_mp, 1.0_mp/),(/TN,gden/))
+		call set_Ar_discharge(pm,(/1.0_mp, 1.0_mp/),(/TN,gden,0.0_mp,0.0_mp/))
 
 		vel = sqrt(2.0_mp/pm%p(2)%ms*q_e*energy)
 		xp0 = (/ (i-0.5_mp,i=1,np) /)*(1.0_mp/np)
@@ -140,7 +140,7 @@ contains
          print *, '================',i,'-th Sample=================='
          print *, ' '
    		call buildPM1D(pm,30.0_mp, 15.0_mp,16,2,0,0,1,dt,L=1.0_mp)
-   		call set_Ar_discharge(pm,(/1.0_mp, 1.0_mp/),(/TN,gden/))
+   		call set_Ar_discharge(pm,(/1.0_mp, 1.0_mp/),(/TN,gden,0.0_mp,0.0_mp/))
 			call setSpecies(pm%p(1),np,xp0,vp0)
 			call setSpecies(pm%p(2),np,xp0,vp0)
          pm%p(1)%vp = 0.0_mp
@@ -169,7 +169,7 @@ contains
 
 		call null_collision(gden,dt)
 		call buildPM1D(pm,30.0_mp, 15.0_mp,16,2,0,0,1,dt,L=1.0_mp)
-		call set_Ar_discharge(pm,(/1.0_mp, 1.0_mp/),(/TN,gden/))
+		call set_Ar_discharge(pm,(/1.0_mp, 1.0_mp/),(/TN,gden,0.0_mp,0.0_mp/))
 
 		vel = sqrt(2.0_mp/pm%p(1)%ms*q_e*energy)
 		xp0 = (/ (i-0.5_mp,i=1,np) /)*(1.0_mp/np)
@@ -239,7 +239,7 @@ contains
          print *, '================',i,'-th Sample=================='
          print *, ' '
    		call buildPM1D(pm,30.0_mp, 15.0_mp,16,2,0,0,1,dt,L=1.0_mp)
-   		call set_Ar_discharge(pm,(/1.0_mp, 1.0_mp/),(/TN,gden/))
+   		call set_Ar_discharge(pm,(/1.0_mp, 1.0_mp/),(/TN,gden,0.0_mp,0.0_mp/))
 			call setSpecies(pm%p(1),np,xp0,vp0)
 			call setSpecies(pm%p(2),np,xp0,vp0)
          pm%p(2)%vp = 0.0_mp
