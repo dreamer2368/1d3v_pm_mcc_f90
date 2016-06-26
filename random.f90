@@ -16,6 +16,17 @@ MODULE random
 
 contains
 
+   subroutine init_random_seed
+      integer :: i, nseed, clock
+      integer, allocatable :: seed(:)
+		call RANDOM_SEED(size=nseed)
+		allocate(seed(nseed))
+      call SYSTEM_CLOCK(clock)
+		seed = clock + 3433*(/ ( i, i=1,nseed ) /)
+		call RANDOM_SEED(put=seed)
+		deallocate(seed)
+   end subroutine
+
 	function randn_rank1(N) result(x)
 		integer, intent(in) :: N
 		real(mp) :: r1(N), r2(N), x(N)

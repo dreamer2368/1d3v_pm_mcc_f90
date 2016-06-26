@@ -25,8 +25,7 @@ contains
 		integer, intent(in) :: Ng, N, pBC, mBC, order
 		real(mp), intent(in), optional :: dt, A(:), L, eps
 		real(mp) :: L0
-		integer :: i,nseed
-		integer, allocatable :: seed(:)
+		integer :: i
 		if( present(dt) ) then
 			this%dt = dt
 		else
@@ -71,12 +70,6 @@ contains
 		do i=1,N
 			call buildAssign(this%a(i),Ng,order)
 		end do
-
-		call RANDOM_SEED(size=nseed)
-		allocate(seed(nseed))
-		seed = 3433*(/ ( i-1, i=1,nseed ) /)
-		call RANDOM_SEED(put=seed)
-		deallocate(seed)
 	end subroutine
 
 	subroutine destroyPM1D(this)
