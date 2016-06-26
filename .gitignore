@@ -7,3 +7,4 @@ data/**/*.bin
 data/**/*.out
 data/**/record
 .DS_Store
+*.stackdump
