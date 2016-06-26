@@ -53,9 +53,9 @@ contains
 !=======================================================
 !	MCC for each species
 !=======================================================
-	subroutine mcc_electron(pm)						!electron species
+	subroutine mcc_electron(pm,n_diag)						!electron species
 		type(PM1D), intent(inout) :: pm
-!		integer, intent(in) :: k
+		integer, intent(out), optional :: n_diag(4)
 		integer :: n_coll, nnp, idx
 		real(mp) :: rnd, rnd_ion, temp_x, temp_v(3)
 		real(mp) :: engy, rengy, vel, nu_total_vel, sum_sigma(3)
@@ -63,13 +63,13 @@ contains
 		real(mp), allocatable :: vec1_e(:), vec2_e(:,:), vec1_Ar(:), vec2_Ar(:,:), temp1(:), temp2(:,:)
 		real(mp) :: vT
 		integer :: i
-!		!only for test
-!		integer :: n_elastic, n_excite, n_ionize
-!		character(len=100) :: kstr
-!		n_coll = 0
-!		n_elastic=0
-!		n_excite=0
-!		n_ionize=0
+		integer :: n_elastic, n_excite, n_ionize
+      if( present(n_diag) ) then
+   		n_coll = 0
+	   	n_elastic=0
+		   n_excite=0
+		   n_ionize=0
+      end if
 
 		!Pick particles for collisions
 		n_coll = floor( pm%p(1)%np*col_prob_e )
@@ -94,8 +94,8 @@ contains
 		!Pick the type of collision for each particle
 		!Note: we don't consider the velocity of the neutral, assuming that it is much smaller than that of electron species
 		vT = sqrt( pm%A0(1)*q_e/m_Ar )
-!		new_e = 0
-!		new_Ar = 0
+		new_e = 0
+		new_Ar = 0
 		allocate(vec1_e(n_coll))
 		allocate(vec2_e(n_coll,3))
 		allocate(vec1_Ar(n_coll))
@@ -113,8 +113,9 @@ contains
 			if( rnd .le. sum_sigma(1)/nu_total_vel ) then
 
 				call anewvel_e(engy,m_e,m_Ar,pm%p(1)%vp(i,:),.true.)
-!				!only for test
-!				n_elastic = n_elastic+1
+            if( present(n_diag) ) then
+   				n_elastic = n_elastic+1
+            end if
 
 			!Excitation
 			elseif( (engy.ge.extengy0) .and. (rnd.le.sum_sigma(2)/nu_total_vel) ) then
@@ -124,8 +125,9 @@ contains
 				vel = sqrt( 2.0_mp/pm%p(1)%ms*q_e*engy )
 				pm%p(1)%vp(i,:) = pm%p(1)%vp(i,:)*vel
 				call anewvel_e(engy,m_e,m_Ar,pm%p(1)%vp(i,:),.false.)
-!				!only for test
-!				n_excite = n_excite+1
+            if( present(n_diag) ) then
+   				n_excite = n_excite+1
+            end if
 
 			!Ionization
 			elseif( (engy.ge.ionengy0) .and. (rnd.le.sum_sigma(3)/nu_total_vel) ) then
@@ -151,16 +153,14 @@ contains
 				!scatter the incident electron
 				pm%p(1)%vp(i,:) = pm%p(1)%vp(i,:)/vel*sqrt( 2.0_mp/pm%p(1)%ms*q_e*engy )
 				call anewvel_e(engy,m_e,m_Ar,pm%p(1)%vp(i,:),.false.)
-!				!only for test
-!				n_ionize = n_ionize+1
+            if( present(n_diag) ) then
+   				n_ionize = n_ionize+1
+            end if
 			end if
 		end do
-!		!only for test
-!		write(kstr,*) k
-!		open(unit=301,file='data/test_mcc_electron/ncoll'//	&
-!			trim(adjustl(kstr))//'.bin',status='replace',form='unformatted',access='stream')
-!		write(301) n_coll, n_elastic, n_excite, n_ionize
-!		close(301)
+      if( present(n_diag) ) then
+   		n_diag = (/ n_coll, n_elastic, n_excite, n_ionize /)
+      end if
 
 		!Add newly created particles
 		pm%p(1)%np = pm%p(1)%np + new_e
