@@ -13,8 +13,9 @@ program main
 !	call test_refluxing_boundary
 !	call test_anewvel_Ar
 !	call test_mcc_electron
-	call test_mcc_Argon
+!	call test_mcc_Argon
 !	call test_ext_voltage_Poisson
+   call Ar_discharge
 
 	! print to screen
 	print *, 'program main...done.'
@@ -22,6 +23,53 @@ program main
 contains
 
 	! You can add custom subroutines/functions here later, if you want
+
+subroutine Ar_discharge
+type(PM1D) :: pm
+type(recordData) :: r
+real(mp), parameter :: Kb = 1.38065E-23, EV_TO_K = 11604.52_mp, eps = 8.85418782E-12, mTorr_to_Pa = 0.13332237_mp
+real(mp) :: I0 = 25.6_mp, I_f = 13.56E6                !I0(A/m2), If(Hz)
+real(mp) :: TN = 0.026_mp, PN = 50.0_mp, gden        !TN(eV), PN(mTorr)
+real(mp) :: T0 = 1.0_mp, n0, f0, wp0, lambda0, L=0.02_mp
+integer, parameter :: Np = 1E6, Ng = 300
+real(mp) :: spwt, xp0(Np), vp0(Np,3)
+real(mp) :: dt
+integer :: i
+gden = (PN*mTorr_to_Pa)/(q_e*TN)
+
+!Saha equilibrium
+f0 = 2.0_mp*exp(-ionengy0/T0)
+n0 = gden*f0
+spwt = n0/Np
+
+print *, 'gden(m-3): ',gden,', n0(m-3): ',n0,', spwt: ',spwt
+
+wp0 = sqrt(n0*q_e*q_e/m_e/eps)
+lambda0 = sqrt(eps*T0/n0/q_e)
+
+print *, 'L = ',L,', lambda0 = ',lambda0,' e = lambda/L = ',lambda0/L
+
+dt = 0.1_mp/wp0
+print *, 'dt = ',dt
+call init_random_seed
+call null_collision(gden,dt)
+print *, 'P_e = ',col_prob_e,', P_Ar = ', col_prob_Ar
+
+call buildPM1D(pm,200.0_mp*dt,100.0_mp*dt,Ng,2,pBC=2,mBC=2,order=1,dt=dt,L=L)
+call buildRecord(r,pm%nt,2,pm%L,pm%ng,'rf_Ar',1)
+call set_Ar_discharge(pm,(/spwt, spwt/),(/TN,gden,I0,I_f/))
+call RANDOM_NUMBER(xp0)
+vp0 = randn(Np,3)*sqrt(T0*q_e/m_e)
+call setSpecies(pm%p(1),Np,xp0*L,vp0)
+call RANDOM_NUMBER(xp0)
+vp0 = randn(Np,3)*sqrt(T0*q_e/m_Ar)
+call setSpecies(pm%p(2),Np,xp0*L,vp0)
+
+call forwardsweep(pm,r,RF_current,Null_source)
+
+call destroyPM1D(pm)
+call destroyRecord(r)
+end subroutine
 
 	subroutine test_ext_voltage_Poisson
 		type(mesh) :: m
