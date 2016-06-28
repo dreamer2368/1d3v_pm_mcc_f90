@@ -36,9 +36,18 @@ contains
 !=======================================================
 	subroutine mcc_collision(pm)
 		type(PM1D), intent(inout) :: pm
+      integer :: N_e(4), N_Ar(3)
 
-		call mcc_Argon(pm)
-		call mcc_electron(pm)
+		call mcc_Argon(pm,N_Ar)
+		call mcc_electron(pm,N_e)
+      print *, '----------- collision diagnostic ------------------'
+      print *, 'Electron, Np(1): ',pm%p(1)%np
+      print *, 'Null collision - Elastic - Excitation - Ionization'
+      print *, N_e
+      print *, 'Argon, Np(2): ',pm%p(2)%np
+      print *, 'Null collision - Elastic - Exchange'
+      print *, N_Ar
+      print *, '---------------------------------------------------'
 	end subroutine
 
 !=======================================================
