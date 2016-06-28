@@ -26,16 +26,20 @@ for i=1:4
     o(i) = std(r(:,i));
 end
 
-Nbin = [55, 55, 45, 38]; Ng = 10000;
+Ng = 10000;
 for i=1:4
+    figure(i)
+    h=histogram(r(:,i));
+    hold on
     L = max(abs(r(:,i)));
     x = linspace(-L,L,Ng);
-    f = Nsample*2*L/Nbin(i)/sqrt(2*pi)/Nstd(i)*exp( -x.^2/2/Nstd(i)/Nstd(i) );
+    f = Nsample*2*L/h.NumBins/sqrt(2*pi)/Nstd(i)*exp( -x.^2/2/Nstd(i)/Nstd(i) );
     xm = linspace(-L,L,Ng)+m(i);
-    fm = Nsample*2*L/Nbin(i)/sqrt(2*pi)/o(i)*exp( -(xm-m(i)).^2/2/o(i)/o(i) );
-    figure(i)
-    histogram(r(:,i),Nbin(i));
-    hold on
+    fm = Nsample*2*L/h.NumBins/sqrt(2*pi)/o(i)*exp( -(xm-m(i)).^2/2/o(i)/o(i) );
     plot(xm,fm,'-k');
     plot(x,f,'-r');
+    xlabel(strcat('$r_',num2str(i-1),'$'),'interpreter','latex');
+    ylabel('population');
+    title(strcat(num2str(Nsample),' sample for $N=',num2str(Np),'$, $P_',num2str(i-1),'=',num2str(prob(i)),'$'),'interpreter','latex');
+    set(gca,'fontsize',25);
 end
