@@ -141,7 +141,7 @@ contains
 			call accelSpecies(this%p(i),dt)
 		end do
 
-		call mcc_collision(this)
+		call mcc_collision(this,r%n_coll(:,k))
 	end subroutine
 !
 !	subroutine QOI(this,J)
