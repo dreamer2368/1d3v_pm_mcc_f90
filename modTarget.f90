@@ -37,7 +37,7 @@ contains
       real(mp) :: dQwall
 
       !jwall = A0(3)*sin( 2*pi*A0(4)*t )
-      dQwall = this%A0(3)*( 2.0_mp*pi*this%A0(4) )*COS( 2.0_mp*pi*this%A0(4)*k*this%dt )*this%dt
+      dQwall = this%A0(3)*SIN( 2.0_mp*pi*this%A0(4)*k*this%dt )*this%dt
 
       SELECT CASE (str)
          CASE('rho_back')
