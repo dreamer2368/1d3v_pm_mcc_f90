@@ -37,6 +37,20 @@ fileID = fopen('rho.bin');
 rho = fread(fileID,Ng*Nt,'double');
 rho = reshape(rho,[Ng,Nt]);
 
+
+EV_TO_K = 11604.52;
+mTorr_to_Pa = 0.13332237;
+Kb = 1.38065E-23;
+qe = 1.602e-19; me = 9.10938215E-31;
+PN = 50.0; TN = 0.026;
+T0 = 1.0; Np0 = 1e6; L = 0.02;
+ionengy = 15.76;
+
+gden = PN*mTorr_to_Pa/(qe*TN);
+f0 = 2*exp(-ionengy/T0);
+n0 = gden*f0;
+spwt = n0*L/Np0;
+
 %%
 close all
 clc
@@ -115,16 +129,16 @@ ve = sqrt(K*Te/me); vi = sqrt(K*Ti/mi);
 
 for i=1:Nt
     fileID = fopen(strcat('xp/',num2str(i),'_1.bin'));
-    xp_e = fread(fileID,Np(1,i+1),'double');
+    xp_e = fread(fileID,Np(1,i),'double');
     fileID = fopen(strcat('vp/',num2str(i),'_1.bin'));
-    vp_e = fread(fileID,Np(1,i+1)*3,'double');
-    vp_e = reshape(vp_e,[Np(1,i+1), 3]);
+    vp_e = fread(fileID,Np(1,i)*3,'double');
+    vp_e = reshape(vp_e,[Np(1,i), 3]);
     
     fileID = fopen(strcat('xp/',num2str(i),'_2.bin'));
-    xp_i = fread(fileID,Np(2,i+1),'double');
+    xp_i = fread(fileID,Np(2,i),'double');
     fileID = fopen(strcat('vp/',num2str(i),'_2.bin'));
-    vp_i = fread(fileID,Np(2,i+1)*3,'double');
-    vp_i = reshape(vp_i,[Np(2,i+1), 3]);
+    vp_i = fread(fileID,Np(2,i)*3,'double');
+    vp_i = reshape(vp_i,[Np(2,i), 3]);
     
     f1=figure(1);
     plot(xp_e,vp_e(:,1),'.k');
@@ -144,11 +158,16 @@ for i=1:Nt
     
     f3=figure(3);
     plot(xg,phi(:,i),'-k');
-%     axis([0 L -3e-3 3e-3]);
+    axis([0 L -400 400]);
     title('potential');
     xlabel('$x$(m)','interpreter','latex');
     ylabel('$\phi$(V)','interpreter','latex');
     set(gca,'fontsize',25);
+    
+    EEDF = 0.5*me*sum( vp_e.^2, 2 )/qe;
+    [n,x] = hist(EEDF,50);
+    figure(4)
+    semilogy(x,n/Np(1,Nt)/diff(x(1:2)));
     
 %     %videoclip
 %     frame = getframe(f1);
@@ -163,7 +182,7 @@ for i=1:Nt
 %     writeVideo(writerObj3,frame);
 
     fclose('all');
-    pause(.1);
+    pause(.000001);
 end
 
 % % videoclip close
@@ -184,8 +203,8 @@ set(gca,'fontsize',25);
 figure(2)
 plot(1:Nt,abs(Np(1,:)-Np(2,:)),'-k');
 figure(3)
-plot(1:Nt,phi(20,:),'-k');
-axis([0 Nt 0 25]);
+plot(1:Nt,phi(Ng,:),'-k');
+% axis([0 Nt 0 25]);
 
 %%
 close all
@@ -197,14 +216,45 @@ histogram( xp_i );
 %%
 close all
 
-t = 8e-11*20*(1:50);
+t = 8e-11*20*(1:Nt);
 figure(1)
-plot(t,phi(300,:),t,max(phi(300,:))*sin(2*pi*13.56e6*t));
+plot(t,phi(300,:),t,min(phi(300,:))*sin(2*pi*13.56e6*t));
 
 %%
 close all
 
-EEDF = sum( vp_e.^2, 2 );
-[n,x] = hist(EEDF,50);
-figure(1)
-semilogy(x,n/Np(1,50)/diff(x(1:2)));
+i=312;
+fileID = fopen(strcat('xp/',num2str(i),'_1.bin'));
+xp_e = fread(fileID,Np(1,i),'double');
+fileID = fopen(strcat('vp/',num2str(i),'_1.bin'));
+vp_e = fread(fileID,Np(1,i)*3,'double');
+vp_e = reshape(vp_e,[Np(1,i), 3]);
+
+figure(1);
+plot(xp_e,vp_e(:,1),'.k');
+axis([0 L -3*ve 3*ve]);
+title('Electron distribution');
+xlabel('$x$(m)','interpreter','latex');
+ylabel('$v$(m/s)','interpreter','latex');
+set(gca,'fontsize',25);
+
+vt = mean(vp_e,1); vt_e = zeros(Np(1,i),3);
+vt_e(:,1) = vp_e(:,1) - vt(1);
+vt_e(:,2) = vp_e(:,2) - vt(2);
+vt_e(:,3) = vp_e(:,3) - vt(3);
+
+figure(2)
+histogram(vt_e(:,1));
+
+EEDF = 0.5*me*sum( vt_e.^2, 2 )/qe;
+[n,x] = hist(EEDF,500);
+
+b1 = (gamma(2.5))^1.5*(gamma(1.5))^(-2.5);
+b2 = gamma(2.5)*(gamma(1.5))^(-1);
+T1 = 4.0; T2 = 8.5;
+EEDF1 = T1^(-1.5)*b1*exp( -x*b2/T1 );
+EEDF2 = T2^(-1.5)*b1*exp( -x*b2/T2 );
+
+figure(3)
+semilogy(x,n/Np(1,i)/diff(x(1:2)),x,EEDF1,x,2*EEDF2);
+axis([0 15 1e-2 3e-1]);

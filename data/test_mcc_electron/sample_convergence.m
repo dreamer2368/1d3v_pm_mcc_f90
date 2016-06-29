@@ -14,16 +14,18 @@ Ncoll = reshape(Ncoll,[Nsample,4]);
 close all
 
 Nexp = Np*prob;
-Nstd = sqrt( Np*prob.*(1-prob) );
+Nstd = sqrt( Np*prob.*(1-prob/prob(1)) );
 r = zeros(Nsample,4);
 r(:,1) = Ncoll(:,1)-Nexp(1);
 r(:,2) = Ncoll(:,2)-Nexp(2);
 r(:,3) = Ncoll(:,3)-Nexp(3);
 r(:,4) = Ncoll(:,4)-Nexp(4);
-m = zeros(4,1); o=m;
+m = zeros(4,1); o=m; s=m; k=m;
 for i=1:4
     m(i) = mean(r(:,i));
     o(i) = std(r(:,i));
+    s(i) = skewness(r(:,i));
+    k(i) = kurtosis(r(:,i));
 end
 
 Ng = 10000;
@@ -43,3 +45,8 @@ for i=1:4
     title(strcat(num2str(Nsample),' sample for $N=',num2str(Np),'$, $P_',num2str(i-1),'=',num2str(prob(i)),'$'),'interpreter','latex');
     set(gca,'fontsize',25);
 end
+
+%% skewness and kurtosis of binomial distribution
+
+Nskew = (1-2*prob/prob(1))./Nstd;
+Nkurt = 3 - 6/Np + 1./Nstd./Nstd;
