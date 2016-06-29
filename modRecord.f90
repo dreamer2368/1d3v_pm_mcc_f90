@@ -14,6 +14,7 @@ module modRecord
 		real(mp), allocatable :: Edata(:,:)
 		real(mp), allocatable :: rhodata(:,:)
 		real(mp), allocatable :: PE(:), KE(:,:)
+      integer*4, allocatable :: n_coll(:,:)               !(species*collision type, time)
 	end type
 
 contains
@@ -68,6 +69,8 @@ contains
 		deallocate(this%PE)
 		deallocate(this%KE)
 
+      deallocate(this%n_coll)
+
 		deallocate(this%dir)
 	end subroutine
 
@@ -96,7 +99,7 @@ contains
 				close(305)
 				close(306)
 				this%np(n,k/this%mod+1) = pm%p(n)%np
-				this%KE(n,k/this%mod+1) = 0.5_mp*SUM(pm%p(n)%ms*pm%p(n)%spwt*(pm%p(n)%vp**2))
+				this%KE(n,k/this%mod+1) = 0.5_mp*pm%p(n)%ms*pm%p(n)%spwt*SUM(pm%p(n)%vp**2)
 			end do
 
 			this%phidata(:,k/this%mod+1) = pm%m%phi
@@ -105,8 +108,9 @@ contains
 			this%PE(k/this%mod+1) = 0.5_mp*SUM(pm%m%E**2)*pm%m%dx
 			print *, '============= ',k,'-th Time Step ================='
 			do n=1,pm%n
-				print *, 'Species(',n,'): ',pm%p(n)%np, ', KE: ', 0.5_mp*pm%p(n)%ms*sum((pm%p(n)%vp)**2)
+				print *, 'Species(',n,'): ',pm%p(n)%np, ', KE: ', 0.5_mp*pm%p(n)%ms*sum((pm%p(n)%vp)**2),'J'
 			end do
+         print *, 'Voltage = ',pm%m%phi(pm%ng),'V'
 		end if
 	end subroutine
 
@@ -121,6 +125,7 @@ contains
 		open(unit=303,file='data/'//this%dir//'/PE.bin',status='replace',form='unformatted',access='stream')
 		open(unit=304,file='data/'//this%dir//'/Np.bin',status='replace',form='unformatted',access='stream')
 		open(unit=305,file='data/'//this%dir//'/phi.bin',status='replace',form='unformatted',access='stream')
+		open(unit=306,file='data/'//this%dir//'/Ncoll.bin',status='replace',form='unformatted',access='stream')
 		do i=1,this%n
 			write(s,*) i
 			open(unit=307+i,file='data/'//this%dir//'/KE_'//trim(adjustl(s))//'.bin',status='replace',form='unformatted',access='stream')
@@ -128,6 +133,9 @@ contains
 
 		write(300,*) this%n, this%ng, this%nt, this%L, this%mod
 		close(300)
+
+      write(306) this%n_coll
+      close(306)
 
 		do i = 1,this%nt/this%mod
 			write(301) this%Edata(:,i)

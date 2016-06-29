@@ -35,7 +35,7 @@ modMesh.o : MatrixVector.o
 modAssign.o : modSpecies.o modMesh.o
 modPM1D.o : modSpecies.o modMesh.o modAssign.o
 modRecord.o : modPM1D.o
-ArMCC.o : modPM1D.o random.o
+ArMCC.o : modPM1D.o modRecord.o random.o
 init.o : modPM1D.o random.o
 modBC.o : modPM1D.o random.o
 modTarget.o : modPM1D.o
