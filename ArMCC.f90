@@ -1,18 +1,20 @@
 module ArMCC
 
 	use modPM1D
+   use modRecord
 	use random
 	implicit none
 
 	real(mp), parameter :: q_e = 1.602E-19, m_e = 9.10938356e-31, m_Ar = 6.6335209e-26			!kg
 	real(mp), parameter :: max_sigmav_e = 6.6038e-13, max_sigmav_Ar = 2.8497e-14				!m3/s
-	real(mp), parameter :: extengy0 = 11.55, ionengy0 = 15.76									!eV (excitation, ionization)
+	real(mp), parameter :: extengy0 = 11.55_mp, ionengy0 = 15.76_mp									!eV (excitation, ionization)
 	real(mp) :: col_prob_e = 0.0_mp, col_prob_Ar = 0.0_mp
 
 contains
 
-	subroutine set_Ar_discharge(pm, spwt, A)
+	subroutine set_Ar_discharge(pm, spwt, A, r)
 		type(PM1D), intent(inout) :: pm
+      type(recordData), intent(inout), optional :: r
 		real(mp), intent(in) :: A(4)						!A(1): temperature of neutral(eV),	A(2): density of neutral(m-3),
                                                    !A(3): discharge current density(A/m2), A(4): discharge frequency(Hz)
 		real(mp), intent(in) :: spwt(2)
@@ -29,25 +31,29 @@ contains
 		deallocate(pm%A0)
 		allocate(pm%A0(4))
 		pm%A0 = A
+
+      if( present(r) ) then
+         allocate(r%n_coll(7,r%nt))
+      end if
 	end subroutine
 
 !=======================================================
 !	MCC global subroutine
 !=======================================================
-	subroutine mcc_collision(pm)
+	subroutine mcc_collision(pm,n_coll)
 		type(PM1D), intent(inout) :: pm
-      integer :: N_e(4), N_Ar(3)
+      integer, intent(out) :: n_coll(7)
 
-		call mcc_Argon(pm,N_Ar)
-		call mcc_electron(pm,N_e)
-      print *, '----------- collision diagnostic ------------------'
-      print *, 'Electron, Np(1): ',pm%p(1)%np
-      print *, 'Null collision - Elastic - Excitation - Ionization'
-      print *, N_e
-      print *, 'Argon, Np(2): ',pm%p(2)%np
-      print *, 'Null collision - Elastic - Exchange'
-      print *, N_Ar
-      print *, '---------------------------------------------------'
+		call mcc_Argon(pm,n_coll(5:7))
+		call mcc_electron(pm,n_coll(1:4))
+!      print *, '----------- collision diagnostic ------------------'
+!      print *, 'Electron, Np(1): ',pm%p(1)%np
+!      print *, 'Null collision - Elastic - Excitation - Ionization'
+!      print *, N_e
+!      print *, 'Argon, Np(2): ',pm%p(2)%np
+!      print *, 'Null collision - Elastic - Exchange'
+!      print *, N_Ar
+!      print *, '---------------------------------------------------'
 	end subroutine
 
 !=======================================================
@@ -173,38 +179,55 @@ contains
       end if
 
 		!Add newly created particles
+      !Electron species
 		pm%p(1)%np = pm%p(1)%np + new_e
+      !xp
 		allocate(temp1(pm%p(1)%np))
-		allocate(temp2(pm%p(1)%np,3))
 		temp1(1:pm%p(1)%np-new_e) = pm%p(1)%xp
 		temp1(pm%p(1)%np-new_e+1:pm%p(1)%np) = vec1_e(1:new_e)
+		deallocate(pm%p(1)%xp)
+		allocate(pm%p(1)%xp(pm%p(1)%np))
+		pm%p(1)%xp = temp1
+      !Ep
+		temp1(1:pm%p(1)%np-new_e) = pm%p(1)%Ep
+		temp1(pm%p(1)%np-new_e+1:pm%p(1)%np) = 0.0_mp
+		deallocate(pm%p(1)%Ep)
+		allocate(pm%p(1)%Ep(pm%p(1)%np))
+		pm%p(1)%Ep = temp1
+		deallocate(temp1)
+      !vp
+		allocate(temp2(pm%p(1)%np,3))
 		temp2(1:pm%p(1)%np-new_e,:) = pm%p(1)%vp
 		temp2(pm%p(1)%np-new_e+1:pm%p(1)%np,:) = vec2_e(1:new_e,:)
-		deallocate(pm%p(1)%xp)
 		deallocate(pm%p(1)%vp)
-		allocate(pm%p(1)%xp(pm%p(1)%np))
 		allocate(pm%p(1)%vp(pm%p(1)%np,3))
-		pm%p(1)%xp = temp1
 		pm%p(1)%vp = temp2
-		deallocate(temp1)
 		deallocate(temp2)
-
+      !Argon species
 		pm%p(2)%np = pm%p(2)%np + new_Ar
+      !xp
 		allocate(temp1(pm%p(2)%np))
-		allocate(temp2(pm%p(2)%np,3))
 		temp1(1:pm%p(2)%np-new_Ar) = pm%p(2)%xp
 		temp1(pm%p(2)%np-new_Ar+1:pm%p(2)%np) = vec1_Ar(1:new_Ar)
+		deallocate(pm%p(2)%xp)
+		allocate(pm%p(2)%xp(pm%p(2)%np))
+		pm%p(2)%xp = temp1
+      !Ep
+		temp1(1:pm%p(2)%np-new_Ar) = pm%p(2)%Ep
+		temp1(pm%p(2)%np-new_Ar+1:pm%p(2)%np) = 0.0_mp
+		deallocate(pm%p(2)%Ep)
+		allocate(pm%p(2)%Ep(pm%p(2)%np))
+		pm%p(2)%Ep = temp1
+		deallocate(temp1)
+      !vp
+		allocate(temp2(pm%p(2)%np,3))
 		temp2(1:pm%p(2)%np-new_Ar,:) = pm%p(2)%vp
 		temp2(pm%p(2)%np-new_Ar+1:pm%p(2)%np,:) = vec2_Ar(1:new_Ar,:)
-		deallocate(pm%p(2)%xp)
 		deallocate(pm%p(2)%vp)
-		allocate(pm%p(2)%xp(pm%p(2)%np))
 		allocate(pm%p(2)%vp(pm%p(2)%np,3))
-		pm%p(2)%xp = temp1
 		pm%p(2)%vp = temp2
-		deallocate(temp1)
 		deallocate(temp2)
-
+      !deallocate temporary arrays
 		deallocate(vec1_e)
 		deallocate(vec2_e)
 		deallocate(vec1_Ar)
@@ -262,7 +285,7 @@ contains
 
 				pm%p(2)%vp(i,:) = 0.0_mp
             if( present(N_diag) ) then
-   				n_elastic = n_elastic+1
+   				n_exchange = n_exchange+1
             end if
 
 			!Elastic scattering
@@ -270,7 +293,7 @@ contains
 
 				call anewvel_Ar(pm%p(2)%vp(i,:))
             if( present(N_diag) ) then
-   				n_exchange = n_exchange+1
+   				n_elastic = n_elastic+1
             end if
 
 			end if
@@ -278,7 +301,7 @@ contains
 		end do
 
       if( present(N_diag) ) then
-		   N_diag = (/ n_coll, n_elastic, n_exchange /)
+		   N_diag = (/ n_coll, n_exchange, n_elastic /)
       end if
 	end subroutine
 
