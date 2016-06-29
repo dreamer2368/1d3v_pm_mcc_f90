@@ -28,22 +28,22 @@ contains
       type(PM1D) :: pm
       type(recordData) :: r
       real(mp), parameter :: Kb = 1.38065E-23, EV_TO_K = 11604.52_mp, eps = 8.85418782E-12, mTorr_to_Pa = 0.13332237_mp
-      real(mp) :: I0 = 0.256_mp, I_f = 13.56E6                !I0(A), If(Hz)
-      real(mp) :: TN = 0.026_mp, PN = 50.0_mp, area = 0.01_mp, gden        !TN(eV), PN(mTorr), area(m2), gden(m-1)
-      real(mp) :: T0 = 1.0_mp, n0, f0, wp0, lambda0, L=0.02_mp
-      integer, parameter :: Np = 5E5, Ng = 300
+      real(mp) :: I0 = 25.6_mp, I_f = 13.56E6                !I0(A/m2), If(Hz)
+      real(mp) :: TN = 0.026_mp, PN = 50.0_mp, gden        !TN(eV), PN(mTorr), gden(m-3)
+      real(mp) :: T0 = 1.0_mp, n0, f0, wp0, lambda0
+      real(mp) :: L = 0.02_mp, area = 0.016_mp               !L(m), area(m2)
+      integer, parameter :: Np = 1E6, Ng = 300
       real(mp) :: spwt, xp0(Np), vp0(Np,3)
       real(mp) :: dt
       integer :: i
-      !note that gas density is a line density for 1D simulation.
-      gden = (PN*mTorr_to_Pa)/(q_e*TN)*area
+      gden = (PN*mTorr_to_Pa)/(q_e*TN)
       
       !Saha equilibrium
       f0 = 2.0_mp*exp(-ionengy0/T0)
       n0 = gden*f0
-      spwt = n0/Np
+      spwt = n0*L/Np
       
-      print *, 'gden(m-3): ',gden,', n0(m-3): ',n0,', spwt: ',spwt
+      print *, 'gden(m-3): ',gden,', n0(m-3): ',n0,', spwt(m-2): ',spwt
       
       wp0 = sqrt(n0*q_e*q_e/m_e/eps)
       lambda0 = sqrt(eps*T0/n0/q_e)
@@ -56,9 +56,9 @@ contains
       call null_collision(gden,dt)
       print *, 'P_e = ',col_prob_e,', P_Ar = ', col_prob_Ar
       
-      call buildPM1D(pm,10000.0_mp*dt,100.0_mp*dt,Ng,2,pBC=1,mBC=2,order=1,dt=dt,L=L)
+      call buildPM1D(pm,10000.0_mp*dt,100.0_mp*dt,Ng,2,pBC=1,mBC=2,order=1,dt=dt,L=L,eps=eps)
       call buildRecord(r,pm%nt,2,pm%L,pm%ng,'rf_Ar',20)
-      call set_Ar_discharge(pm,(/spwt, spwt/),(/TN,gden,I0,I_f/))
+      call set_Ar_discharge(pm,(/spwt, spwt/),(/TN,gden,I0,I_f/),r)
       call RANDOM_NUMBER(xp0)
       vp0 = randn(Np,3)*sqrt(T0*q_e/m_e)
       call setSpecies(pm%p(1),Np,xp0*L,vp0)
@@ -213,8 +213,8 @@ contains
 		real(mp) :: gden = 1.0_mp/max_sigmav_e, TN = 0.026_mp		!neutral temperature TN: scale in eV
 		real(mp) :: energy = 20.0_mp, vel										!electron energy
 		real(mp) :: xp0(np), vp0(np,3)
-		integer :: i, N_coll(Nsample,4)
-		character(len=100) :: istr
+      real(mp) :: rnd, pr(3)
+		integer :: i, j, N_coll(Nsample,4), N_exp(Nsample,3)
 
       call init_random_seed
 
@@ -278,13 +278,15 @@ contains
 		vp0(:,2) = vel
 		vp0(:,3) = 0.0_mp
 
+      pr = (/ asigma1(energy), asigma2(energy), asigma3(energy) /)*vel/max_sigmav_e
 		open(unit=301,file='data/test_mcc_electron/prob.bin',status='replace',form='unformatted',access='stream')
 		write(301)	col_prob_e,	&
-                 col_prob_e*( asigma1(energy)*vel/max_sigmav_e ),   &
-                 col_prob_e*( asigma2(energy)*vel/max_sigmav_e ),   &
-                 col_prob_e*( asigma3(energy)*vel/max_sigmav_e )
+                 col_prob_e*pr(1),   &
+                 col_prob_e*pr(2),   &
+                 col_prob_e*pr(3)
 		close(301)
 
+      N_exp = 0
 		do i=1,Nsample
          print *, ' '
          print *, '================',i,'-th Sample=================='
@@ -298,6 +300,18 @@ contains
 			call mcc_electron(pm,N_coll(i,:))
 
 			call destroyPM1D(pm)
+
+         !Do the simple sampling comparison, if needed
+!         do j=1,N_coll(i,1)
+!            call RANDOM_NUMBER(rnd)
+!            if( rnd.le.pr(1) ) then
+!               N_exp(i,1) = N_exp(i,1)+1
+!            elseif( rnd.le.(pr(1)+pr(2)) ) then
+!               N_exp(i,2) = N_exp(i,2)+1
+!            elseif( rnd.le.(pr(1)+pr(2)+pr(3) ) then
+!               N_exp(i,3) = N_exp(i,3)+1
+!            end if
+!         end do
 		end do
 
 		open(unit=301,file='data/test_mcc_electron/coll_sample.bin',status='replace',form='unformatted',access='stream')

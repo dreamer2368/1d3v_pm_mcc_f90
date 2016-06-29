@@ -8,3 +8,6 @@ data/**/*.out
 data/**/record
 .DS_Store
 *.stackdump
+*.log
+*.swp
+data/rf_Ar/sheath.asv
