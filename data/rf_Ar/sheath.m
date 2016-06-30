@@ -111,20 +111,22 @@ K = 1.38065E-23;
 vB = sqrt(K*(Te+3*Ti)/mi);
 
 ve = sqrt(K*Te/me); vi = sqrt(K*Ti/mi);
+vscale_e = 1e6; vscale_i = 1e4;
+ve = ve/vscale_e; vi = vi/vscale_i;
 
 % %video clip
 % writerObj1 = VideoWriter('electron.avi');
-% writerObj1.FrameRate = 60;
+% writerObj1.FrameRate = 20;
 % open(writerObj1);
 % 
 % %video clip
 % writerObj2 = VideoWriter('ion.avi');
-% writerObj2.FrameRate = 60;
+% writerObj2.FrameRate = 20;
 % open(writerObj2);
 % 
 % %video clip
 % writerObj3 = VideoWriter('phi.avi');
-% writerObj3.FrameRate = 60;
+% writerObj3.FrameRate = 20;
 % open(writerObj3);
 
 for i=1:Nt
@@ -140,34 +142,37 @@ for i=1:Nt
     vp_i = fread(fileID,Np(2,i)*3,'double');
     vp_i = reshape(vp_i,[Np(2,i), 3]);
     
-    f1=figure(1);
-    plot(xp_e,vp_e(:,1),'.k');
-    axis([0 L -3*ve 3*ve]);
-    title('Electron distribution');
-    xlabel('$x$(m)','interpreter','latex');
-    ylabel('$v$(m/s)','interpreter','latex');
-    set(gca,'fontsize',25);
+%     f1=figure(1);
+%     plot(xp_e,vp_e(:,1)/vscale_e,'.k');
+%     axis([0 L -3*ve 3*ve]);
+%     title('Electron distribution');
+%     xlabel('$x$(m)','interpreter','latex');
+%     ylabel('$v(\times10^6m/s)$','interpreter','latex');
+%     set(gca,'fontsize',25);
+%     
+%     f2=figure(2);
+%     plot(xp_i,vp_i(:,1)/vscale_i,'.r',[0 L], [vB vB], '-b', [0 L], [-vB -vB],'-b');
+%     axis([0 L -5*vi 5*vi]);
+%     title('Ion distribution');
+%     xlabel('$x$(m)','interpreter','latex');
+%     ylabel('$v(\times10^4m/s)$','interpreter','latex');
+%     set(gca,'fontsize',25);
+%     
+%     f3=figure(3);
+%     plot(xg,phi(:,i),'-k');
+%     axis([0 L -400 400]);
+%     title('potential');
+%     xlabel('$x$(m)','interpreter','latex');
+%     ylabel('$\phi$(V)','interpreter','latex');
+%     set(gca,'fontsize',25);
     
-    f2=figure(2);
-    plot(xp_i,vp_i(:,1),'.r',[0 L], [vB vB], '-b', [0 L], [-vB -vB],'-b');
-    axis([0 L -5*vi 5*vi]);
-    title('Ion distribution');
-    xlabel('$x$(m)','interpreter','latex');
-    ylabel('$v$(m/s)','interpreter','latex');
-    set(gca,'fontsize',25);
-    
-    f3=figure(3);
-    plot(xg,phi(:,i),'-k');
-    axis([0 L -400 400]);
-    title('potential');
-    xlabel('$x$(m)','interpreter','latex');
-    ylabel('$\phi$(V)','interpreter','latex');
-    set(gca,'fontsize',25);
-    
-    EEDF = 0.5*me*sum( vp_e.^2, 2 )/qe;
-    [n,x] = hist(EEDF,50);
-    figure(4)
-    semilogy(x,n/Np(1,Nt)/diff(x(1:2)));
+%     vt = mean(vp_e,1); vt_e = zeros(Np(1,i),3);
+%     vt_e(:,1) = vp_e(:,1) - vt(1);
+%     vt_e(:,2) = vp_e(:,2) - vt(2);
+%     vt_e(:,3) = vp_e(:,3) - vt(3);
+%     [n,x] = hist(EEDF,1000);
+%     figure(4)
+%     semilogy(x,n/Np(1,N)/diff(x(1:2)));
     
 %     %videoclip
 %     frame = getframe(f1);
@@ -182,7 +187,7 @@ for i=1:Nt
 %     writeVideo(writerObj3,frame);
 
     fclose('all');
-    pause(.000001);
+%     pause(.0000001);
 end
 
 % % videoclip close
@@ -193,17 +198,20 @@ end
 %%
 close all
 
+t = 8e-11*20*(1:Nt);
 figure(1)
-plot(1:Nt,Np(1,:),'-k',1:Nt,Np(2,:),'-r','linewidth',2);
-xlabel('Time step');
+plot(t,Np(1,:),'-k',t,Np(2,:),'-r','linewidth',2);
+xlabel('Time');
 ylabel('Particles');
-title('Number of ion/electron');
 legend('Electron','Ion');
 set(gca,'fontsize',25);
-figure(2)
-plot(1:Nt,abs(Np(1,:)-Np(2,:)),'-k');
+
 figure(3)
-plot(1:Nt,phi(Ng,:),'-k');
+plot(t,phi(Ng,:),'-k');
+xlabel('Time');
+ylabel('Voltage');
+title('Voltage between electrodes');
+set(gca,'fontsize',25);
 % axis([0 Nt 0 25]);
 
 %%
@@ -223,7 +231,7 @@ plot(t,phi(300,:),t,min(phi(300,:))*sin(2*pi*13.56e6*t));
 %%
 close all
 
-i=312;
+i=450;
 fileID = fopen(strcat('xp/',num2str(i),'_1.bin'));
 xp_e = fread(fileID,Np(1,i),'double');
 fileID = fopen(strcat('vp/',num2str(i),'_1.bin'));
@@ -232,7 +240,7 @@ vp_e = reshape(vp_e,[Np(1,i), 3]);
 
 figure(1);
 plot(xp_e,vp_e(:,1),'.k');
-axis([0 L -3*ve 3*ve]);
+% axis([0 L -3*ve 3*ve]);
 title('Electron distribution');
 xlabel('$x$(m)','interpreter','latex');
 ylabel('$v$(m/s)','interpreter','latex');
@@ -251,10 +259,10 @@ EEDF = 0.5*me*sum( vt_e.^2, 2 )/qe;
 
 b1 = (gamma(2.5))^1.5*(gamma(1.5))^(-2.5);
 b2 = gamma(2.5)*(gamma(1.5))^(-1);
-T1 = 4.0; T2 = 8.5;
+T1 = 1.2; T2 = 6.1;
 EEDF1 = T1^(-1.5)*b1*exp( -x*b2/T1 );
 EEDF2 = T2^(-1.5)*b1*exp( -x*b2/T2 );
 
 figure(3)
-semilogy(x,n/Np(1,i)/diff(x(1:2)),x,EEDF1,x,2*EEDF2);
-axis([0 15 1e-2 3e-1]);
+semilogy(x,n/Np(1,i)/diff(x(1:2))./sqrt(x),x,0.3*EEDF1,x,0.7*EEDF2);
+axis([0 15 1e-3 1e0]);
