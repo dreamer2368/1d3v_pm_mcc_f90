@@ -6,15 +6,15 @@ module modRecord
 
 	type recordData
 		integer :: nt, n, ng, mod
-		real(mp) :: L, dx
+		real(mp) :: L
 		character(len=:), allocatable :: dir
 
-		integer*4, allocatable :: np(:,:)
+		integer, allocatable :: np(:,:)
 		real(mp), allocatable :: phidata(:,:)
 		real(mp), allocatable :: Edata(:,:)
 		real(mp), allocatable :: rhodata(:,:)
 		real(mp), allocatable :: PE(:), KE(:,:)
-      integer*4, allocatable :: n_coll(:,:)               !(species*collision type, time)
+      integer, allocatable :: n_coll(:,:)               !(species*collision type, time)
 	end type
 
 contains
@@ -25,7 +25,7 @@ contains
 		real(mp), intent(in) :: L
 		character(len=*), intent(in), optional :: input_dir
 		integer :: nr
-		nr = (nt-1)/mod+1
+		nr = nt/mod+1
 
 		this%nt = nt
 		this%n = n
@@ -34,13 +34,18 @@ contains
 		this%mod = mod
 
 		allocate(this%np(n,nr))
-
 		allocate(this%phidata(ng,nr))
 		allocate(this%Edata(ng,nr))
 		allocate(this%rhodata(ng,nr))
-
 		allocate(this%PE(nr))
 		allocate(this%KE(n,nr))
+
+		this%np = 0
+		this%phidata = 0.0_mp
+		this%Edata = 0.0_mp
+		this%rhodata = 0.0_mp
+		this%PE = 0.0_mp
+		this%KE = 0.0_mp
 
 		if( present(input_dir) ) then
 			allocate(character(len=len(input_dir)) :: this%dir)
@@ -69,7 +74,9 @@ contains
 		deallocate(this%PE)
 		deallocate(this%KE)
 
-      deallocate(this%n_coll)
+		if( allocated(this%n_coll) ) then
+			deallocate(this%n_coll)
+		end if
 
 		deallocate(this%dir)
 	end subroutine
@@ -78,18 +85,15 @@ contains
 		type(recordData), intent(inout) :: this
 		type(PM1D), intent(in) :: pm
 		integer, intent(in) :: k					!k : time step
-		integer :: n								!n : species
+		integer :: n,j, kr								!n : species
 		character(len=100) :: nstr, kstr
 		real(mp) :: qe = 1.602176565E-19
 
-		if( (this%mod.eq.1) .or. (mod(k,this%mod).eq.1) ) then
+		if( (this%mod.eq.1) .or. (mod(k,this%mod).eq.0) ) then
+			kr = merge(k,k/this%mod,this%mod.eq.1)
 			do n=1,pm%n
 				write(nstr,*) n
-				if( this%mod .eq. 1 ) then
-					write(kstr,*) k
-				else
-					write(kstr,*) k/this%mod + 1
-				end if
+				write(kstr,*) kr
 				open(unit=305,file='data/'//this%dir//'/xp/'//trim(adjustl(kstr))//'_'	&
 					//trim(adjustl(nstr))//'.bin',status='replace',form='unformatted',access='stream')
 				open(unit=306,file='data/'//this%dir//'/vp/'//trim(adjustl(kstr))//'_'	&
@@ -98,14 +102,16 @@ contains
 				write(306) pm%p(n)%vp
 				close(305)
 				close(306)
-				this%np(n,k/this%mod+1) = pm%p(n)%np
-				this%KE(n,k/this%mod+1) = 0.5_mp*pm%p(n)%ms*pm%p(n)%spwt*SUM(pm%p(n)%vp**2)
+				!time step: 0~Nt, in array: 1~(Nt+1) (valgrind prefers this way of allocation)
+				this%np(n,kr+1) = pm%p(n)%np
+				this%KE(n,kr+1) = 0.5_mp*pm%p(n)%ms*pm%p(n)%spwt*SUM(pm%p(n)%vp**2)
 			end do
 
-			this%phidata(:,k/this%mod+1) = pm%m%phi
-			this%Edata(:,k/this%mod+1) = pm%m%E
-			this%rhodata(:,k/this%mod+1) = pm%m%rho
-			this%PE(k/this%mod+1) = 0.5_mp*SUM(pm%m%E**2)*pm%m%dx
+			this%phidata(:,kr+1) = pm%m%phi
+			this%Edata(:,kr+1) = pm%m%E
+			this%rhodata(:,kr+1) = pm%m%rho
+			this%PE(kr+1) = 0.5_mp*SUM(pm%m%E**2)*pm%m%dx
+
 			print *, '============= ',k,'-th Time Step ================='
 			do n=1,pm%n
 				print *, 'Species(',n,'): ',pm%p(n)%np, ', KE: ', 0.5_mp*pm%p(n)%ms*sum((pm%p(n)%vp)**2),'J'
@@ -137,7 +143,7 @@ contains
       write(306) this%n_coll
       close(306)
 
-		do i = 1,this%nt/this%mod
+		do i = 1,this%nt/this%mod+1
 			write(301) this%Edata(:,i)
 			write(302) this%rhodata(:,i)
 			write(303) this%PE(i)
