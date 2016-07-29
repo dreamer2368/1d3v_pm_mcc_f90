@@ -9,4 +9,5 @@ Checkpointing PIC-adjoint is added for periodic BC.
 1. Do not pass a string as itself into the subroutine buildRecord. Instead:
 
 	dir1='example'
+
 	call buildRecord(recordData, Nt, N, L, Ng, trim(dir1), mod)
