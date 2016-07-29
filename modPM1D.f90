@@ -55,6 +55,7 @@ contains
 		this%nt = CEILING(Tf/this%dt)
 		this%dt = Tf/this%nt
 		this%ni = FLOOR(Ti/this%dt) + 1
+		this%wp = 1.0_mp
 		print *, 'Plasma is created'
 		print *, 'L = (',this%L,')'
 		print *, 'Ng = (',this%ng,'), N = ',this%n
@@ -63,7 +64,6 @@ contains
 		print *, 'A = ',this%A0
 		print *, 'Ni = ',this%ni,', Nt = ',this%nt,', dt = ',this%dt
 
-		this%wp = 1.0_mp
 		allocate(this%p(N))
 		call buildMesh(this%m,this%L,Ng,this%mBCindex)
 		allocate(this%a(N))

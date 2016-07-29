@@ -2,10 +2,15 @@
 *.o
 *.mod
 exec
-exec.exe
+exec.*
 data/**/*.bin
 data/**/*.out
 data/**/record
+doc/*.pdf
+doc/*.aux
+doc/*.out
+doc/*.gz
+doc/*.toc
 .DS_Store
 *.stackdump
 *.log

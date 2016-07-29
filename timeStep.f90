@@ -4,16 +4,19 @@ module timeStep
 	use modTarget
 	use modBC
 	use modRecord
-	use ArMCC
+	use nullMCC
+	use modAdj
+	use modQoI
 
 	implicit none
 
 contains
 
-	subroutine forwardsweep(this,r,target_input,source)
+	subroutine forwardsweep(this,r,target_input,source,QoI,J)
 		type(PM1D), intent(inout) :: this
 		type(recordData), intent(inout) :: r
-		integer :: k
+		integer :: i,k
+		real(mp), intent(out), optional :: J
 		interface
 			subroutine target_input(pm,k,str)
 				use modPM1D
@@ -28,11 +31,30 @@ contains
 				type(PM1D), intent(inout) :: pm
 			end subroutine
 		end interface
+		interface
+			subroutine QoI(pm,k,J)
+				use modQoI
+				type(PM1D), intent(in) :: pm
+				real(mp), intent(inout) :: J
+				integer, intent(in) :: k
+			end subroutine
+		end interface
+		optional :: QoI
+		J = 0.0_mp
+		k=0
 
 		!Time stepping
-		call halfStep(this,target_input)
+!		call halfStep(this,target_input)
+		if( present(J) ) then
+			call QoI(this,k,J)
+		end if
+		call recordPlasma(r, this, k)									!record for n=1~Nt
 		do k=1,this%nt
-			call updatePlasma(this,r,target_input,source,k)
+			call updatePlasma(this,target_input,source,k,r)
+			if( present(J) ) then
+				call QoI(this,k,J)
+			end if
+			call recordPlasma(r, this, k)									!record for n=1~Nt
 		end do
 	end subroutine
 
@@ -82,9 +104,9 @@ contains
 		end do
 	end subroutine
 
-	subroutine updatePlasma(this,r,target_input,source,k)
+	subroutine updatePlasma(this,target_input,source,k,r)
 		type(PM1D), intent(inout) :: this
-		type(recordData), intent(inout) :: r
+		type(recordData), intent(inout), optional :: r
 		integer, intent(in) :: k
 		real(mp) :: rhs(this%ng-1), phi1(this%ng-1)
 		real(mp) :: dt, L
@@ -107,7 +129,6 @@ contains
 		L = this%L
 		N = this%n
 		Ng = this%ng
-		call recordPlasma(r, this, k)									!record for n=0~(Nt-1)
 
 		call target_input(this,k,'xp')
 
@@ -141,7 +162,11 @@ contains
 			call accelSpecies(this%p(i),dt)
 		end do
 
-		call mcc_collision(this,r%n_coll(:,k))
+		if( present(r) ) then
+			call mcc_collision(this,r%n_coll(:,k))
+		else
+			call mcc_collision(this)
+		end if
 	end subroutine
 !
 !	subroutine QOI(this,J)
@@ -157,66 +182,173 @@ contains
 !	J = 1.0_mp/Ng/(B-A)*SUM(this%Edata(:,A+1:B)**2)		!omitted 1/N/T for the sake of machine precision
 !	end subroutine
 !
+!===================Adjoint time stepping==========================
 
-!
-!	subroutine adjoint(this,delJdelA)
-!		type(plasma), intent(inout) :: this
-!		real(mp), intent(out) :: delJdelA
-!		real(mp) :: dts
-!		real(mp) :: xps(size(this%xp)), vps(size(this%vp)), Es(size(this%E)), phis(size(this%phi))
-!		real(mp) :: dEs(size(this%E))
-!		real(mp) :: rhs(size(this%E)), phis1(size(this%phi)-1)
-!		integer :: i,k, nk
-!		real(mp) :: coeff(this%n)
-!		dts = -dt
-!		xps = 0.0_mp
-!		vps = 0.0_mp
-!
-!		do k=1,this%nt
-!			!vps update
-!			nk = this%nt+1-k
-!!			dvps = merge(2.0_mp/N/(Nt-Ni)/dt*this%vpdata(:,this%nt+1-k),0.0_mp,nk>=Ni+1)
-!			if (k==this%nt) then
-!!				vps = 1.0_mp/2.0_mp*( vps + dts*( -xps + dvps ) )
-!				vps = 1.0_mp/2.0_mp*( vps + dts*( -xps ) )
-!			else
-!!				vps = vps + dts*( -xps + dvps )
-!				vps = vps + dts*( -xps )
+	subroutine backward_sweep(adj,pm,r, dJ, Dtarget_input,target_input,source)
+		type(adjoint), intent(inout) :: adj
+		type(PM1D), intent(inout) :: pm
+		type(recordData), intent(inout) :: r
+		integer :: k, nk, i
+		interface
+			subroutine dJ(adj,pm,k)
+				use modPM1D
+				use modAdj
+				type(adjoint), intent(inout) :: adj
+				type(PM1D), intent(in) :: pm
+				integer, intent(in) :: k
+			end subroutine
+		end interface
+		interface
+			subroutine Dtarget_input(adj,pm,k,str)
+				use modPM1D
+				use modAdj
+				type(adjoint), intent(inout) :: adj
+				type(PM1D), intent(in) :: pm
+				integer, intent(in) :: k
+				character(len=*), intent(in) :: str
+			end subroutine
+		end interface
+		interface
+			subroutine target_input(pm,k,str)
+				use modPM1D
+				type(PM1D), intent(inout) :: pm
+				integer, intent(in) :: k
+				character(len=*), intent(in) :: str
+			end subroutine
+		end interface
+		interface
+			subroutine source(pm)
+				use modPM1D
+				type(PM1D), intent(inout) :: pm
+			end subroutine
+		end interface
+
+!		adj%xps = 0.0_mp
+!		adj%vps = 0.0_mp
+		do k=1,pm%nt
+			nk = pm%nt+1-k
+
+			call reset_Dadj(adj)
+
+			!=====  Checkpointing  =====
+			call checkpoint(pm,r,nk,target_input,source)
+
+			!======= dJ : source term ==========
+			call dJ(adj,pm,nk)
+
+			!======= dv_p =============
+			call Dtarget_input(adj,pm,nk,'vp')
+			call Adj_accel(adj)
+
+!			!Check when adjoint reach to the initial step
+!			if( k .eq. pm%nt ) then
+!				adj%vps = 2.0_mp*adj%vps
 !			end if
-!			!assignment
-!			call assignMatrix(this,this%xpdata(:,nk))
-!
-!			!Es update : (qe/me/dx)*mat*vps
-!			call vpsAssign(this,Es,vps)
-!			dEs = merge( -2.0_mp/Ng/(Nt-Ni)/dt/dx*this%Edata(:,this%nt+1-k),0.0_mp,nk>=Ni+1)
-!			Es = Es + dEs
-!
-!			!phis update
-!			!rhs = D*Es
-!			rhs = multiplyD(Es,dx)
-!
-!			!K*phis = D*Es
-!			call CG_K(phis1,rhs(1:Ng-1),dx)				!Conjugate-Gradient Iteration
-!			phis(1:Ng-1) = phis1
-!			phis(Ng) = 0.0_mp
-!
-!			!xps update
-!			if(nk==this%ni) then
-!				xps = xps - dts*xps*(B*L/N*2.0_mp*pi*mode/L)*COS(2.0_mp*pi*mode*this%xpdata(:,nk)/L)
-!			end if
-!			xps = xps + xpsUpdate(this,vps,phis,dts,k)
-!
-!			call recordAdjoint(this,nk,xps)					!recorde xps from n=(Nt-1) to n=0
-!			if( nk<this%ni ) then
-!				exit
-!			end if
-!		end do
-!
-!		coeff = - L/N*SIN( 2.0_mp*pi*mode*this%xpdata(:,this%ni)/L )
-!		delJdelA = 0.0_mp
-!		do i = 1,N
-!			delJdelA = delJdelA + dt*coeff(i)*this%xpsdata(i,this%ni+1)
-!		end do
-!	end subroutine
+
+			!======= dE_p =============
+			do i=1,adj%n
+				adj%p(i)%Ep = adj%p(i)%qs/pm%p(i)%ms*adj%p(i)%vp(:,1)
+			end do
+
+			!======= dE_g =============
+			adj%m%E = 0.0_mp
+			do i=1,adj%n
+				call Adj_forceAssign_E(pm%a(i),adj%p(i)%Ep,adj%m%E)
+			end do
+			adj%m%E = adj%m%E + adj%dm%E
+
+			!======= dPhi_g, dRho_g =============
+			call solveMesh_Adj(adj%m,pm%eps0)
+
+			!======= dx_p =============
+			do i=1,adj%n
+				call Adj_chargeAssign(pm%a(i),pm%p(i),pm%m,adj%m%rho,adj%dp(i)%xp)
+				call Adj_forceAssign_xp(pm%a(i),pm%m,pm%m%E,adj%p(i)%Ep,adj%dp(i)%xp)
+			end do
+			call Dtarget_input(adj,pm,nk,'xp')
+			call Adj_move(adj)
+
+!			call recordAdjoint(pm%r,adj,nk)									!record for nk=1~Nt : xps_nk and vp_(nk+1/2)
+		end do
+		nk = 0
+		call reset_Dadj(adj)
+		!======= dJ : source term ==========
+		call dJ(adj,pm,nk)
+
+		!======= dv_p =============
+		call Dtarget_input(adj,pm,nk,'vp')
+		call Adj_accel(adj)
+
+		!======= dx_p =============
+		call Dtarget_input(adj,pm,nk,'xp')
+		call Adj_move(adj)
+	end subroutine
+
+	subroutine checkpoint(pm,r,nk,target_input,source)
+		type(PM1D), intent(inout) :: pm
+		type(recordData), intent(inout) :: r
+		integer, intent(in) :: nk
+		integer :: kr,i
+		character(len=1000) :: istr, kstr, dir_temp
+		real(mp), allocatable :: xp0(:), vp0(:,:)
+		interface
+			subroutine target_input(pm,k,str)
+				use modPM1D
+				type(PM1D), intent(inout) :: pm
+				integer, intent(in) :: k
+				character(len=*), intent(in) :: str
+			end subroutine
+		end interface
+		interface
+			subroutine source(pm)
+				use modPM1D
+				type(PM1D), intent(inout) :: pm
+			end subroutine
+		end interface
+
+		kr = merge(nk,nk/r%mod,r%mod.eq.1)
+		write(kstr,*) kr
+		do i=1,pm%n
+			allocate(xp0(r%np(i,kr+1)))
+			allocate(vp0(r%np(i,kr+1),3))
+			write(istr,*) i
+			dir_temp='data/'//r%dir//'/xp/'//trim(adjustl(kstr))//'_'//trim(adjustl(istr))//'.bin'
+			open(unit=305,file=trim(dir_temp),form='unformatted',access='stream')
+			dir_temp='data/'//r%dir//'/vp/'//trim(adjustl(kstr))//'_'//trim(adjustl(istr))//'.bin'
+			open(unit=306,file=trim(dir_temp),form='unformatted',access='stream')
+			read(305) xp0
+			read(306) vp0
+			close(305)
+			close(306)
+			call destroySpecies(pm%p(i))
+			call setSpecies(pm%p(i),r%np(i,kr+1),xp0,vp0)
+			deallocate(xp0)
+			deallocate(vp0)
+		end do
+		if( nk-kr*r%mod.eq.0 ) then
+			do i=1, pm%n
+				call assignMatrix(pm%a(i),pm%m,pm%p(i)%xp)
+			end do
+			call adjustGrid(pm)
+
+			!charge assignment
+			call chargeAssign(pm%a,pm%p,pm%m)
+
+			call target_input(pm,nk,'rho_back')
+			call solveMesh(pm%m,pm%eps0)
+
+			!Electric field : -D*phi
+			pm%m%E = - multiplyD(pm%m%phi,pm%m%dx,pm%m%BCindex)
+
+			!Force assignment : mat'*E
+			do i=1, pm%n
+				call forceAssign(pm%a(i), pm%p(i), pm%m)
+			end do
+		else
+			do i=1,nk-kr*r%mod
+				call updatePlasma(pm,target_input,source,i)
+			end do
+		end if
+	end subroutine
 
 end module

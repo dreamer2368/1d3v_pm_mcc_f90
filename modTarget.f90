@@ -1,6 +1,6 @@
 module modTarget
 
-	use modPM1D
+	use modAdj
 
 	implicit none
 
@@ -9,6 +9,13 @@ contains
 
 	subroutine Null_input(this,k,str)
 		type(PM1D), intent(inout) :: this
+		integer, intent(in) :: k
+		character(len=*), intent(in) :: str
+	end subroutine
+
+	subroutine Null_Dinput(adj,pm,k,str)
+		type(adjoint), intent(inout) :: adj
+		type(PM1D), intent(in) :: pm
 		integer, intent(in) :: k
 		character(len=*), intent(in) :: str
 	end subroutine

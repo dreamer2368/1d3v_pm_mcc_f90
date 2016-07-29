@@ -11,8 +11,8 @@ LIBS    =
 
 
 EXE = exec
-F90SRC = main.f90 constants.f90 MatrixVector.f90 modSpecies.f90 modMesh.f90 modAssign.f90 modRecord.f90 modPM1D.f90 random.f90 ArMCC.f90 init.f90 modBC.f90 modTarget.f90 modSource.f90 timeStep.f90
-F90OBJ = main.o constants.o MatrixVector.o modSpecies.o modMesh.o modAssign.o modRecord.o modPM1D.o random.o ArMCC.o init.o modBC.o modTarget.o modSource.o timeStep.o
+F90SRC = main.f90 constants.f90 MatrixVector.f90 modSpecies.f90 modMesh.f90 modAssign.f90 modRecord.f90 modPM1D.f90 random.f90 nullMCC.f90 init.f90 modBC.f90 modTarget.f90 modSource.f90 timeStep.f90 testmodule.f90 modAdj.f90 modQoI.f90
+F90OBJ = main.o constants.o MatrixVector.o modSpecies.o modMesh.o modAssign.o modRecord.o modPM1D.o random.o nullMCC.o init.o modBC.o modTarget.o modSource.o timeStep.o testmodule.o modAdj.o modQoI.f90
 
 ### Targets
 all: $(EXE)
@@ -35,13 +35,15 @@ modMesh.o : MatrixVector.o
 modAssign.o : modSpecies.o modMesh.o
 modPM1D.o : modSpecies.o modMesh.o modAssign.o
 modRecord.o : modPM1D.o
-ArMCC.o : modPM1D.o modRecord.o random.o
+modAdj.o : modPM1D.o
+modQoI.o : modAdj.o
+nullMCC.o : modPM1D.o modRecord.o random.o
 init.o : modPM1D.o random.o
 modBC.o : modPM1D.o random.o
-modTarget.o : modPM1D.o
+modTarget.o : modAdj.o
 modSource.o : modPM1D.o random.o
-timeStep.o : modTarget.o modSource.o modBC.o modRecord.o ArMCC.o
-main.o : init.o timeStep.o
+timeStep.o : modTarget.o modSource.o modBC.o modRecord.o nullMCC.o modAdj.o modQoI.o
+main.o : init.o timeStep.o testmodule.o
 
 clean:
 	rm *.o *.mod $(EXE)

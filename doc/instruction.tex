@@ -1,0 +1,201 @@
+\documentclass[11pt]{article}
+
+\usepackage[dvips]{graphicx}
+\usepackage{multicol}
+\usepackage{float}
+\usepackage{psfrag}
+\usepackage{amsmath,amssymb,rotating,dcolumn,texdraw,tabularx,colordvi}
+\usepackage[usenames]{color}
+\usepackage[nooneline,tight,raggedright]{subfigure}
+\usepackage{amsthm}
+
+\usepackage{wrapfig}
+\usepackage{pstricks,enumerate}
+
+\usepackage[font=footnotesize,format=plain,labelfont=bf]{caption}
+
+\usepackage{hyperref}
+
+%\captionsetup{labelfont={color=Brown,bf},textfont={color=BurntOrange}}
+
+\definecolor{myTan}{rgb}{.7,0.4,.15}
+\captionsetup{labelfont={color=brown,bf},textfont={color=myTan}}
+
+\newcommand{\entry}[1]{\mbox{\sffamily\bfseries{#1:}}\hfil}%
+
+\setlength{\marginparwidth}{.65in}
+\def\margcomment#1{\Red{$\bullet$}\marginpar{\raggedright \Red{\tiny #1}}}
+
+\makeatletter
+\renewcommand{\section}{\@startsection
+{section}%
+{0}%
+{0mm}%
+{-0.35\baselineskip}%
+{0.01\baselineskip}%
+{\normalfont\Large\bfseries\color{brown}}}%
+\makeatother
+
+\makeatletter
+\renewcommand{\subsection}{\@startsection
+{subsection}%
+{1}%
+{0mm}%
+{-0.35\baselineskip}%
+{0.1\baselineskip}%
+{\normalfont\large\bfseries\color{brown}}}%
+\makeatother
+
+
+\makeatletter
+\renewcommand{\subsubsection}{\@startsection
+{subsubsection}%
+{1}%
+{0mm}%
+{-0.5\baselineskip}%
+{0.3\baselineskip}%
+{\normalfont\normalsize\itshape\centering\color{brown}}}%
+\makeatother
+
+%\renewcommand{\topfraction}{0.0}
+\renewcommand{\textfraction}{0.0}
+\renewcommand{\floatpagefraction}{0.7}
+
+
+\setlength{\oddsidemargin}{0.0in}
+\setlength{\textwidth}{6.5in}
+\setlength{\topmargin}{-0.5in}
+\setlength{\footskip}{0.30in}
+\setlength{\textheight}{9.0in}
+\setlength{\headheight}{0.2in}
+\setlength{\headsep}{0.3in}
+
+\def\Dpartial#1#2{ \frac{\partial #1}{\partial #2} }
+\def\Dparttwo#1#2{ \frac{\partial^2 #1 }{ \partial #2^2} }
+\def\Dpartpart#1#2#3{ \frac{\partial^2 #1}{ \partial #2 \partial #3} }
+\def\Dnorm#1#2{ \frac{d #1 }{ d #2} }
+\def\Dnormtwo#1#2{ \frac{d^2 #1}{  d #2 ^2} }
+\def\Dtotal#1#2{ \frac{D #1 }{ D #2} }
+\def\Del#1#2{ \frac{\delta #1}{\delta #2} }
+\def\Var#1{\Dnorm{}{\epsilon} #1 \bigg|_{\epsilon=0}}
+
+\def\eps{\varepsilon}
+
+\newcommand{\vp}{v_p}
+\newcommand{\xp}{x_p}
+\newcommand{\vps}{v_p^*}
+\newcommand{\xps}{x_p^*}
+\newcommand{\Es}{E^*}
+\newcommand{\phis}{\phi^*}
+\newcommand{\Dx}{\Delta x}
+\newcommand{\Dt}{\Delta t}
+
+\newcommand{\vph}{\hat{v}_p}
+\newcommand{\xph}{\hat{x}_p}
+\newcommand{\Eh}{\hat{E}}
+\newcommand{\phih}{\hat{\phi}}
+\newcommand{\rhoh}{\hat{\rho}}
+
+\newcommand{\cH}{\mathcal{H}}
+\newcommand{\cJ}{\mathcal{J}}
+\newcommand{\cL}{\mathcal{L}}
+\newcommand{\cD}{\mathcal{D}}
+
+\newcommand{\timesum}{\sum\limits_{n=0}^{N_t-1}}
+\newcommand{\particlesum}{\sum\limits_{p=1}^{N}}
+\newcommand{\meshsum}{\sum\limits_{i=1}^{N_g}}
+
+\newcommand{\bxi}{\boldsymbol{\xi}}
+
+\newcommand{\bbK}{\hat{\mathbb{K}}}
+
+\newcommand{\myint}{\int_0^{T}\sum\limits_{p=1}^N}
+\newcommand{\mysum}{\sum\limits_{p=1}^N\int_0^{T}}
+\newcommand{\myiint}{\int_0^{T}\int_0^L}
+\newcommand{\dt}{\; dt}
+
+\def\bdash{\hbox{\drawline{4}{.5}\spacce{2}}}
+\def\spacce#1{\hskip #1pt}
+\def\drawline#1#2{\raise 2.5pt\vAox{\hrule width #1pt height #2pt}}
+\def\dashed{\bdash\bdash\bdash\bdash\nobreak\ }
+\def\solid{\drawline{24}{.5}\nobreak\ }
+\def\square{${\vcenter{\hrule height .4pt 
+              \hbox{\vrule width .4pt height 3pt \kern 3pt \vrule width .4pt}
+          \hrule height .4pt}}$\nobreak\ }
+\def\solidsquare{${\vcenter{\hrule height 3pt width 3pt}}$\nobreak\ }
+
+
+\renewcommand{\thefootnote}{\fnsymbol{footnote}}
+
+ \renewcommand{\topfraction}{0.9}
+    \renewcommand{\bottomfraction}{0.8}	
+    \setcounter{topnumber}{2}
+    \setcounter{bottomnumber}{2}
+    \setcounter{totalnumber}{4}     % 2 may work better
+    \setcounter{dbltopnumber}{2}    % for 2-column pages
+    \renewcommand{\dbltopfraction}{0.9}	% fit big float above 2-col. text
+    \renewcommand{\textfraction}{0.07}	% allow minimal text w. figs
+    \renewcommand{\floatpagefraction}{0.7}	% require fuller float pages
+    \renewcommand{\dblfloatpagefraction}{0.7}	% require fuller float pages
+
+\setlength{\parindent}{0.25in}
+\setlength{\parskip}{2.0ex}
+
+\newtheorem*{remark}{Remark}
+
+\title{Instructions on 1d3v\_pm\_mcc\_f90 code}
+\author{Seung Whan Chung}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+\maketitle
+\tableofcontents
+\clearpage
+
+\subsection*{Adjoints blocks}
+\addcontentsline{toc}{subsection}{Adjoint blocks}
+
+\begin{multicols}{2}
+$\cH$ blocks : $n=1,\cdots,N_t$
+\begin{equation*}
+\begin{split}
+\xph^{n}\left[ \frac{\xp^{n} - \xp^{n-1}}{\Dt} - \vp^{n-1/2} \right] &= 0\\
+\rhoh_{i}^n\left[ \rho_{i}^n - \sum\limits_p f\left( x_{i}, x_p^n \right) \right] &= 0\\
+\left( \phih_i^{n} \right)^T\left[ \phi_i^n + K^{-1}\frac{\rho_i^n}{\varepsilon_0} \right] &= 0\\
+\left( \Eh_i^n \right)^T\left[ E_i^n + D\phi_i^n \right] &= 0\\
+\Eh_{p}^{n}\left[ E_{p}^{n} - \sum\limits_{i}E_{i}^{n}\cdot g\left( x_{i}, x_p^{n} \right) \right] &= 0\\
+\vph^{n+1/2}\left[ \frac{\vp^{n+1/2} - \vp^{n-1/2}}{\Dt} - \frac{q_p}{m_p}E_p^{n} \right] &= 0
+\end{split}
+\end{equation*}
+Adjoint equation : $n=1,\cdots,N_t$
+\begin{equation*}
+\begin{split}
+\frac{\vph^{n+3/2} - \vph^{n+1/2}}{-\Dt} - \xph^{n+1} &= 0\qquad:\delta \vp^{n+1/2}\\
+\Eh_{p}^{n} - \frac{q_p}{m_p}\vph^{n+1/2} &= 0\qquad:\delta E_p^{n}\\
+\Eh_{i}^{n} - \sum\limits_p \Eh_{p}^{n}\cdot g\left( x_{i}, x_p^{n} \right) &= 0\qquad:\delta E_i^{n}\\
+\phih_i^{n} - D\Eh_i^{n} &= 0\qquad:\delta \phi_i^{n}\\
+\rhoh_i^{n} + \frac{1}{\varepsilon_0}K^{-1}\phih_i^{n} &= 0\qquad:\delta \rho_i^{n}\\
+\frac{\xph^{n+1} - \xph^{n}}{-\Dt} + \sum\limits_{i}\rhoh_{i}^{n}\cdot\left( -\Dpartial{f}{x_p^{n}} \right) + &\\
+\qquad\sum\limits_{i} \Eh_{p}^{n}E_{i}^{n}\cdot\left( -\Dpartial{g}{x_p^{n}} \right) &= 0\qquad:\delta \xp^{n}
+\end{split}
+\end{equation*}
+\end{multicols}
+$n=0,\cdots,N_t-1$ timesteps are saved.
+\begin{itemize}
+\item Adjoint in initial timestep ($n=0$)
+\begin{equation}
+\frac{\xph^1-\xph^0}{-\Dt}\delta \xp^0 = 0\qquad\qquad \left[ \frac{\vph^{3/2} - \vph^{1/2}}{-\Dt} - \xph^1 \right]\delta \vp^{1/2}=0
+\end{equation}
+You can just use $\xph^1$, $\vph^{3/2}$ for sensitivity,
+but for the case we have initial conditions in $\cJ$, this computation for initial step is included in this code.
+\item Adjoint final condition
+\begin{equation}
+\frac{\vph^{N_t+3/2}}{\Dt}\delta v_p^{N_t+1/2} = 0\qquad\qquad\frac{\xph^{N_t+1}}{\Dt}\delta x_p^{N_t} = 0
+\end{equation}
+\item Remaining term (add to $\delta \cJ$)
+\begin{equation}
+-\frac{\xph^0}{\Dt}\delta \xp^0 - \frac{\vph^{1/2}}{\Dt}\delta \vp^{1/2}
+\end{equation}
+\end{itemize}
+
+\end{document}
