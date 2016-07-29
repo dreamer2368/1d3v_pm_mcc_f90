@@ -12,8 +12,6 @@ module modMesh
 		real(mp), allocatable :: rho(:)
 		real(mp), allocatable :: rho_back(:)				!1D sheath: surface charge
 		real(mp), allocatable :: phi(:)
-
-		complex(mp), allocatable :: W(:)
 	end type
 
 contains
@@ -39,11 +37,13 @@ contains
 		allocate(this%phi(ng))
 		allocate(this%rho(ng))
 		allocate(this%rho_back(ng))
+
+		this%E = 0.0_mp
+		this%phi = 0.0_mp
+		this%rho = 0.0_mp
 		this%rho_back = 0.0_mp
 
-		allocate(this%W(ng))
-
-		call DSTPoisson_setup(this%ng,this%L,this%W)
+!		call DSTPoisson_setup(this%ng,this%L,this%W)
 	end subroutine
 
 	subroutine setMesh(this,rho_back)
@@ -60,7 +60,6 @@ contains
 		deallocate(this%rho)
 		deallocate(this%rho_back)
 		deallocate(this%phi)
-		deallocate(this%W)
 	end subroutine
 
 !===========Mesh Solver===============================================

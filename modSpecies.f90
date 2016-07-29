@@ -39,6 +39,7 @@ contains
 
 		this%xp = xp0
 		this%vp = vp0
+		this%Ep = 0.0_mp
 	end subroutine
 
 	subroutine destroySpecies(this)
