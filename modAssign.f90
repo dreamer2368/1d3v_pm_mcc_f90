@@ -23,20 +23,21 @@ contains
 
 		this%ng = ng
 		this%order = order
+
+		allocate(this%g(1,1))
+		allocate(this%frac(1,1))
+		allocate(this%h(1))
+		this%g = 0
+		this%frac = 0.0_mp
+		this%h = 0.0_mp
 	end subroutine
 
 	subroutine destroyAssign(this)
 		type(pmAssign), intent(inout) :: this
 
-		if( allocated(this%g) ) then
-			deallocate(this%g)
-		end if
-		if( allocated(this%frac) ) then
-			deallocate(this%frac)
-		end if
-		if( allocated(this%h) ) then
-			deallocate(this%h)
-		end if
+		deallocate(this%g)
+		deallocate(this%frac)
+		deallocate(this%h)
 	end subroutine
 
 	subroutine assignMatrix(this,m,xp)
@@ -63,15 +64,9 @@ contains
 
 		np = size(xp)
 		this%np = np
-		if( allocated(this%g) ) then
-			deallocate(this%g)
-		end if
-		if( allocated(this%frac) ) then
-			deallocate(this%frac)
-		end if
-		if( allocated(this%h) ) then
-			deallocate(this%h)
-		end if
+		deallocate(this%g)
+		deallocate(this%frac)
+		deallocate(this%h)
 		allocate(this%g(np,this%order+1))
 		allocate(this%frac(np,this%order+1))
 		allocate(this%h(np))
@@ -107,15 +102,9 @@ contains
 
 		np = size(xp)
 		this%np = np
-		if( allocated(this%g) ) then
-			deallocate(this%g)
-		end if
-		if( allocated(this%frac) ) then
-			deallocate(this%frac)
-		end if
-		if( allocated(this%h) ) then
-			deallocate(this%h)
-		end if
+		deallocate(this%g)
+		deallocate(this%frac)
+		deallocate(this%h)
 		allocate(this%g(np,this%order+1))
 		allocate(this%frac(np,this%order+1))
 		allocate(this%h(np))
