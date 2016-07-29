@@ -111,14 +111,12 @@ contains
 		p = r
 
 		i = 0
-		do
+		do while( DOT_PRODUCT(r,r) > tol )
 			alpha = DOT_PRODUCT(r,r)/DOT_PRODUCT(p,K(p,dx))
 			x = x + alpha*p
 			r1 = r
 			r = r - alpha*K(p,dx)
-			if( DOT_PRODUCT(r,r) < tol ) then
-				exit
-			end if
+
 			beta = DOT_PRODUCT(r,r)/DOT_PRODUCT(r1,r1)
 			p = r + beta*p
 			i = i+1
