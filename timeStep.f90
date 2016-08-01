@@ -40,7 +40,9 @@ contains
 			end subroutine
 		end interface
 		optional :: QoI
-		J = 0.0_mp
+		if( present(J) ) then
+			J = 0.0_mp
+		end if
 		k=0
 
 		!Time stepping
@@ -184,10 +186,11 @@ contains
 !
 !===================Adjoint time stepping==========================
 
-	subroutine backward_sweep(adj,pm,r, dJ, Dtarget_input,target_input,source)
+	subroutine backward_sweep(adj,pm,r, grad, dJ, Dtarget_input,dJdA,target_input,source)
 		type(adjoint), intent(inout) :: adj
 		type(PM1D), intent(inout) :: pm
 		type(recordData), intent(inout) :: r
+		real(mp), intent(out) :: grad(:)
 		integer :: k, nk, i
 		interface
 			subroutine dJ(adj,pm,k)
@@ -209,6 +212,17 @@ contains
 			end subroutine
 		end interface
 		interface
+			subroutine dJdA(adj,pm,k,str,grad)
+				use modPM1D
+				use modAdj
+				type(adjoint), intent(in) :: adj
+				type(PM1D), intent(in) :: pm
+				integer, intent(in) :: k
+				character(len=*), intent(in) :: str
+				real(mp), intent(inout) :: grad(:)
+			end subroutine
+		end interface
+		interface
 			subroutine target_input(pm,k,str)
 				use modPM1D
 				type(PM1D), intent(inout) :: pm
@@ -222,9 +236,8 @@ contains
 				type(PM1D), intent(inout) :: pm
 			end subroutine
 		end interface
+		grad = 0.0_mp
 
-!		adj%xps = 0.0_mp
-!		adj%vps = 0.0_mp
 		do k=1,pm%nt
 			nk = pm%nt+1-k
 
@@ -232,6 +245,9 @@ contains
 
 			!=====  Checkpointing  =====
 			call checkpoint(pm,r,nk,target_input,source)
+
+			!===== dJdA : 1st sensitivity calculation ======
+			call dJdA(adj,pm,nk,'before',grad)
 
 			!======= dJ : source term ==========
 			call dJ(adj,pm,nk)
@@ -268,10 +284,17 @@ contains
 			call Dtarget_input(adj,pm,nk,'xp')
 			call Adj_move(adj)
 
-!			call recordAdjoint(pm%r,adj,nk)									!record for nk=1~Nt : xps_nk and vp_(nk+1/2)
+			!===== dJdA : 2nd sensitivity calculation ======
+			call dJdA(adj,pm,nk,'after',grad)
 		end do
 		nk = 0
 		call reset_Dadj(adj)
+		!=====  Checkpointing  =====
+		call checkpoint(pm,r,nk,target_input,source)
+
+		!===== dJdA : 1st sensitivity calculation ======
+		call dJdA(adj,pm,nk,'before',grad)
+
 		!======= dJ : source term ==========
 		call dJ(adj,pm,nk)
 
@@ -282,6 +305,9 @@ contains
 		!======= dx_p =============
 		call Dtarget_input(adj,pm,nk,'xp')
 		call Adj_move(adj)
+
+		!===== dJdA : 2nd sensitivity calculation ======
+		call dJdA(adj,pm,nk,'after',grad)
 	end subroutine
 
 	subroutine checkpoint(pm,r,nk,target_input,source)
