@@ -192,7 +192,7 @@ contains
 		end do
 
 		if( MINVAL(a%g(:,1))<1 .or. MAXVAL(a%g(:,2))>a%ng ) then
-			print *, MINVAL(a%g(:,1)), MAXVAL(a%g(:,2))
+			print *, MINLOC(a%g(:,1)),MINVAL(a%g(:,1)),MAXLOC(a%g(:,2)), MAXVAL(a%g(:,2))
 			print *, 'Boundary handling is failed. particle is way outside BC. stopped time stepping.'
 			stop
 		end if
