@@ -20,6 +20,48 @@ contains
 		character(len=*), intent(in) :: str
 	end subroutine
 
+	subroutine Null_dJdA(adj,pm,k,str,grad)
+		type(adjoint), intent(in) :: adj
+		type(PM1D), intent(in) :: pm
+		integer, intent(in) :: k
+		character(len=*), intent(in) :: str
+		real(mp), intent(inout) :: grad(:)
+	end subroutine
+
+!==============Initial electron temperature================================
+
+	subroutine Te(pm,k,str)
+		type(PM1D), intent(inout) :: pm
+		integer, intent(in) :: k
+		character(len=*), intent(in) :: str
+
+		SELECT CASE (str)
+			CASE('xp')
+				if(k.eq.1) then
+					pm%p(1)%vp = pm%p(1)%vp*( 1.0_mp + pm%A0(2) )
+				end if
+		END SELECT
+	end subroutine
+
+	subroutine dTe(adj,pm,k,str)
+		type(adjoint), intent(inout) :: adj
+		type(PM1D), intent(in) :: pm
+		integer, intent(in) :: k
+		character(len=*), intent(in) :: str
+	end subroutine
+
+	subroutine dTedA(adj,pm,k,str,grad)
+		type(adjoint), intent(in) :: adj
+		type(PM1D), intent(in) :: pm
+		integer, intent(in) :: k
+		character(len=*), intent(in) :: str
+		real(mp), intent(inout) :: grad(:)
+
+		if( str.eq.'after' .and. k.eq.0 ) then
+			grad(1) = -sum( adj%p(1)%vp(:,1)*pm%p(1)%vp(:,1) )/pm%dt
+		end if
+	end subroutine
+
 !==============Wave perturbation on position===============================
 
 	subroutine IC_wave(this,k,str)
@@ -33,6 +75,32 @@ contains
 					this%p(1)%xp = this%p(1)%xp + this%dt*this%A0(2)*this%L/this%p(1)%np*SIN(4.0_mp*pi*this%p(1)%xp/this%L)		!xp_(Ni-1) : k=Ni, xp_Ni : k=(Ni+1)
 				end if
 		END SELECT
+	end subroutine
+
+	subroutine dIC_wave(adj,pm,k,str)
+		type(adjoint), intent(inout) :: adj
+		type(PM1D), intent(in) :: pm
+		integer, intent(in) :: k
+		character(len=*), intent(in) :: str
+
+		select case (str)
+			case ('xp')
+				if( k .eq. pm%ni-1 ) then
+					adj%dp(1)%xp = adj%dp(1)%xp - adj%p(1)%xp*(pm%A0(2)*pm%L/pm%p(1)%np*4.0_mp*pi/pm%L)*COS(4.0_mp*pi*pm%p(1)%xp/pm%L)
+				end if
+		end select
+	end subroutine
+
+	subroutine dIC_wave_dB(adj,pm,k,str,grad)
+		type(adjoint), intent(in) :: adj
+		type(PM1D), intent(in) :: pm
+		integer, intent(in) :: k
+		character(len=*), intent(in) :: str
+		real(mp), intent(inout) :: grad(:)
+
+		if( str.eq.'before' .and. k.eq.pm%ni-1 ) then
+			grad(1) = grad(1) + SUM( - pm%L/pm%p(1)%np*SIN( 4.0_mp*pi*pm%p(1)%xp/pm%L )*adj%p(1)%xp )
+		end if
 	end subroutine
 
 !==============RF discharge current source=================================

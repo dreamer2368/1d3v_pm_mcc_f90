@@ -7,13 +7,103 @@ module testmodule
 
 contains
 
+	subroutine Landau(fk,ek)
+		real(mp), intent(in) :: fk
+		real(mp), intent(out) :: ek
+		type(adjoint) :: adj
+		type(PM1D) :: pm
+		type(recordData) :: r
+		real(mp) :: Tf=0.2_mp,Ti=0.1_mp
+		integer, parameter :: Ng=64, Np=2, N=1
+		real(mp) :: vT = 1.0_mp, L=4.0_mp*pi
+		real(mp) :: dt=0.1_mp
+		character(len=100)::dir
+		real(mp) :: J0,J1,grad(1)
+		ek = 0.0_mp
+
+		call buildPM1D(pm,Tf,Ti,Ng,N,0,0,1,dt=dt,L=L,A=(/0.1_mp,0.0_mp/))
+		dir = 'landau/before'
+		call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),1)
+		call set_null_discharge(r)
+		call Landau_initialize(pm,Np,vT)
+		call forwardsweep(pm,r,Te,Null_source,MPE,J0)
+		call printPlasma(r)
+		print *, 'J0=',J0
+
+		call buildAdjoint(adj,pm)
+		call backward_sweep(adj,pm,r,grad,dMPE,dTe,dTedA,Te,Null_source)
+
+		print *, 'dJdA=',grad
+
+		call destroyPM1D(pm)
+		call destroyRecord(r)
+		dir = 'landau/after'
+		call buildPM1D(pm,Tf,Ti,Ng,N,0,0,1,dt=dt,L=L,A=(/0.1_mp,fk/))
+		call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),1)
+		call Landau_initialize(pm,Np,vT)
+		call forwardsweep(pm,r,Te,Null_source,MPE,J1)
+		call printPlasma(r)
+		print *, 'J1=',J1
+		print *, 'dJdA = ',(J1-J0)/fk
+		ek = ABS( (J1-J0)/fk - grad(1) )/grad(1)
+
+		call destroyAdjoint(adj)
+		call destroyRecord(r)
+		call destroyPM1D(pm)
+	end subroutine
+
+	subroutine twostream(fk,ek)
+		real(mp), intent(out) :: ek
+		real(mp), intent(in) :: fk
+		type(PM1D) :: pm
+		type(adjoint) :: adj
+		type(recordData) :: r
+		integer, parameter :: Ng=64, Np=10**4, N=1
+		real(mp) :: v0 = 0.2_mp, vT = 0.0_mp
+		integer :: mode=1
+		real(mp) :: J0,J1, grad(1)
+		character(len=100)::dir1
+		ek = 0.0_mp
+
+		call buildPM1D(pm,45.0_mp,40.0_mp,Ng,N,0,0,1,A=(/1.0_mp,0.0_mp/))
+		dir1='twostream/before'
+		call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir1),5)
+		call set_null_discharge(r)
+		call twostream_initialize(pm,Np,v0,vT,mode)
+		call forwardsweep(pm,r,IC_wave,Null_source,MKE,J0)
+		call printPlasma(r)
+		print *, 'J0=',J0
+
+		call buildAdjoint(adj,pm)
+		call backward_sweep(adj,pm,r,grad,dMKE,dIC_wave,dIC_wave_dB,IC_wave,Null_source)
+
+		print *, 'dJdA=',grad
+
+		call destroyPM1D(pm)
+		call destroyRecord(r)
+		dir1 = 'twostream/after'
+		call buildPM1D(pm,45.0_mp,40.0_mp,Ng,N,0,0,1,A=(/1.0_mp,fk/))
+		call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir1),5)
+		call set_null_discharge(r)
+		call twostream_initialize(pm,Np,v0,vT,mode)
+		call forwardsweep(pm,r,IC_wave,Null_source,MKE,J1)
+		print *, 'J1=',J1
+		print *, 'dJdA=',(J1-J0)/fk
+
+		ek = ABS( grad(1) - (J1-J0)/fk )
+
+		call destroyAdjoint(adj)
+		call destroyRecord(r)
+		call destroyPM1D(pm)
+	end subroutine
+
 	subroutine test_backward_sweep
 		type(PM1D) :: pm
 		type(adjoint) :: adj
 		type(recordData) :: r
 		integer, parameter :: Ng=64, Np=2, N=2
 		real(mp) :: qs = 3.4_mp, ms = 2.7_mp, spwt = 1.9_mp, xp(Np), vp(Np,3)
-		real(mp) :: rho_back(Ng), J0=0.0_mp,J1=0.0_mp
+		real(mp) :: rho_back(Ng), J0=0.0_mp,J1=0.0_mp,grad(1)
 		real(mp) :: fxp = (0.1_mp)**9, dxp
 		integer :: j
 		character(len=1000)::dir1,dir2
@@ -39,7 +129,7 @@ contains
 		call printPlasma(r)
 
 		call buildAdjoint(adj,pm)
-		call backward_sweep(adj,pm,r,dTestQoI,Null_Dinput,Null_input,Null_source)
+		call backward_sweep(adj,pm,r,grad,dTestQoI,Null_Dinput,Null_dJdA,Null_input,Null_source)
 
 		print *, 'dJdxp1:', -adj%p(1)%xp/pm%dt
 		print *, 'dJdxp2:', -adj%p(2)%xp/pm%dt

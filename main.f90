@@ -18,7 +18,10 @@ program main
 !	call test_ext_voltage_Poisson
 !   call Ar_discharge
 !	call test_particle_adj(64,2)
-	call test_backward_sweep
+!	call test_backward_sweep
+!	call twostream
+!	call Landau
+	call adjoint_convergence(Landau)
 
 	! print to screen
 	print *, 'program main...done.'
@@ -26,6 +29,38 @@ program main
 contains
 
 	! You can add custom subroutines/functions here later, if you want
+
+	subroutine adjoint_convergence(problem)
+		integer, parameter :: N=20
+		real(mp) :: fk(N)
+		real(mp) :: ek(N)
+		integer :: i
+		interface
+			subroutine problem(fk,ek)
+				use modPM1D
+				use modAdj
+				use modRecord
+				real(mp), intent(in) :: fk
+				real(mp), intent(out) :: ek
+				type(adjoint) :: adj
+				type(PM1D) :: pm
+				type(recordData) :: r
+			end subroutine
+		end interface
+
+		fk = (/ ( 0.1_mp**i,i=-1,N-2 ) /)
+		ek = 0.0_mp
+
+
+		do i=1,N
+			call problem(fk(i),ek(i))
+		end do
+
+		print *, '----fk-------		---------ek----'
+		do i=1,N
+			print *, fk(i),ek(i),';'
+		end do
+	end subroutine
 
 !   subroutine Ar_discharge
 !      type(PM1D) :: pm

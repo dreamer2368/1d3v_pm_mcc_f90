@@ -6,6 +6,32 @@ module init
 
 contains
 
+	subroutine Landau_initialize(pm,Np,vT)
+		type(PM1D), intent(inout) :: pm
+		integer, intent(in) :: Np
+		real(mp), intent(in) :: vT
+		real(mp) :: xp0(Np), vp0(Np,3),rho_back
+		real(mp) :: L,qs,ms
+		integer :: i,j,N
+		L=pm%L
+		N=pm%n
+
+		qs = -pm%wp*pm%wp/(pm%n*Np/L)
+		ms = -qs
+		rho_back = -qs*pm%n*Np/L
+
+		call init_random_seed
+		vp0 = vT*randn(Np,3)
+		call RANDOM_NUMBER(xp0)
+		xp0 = xp0*L
+		xp0 = xp0 + pm%A0(1)*SIN( 2.0_mp*pi*xp0/L )
+		do i=1,N
+			call buildSpecies(pm%p(i),qs,ms,1.0_mp)
+			call setSpecies(pm%p(i),Np,xp0,vp0)
+		end do
+		call setMesh(pm%m,rho_back*(/ ( 1.0_mp, i=1,pm%m%ng) /))
+	end subroutine
+
 	subroutine twostream_initialize(this,Np,v0,vT,mode)		!generate initial distribution
 		type(PM1D), intent(inout) :: this
 		integer, intent(in) :: Np, mode
@@ -28,8 +54,8 @@ contains
 
 		do i=1,this%n
 			!spatial distribution initialize
-			xp0 = (/ ( j*L/Np, j=0,Np-1 ) /) + 0.5*(i-1)*L/Np
-			xp0 = xp0 + this%A0*L/Np*SIN( 2.0_mp*pi*xp0/L*mode )
+			xp0 = (/ ( j*L/Np, j=0,Np-1 ) /) + 0.5_mp*(i-1)*L/Np
+			xp0 = xp0 + this%A0(1)*L/Np*SIN( 2.0_mp*pi*xp0/L*mode )
 
 			call buildSpecies(this%p(i),qs,ms,1.0_mp)
 			call setSpecies(this%p(i),Np,xp0,vp0)
