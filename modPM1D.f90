@@ -54,7 +54,7 @@ contains
 		this%mBCindex = mBC
 		this%nt = CEILING(Tf/this%dt)
 		this%dt = Tf/this%nt
-		this%ni = FLOOR(Ti/this%dt) + 1
+		this%ni = FLOOR(Ti/this%dt)
 		this%wp = 1.0_mp
 		print *, 'Plasma is created'
 		print *, 'L = (',this%L,')'
