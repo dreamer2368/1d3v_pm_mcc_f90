@@ -5,7 +5,7 @@ module ArMCC
 	use random
 	implicit none
 
-	real(mp), parameter :: q_e = 1.602E-19, m_e = 9.10938356e-31, m_Ar = 6.6335209e-26			!kg
+	real(mp), parameter :: q_e = 1.602E-19, m_e = 9.10938356e-31, m_Ar = 6.68E-26!6.6335209e-26			!kg
 	real(mp), parameter :: max_sigmav_e = 6.6038e-13, max_sigmav_Ar = 2.8497e-14				!m3/s
 	real(mp), parameter :: extengy0 = 11.55_mp, ionengy0 = 15.76_mp									!eV (excitation, ionization)
 	real(mp) :: col_prob_e = 0.0_mp, col_prob_Ar = 0.0_mp
