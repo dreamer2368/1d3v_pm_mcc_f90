@@ -7,49 +7,57 @@ module testmodule
 
 contains
 
-	subroutine Landau(fk,ek)
-		real(mp), intent(in) :: fk
-		real(mp), intent(out) :: ek
+	subroutine Landau(fk,Ti,str,k,output)
+		real(mp), intent(in) :: fk, Ti
+		character(len=*), intent(in) ::str
+		integer, intent(in) :: k
+		real(mp), intent(out) :: output(:)
 		type(adjoint) :: adj
 		type(PM1D) :: pm
 		type(recordData) :: r
-		real(mp) :: Tf=0.2_mp,Ti=0.1_mp
-		integer, parameter :: Ng=64, Np=2, N=1
+		real(mp) :: Tf
+		integer, parameter :: Ng=64, Np=3*10**5, N=1
 		real(mp) :: vT = 1.0_mp, L=4.0_mp*pi
 		real(mp) :: dt=0.1_mp
 		character(len=100)::dir
 		real(mp) :: J0,J1,grad(1)
-		ek = 0.0_mp
+		output = 0.0_mp
+		Tf = 0.1_mp + Ti
 
-		call buildPM1D(pm,Tf,Ti,Ng,N,0,0,1,dt=dt,L=L,A=(/0.1_mp,0.0_mp/))
-		dir = 'landau/before'
-		call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),1)
-		call set_null_discharge(r)
-		call Landau_initialize(pm,Np,vT)
-		call forwardsweep(pm,r,Te,Null_source,MPE,J0)
-		call printPlasma(r)
-		print *, 'J0=',J0
+		SELECT CASE(k)
+			CASE(0)
+				call buildPM1D(pm,Tf,Ti,Ng,N,0,0,1,dt=dt,L=L,A=(/0.1_mp,0.0_mp/))
+				dir = str//'/before'
+				call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
+				call set_null_discharge(r)
+				call Landau_initialize(pm,Np,vT)
+				call forwardsweep(pm,r,Te,Null_source,MPE,J0)
+!				call printPlasma(r)
+				print *, 'J0=',J0
 
-		call buildAdjoint(adj,pm)
-		call backward_sweep(adj,pm,r,grad,dMPE,dTe,dTedA,Te,Null_source)
+				call buildAdjoint(adj,pm)
+				call backward_sweep(adj,pm,r,grad,dMPE,dTe,dTedA,Te,Null_source)
 
-		print *, 'dJdA=',grad
+				print *, 'dJdA=',grad
 
-		call destroyPM1D(pm)
-		call destroyRecord(r)
-		dir = 'landau/after'
-		call buildPM1D(pm,Tf,Ti,Ng,N,0,0,1,dt=dt,L=L,A=(/0.1_mp,fk/))
-		call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),1)
-		call Landau_initialize(pm,Np,vT)
-		call forwardsweep(pm,r,Te,Null_source,MPE,J1)
-		call printPlasma(r)
-		print *, 'J1=',J1
-		print *, 'dJdA = ',(J1-J0)/fk
-		ek = ABS( (J1-J0)/fk - grad(1) )/grad(1)
+				output(1:2) = (/J0, grad(1)/)
 
-		call destroyAdjoint(adj)
-		call destroyRecord(r)
-		call destroyPM1D(pm)
+				call destroyAdjoint(adj)
+				call destroyPM1D(pm)
+				call destroyRecord(r)
+			CASE(1)
+				dir = str//'/after'
+				call buildPM1D(pm,Tf,Ti,Ng,N,0,0,1,dt=dt,L=L,A=(/0.1_mp,fk/))
+				call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
+				call Landau_initialize(pm,Np,vT)
+				call forwardsweep(pm,r,Te,Null_source,MPE,J1)
+!				call printPlasma(r)
+				print *, 'J1=',J1
+				output(1) = J1
+
+				call destroyRecord(r)
+				call destroyPM1D(pm)
+		END SELECT
 	end subroutine
 
 	subroutine twostream(fk,ek)
