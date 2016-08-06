@@ -31,17 +31,22 @@ contains
 	! You can add custom subroutines/functions here later, if you want
 
 	subroutine adjoint_convergence(problem)
-		integer, parameter :: N=20
+		integer, parameter :: N=20, Nt=5
 		real(mp) :: fk(N)
-		real(mp) :: ek(N)
-		integer :: i
+		real(mp) :: Tk(Nt)
+		real(mp) :: ek(N,Nt)
+		character(len=100) :: dir
+		integer :: i,j
+		real(mp) :: J0,J1,grad(Nt),temp(2)
 		interface
-			subroutine problem(fk,ek)
+			subroutine problem(fk,Ti,str,k,output)
 				use modPM1D
 				use modAdj
 				use modRecord
-				real(mp), intent(in) :: fk
-				real(mp), intent(out) :: ek
+				real(mp), intent(in) :: fk, Ti
+				character(len=*), intent(in) ::str
+				integer, intent(in) :: k
+				real(mp), intent(out) :: output(:)
 				type(adjoint) :: adj
 				type(PM1D) :: pm
 				type(recordData) :: r
@@ -49,17 +54,34 @@ contains
 		end interface
 
 		fk = (/ ( 0.1_mp**i,i=-1,N-2 ) /)
+		Tk = (/ 0.2_mp, 0.5_mp, 5.0_mp, 10.0_mp, 20.0_mp /)
 		ek = 0.0_mp
 
+		dir = 'landau'
 
-		do i=1,N
-			call problem(fk(i),ek(i))
+		do j=1,size(Tk)
+			call problem(fk(i),Tk(j),trim(dir),0,temp)
+			J0 = temp(1)
+			grad(j) = temp(2)
+			do i=1,N
+				call problem(fk(i),Tk(j),trim(dir),1,temp)
+				J1 = temp(1)
+				ek(i,j) = ABS( ((J1-J0)/fk(i) - grad(j))/grad(j) )
+			end do
 		end do
 
-		print *, '----fk-------		---------ek----'
-		do i=1,N
-			print *, fk(i),ek(i),';'
-		end do
+		open(unit=301,file='data/'//trim(dir)//'/fk.bin',status='replace',form='unformatted',access='stream')
+		write(301) fk
+		close(301)
+		open(unit=301,file='data/'//trim(dir)//'/ek.bin',status='replace',form='unformatted',access='stream')
+		write(301) ek
+		close(301)
+		open(unit=301,file='data/'//trim(dir)//'/grad.bin',status='replace',form='unformatted',access='stream')
+		write(301) grad
+		close(301)
+		open(unit=301,file='data/'//trim(dir)//'/output.bin',status='replace',form='unformatted',access='stream')
+		write(301) N,Nt
+		close(301)
 	end subroutine
 
 !   subroutine Ar_discharge
@@ -68,49 +90,54 @@ contains
 !      real(mp), parameter :: Kb = 1.38065E-23, EV_TO_K = 11604.52_mp, eps = 8.85418782E-12, mTorr_to_Pa = 0.13332237_mp
 !      real(mp) :: I0 = 25.6_mp, I_f = 13.56E6                !I0(A/m2), If(Hz)
 !      real(mp) :: TN = 0.026_mp, PN = 50.0_mp, gden        !TN(eV), PN(mTorr), gden(m-3)
-!      real(mp) :: T0 = 1.0_mp, n0, f0, wp0, lambda0
-!      real(mp) :: L = 0.02_mp, area = 0.016_mp               !L(m), area(m2)
-!      integer, parameter :: Np = 1E6, Ng = 300
-!      real(mp) :: spwt, xp0(Np), vp0(Np,3)
-!      real(mp) :: dt
-!      integer :: i
-!      gden = (PN*mTorr_to_Pa)/(q_e*TN)
-!      
-!      !Saha equilibrium
-!      f0 = 2.0_mp*exp(-ionengy0/T0)
-!      n0 = gden*f0
-!      spwt = n0*L/Np
-!      
-!      print *, 'gden(m-3): ',gden,', n0(m-3): ',n0,', spwt(m-2): ',spwt
-!      
-!      wp0 = sqrt(n0*q_e*q_e/m_e/eps)
-!      lambda0 = sqrt(eps*T0/n0/q_e)
-!      
-!      print *, 'L = ',L,', lambda0 = ',lambda0,' e = lambda/L = ',lambda0/L
-!      
-!      dt = 0.1_mp/wp0
-!      print *, 'dt = ',dt
-!      call init_random_seed
-!      call null_collision(gden,dt)
-!      print *, 'P_e = ',col_prob_e,', P_Ar = ', col_prob_Ar
-!      
-!      call buildPM1D(pm,10000.0_mp*dt,100.0_mp*dt,Ng,2,pBC=1,mBC=2,order=1,dt=dt,L=L,eps=eps)
-!      call buildRecord(r,pm%nt,2,pm%L,pm%ng,'rf_Ar',20)
-!      call set_Ar_discharge(pm,(/spwt, spwt/),(/TN,gden,I0,I_f/),r)
-!      call RANDOM_NUMBER(xp0)
-!      vp0 = randn(Np,3)*sqrt(T0*q_e/m_e)
-!      call setSpecies(pm%p(1),Np,xp0*L,vp0)
-!      call RANDOM_NUMBER(xp0)
-!      vp0 = randn(Np,3)*sqrt(T0*q_e/m_Ar)
-!      call setSpecies(pm%p(2),Np,xp0*L,vp0)
-!   
+!	  real(mp), parameter :: n0=10.0_mp**15!, v0_e = 5.9E5, v0_Ar = 2.19E3
+!	  real(mp) :: T0=1.0_mp, wp0, lambda0, v0_e, v0_Ar
+!	  real(mp), parameter :: L = 0.02_mp, area = 0.016_mp               !L(m), area(m2)
+!	  integer, parameter :: nc2p = 10**6, Np=CEILING(n0*L*area/nc2p), Ng = 300
+!	  real(mp) :: spwt, xp0(Np), vp0(Np,3)
+!	  real(mp) :: dt
+!	  integer :: i
+!	  gden = (PN*mTorr_to_Pa)/(q_e*TN)
+!
+!	  spwt = n0*L/Np                      !spwt = nc2p/area
+!
+!	  print *, 'gden(m-3): ',gden,', n0(m-3): ',n0,', spwt(m-2): ',spwt
+!
+!!      T0 = 0.5_mp*m_e*v0_e**2/q_e*EV_TO_K
+!	  v0_e = sqrt(2.0_mp*T0/EV_TO_K*q_e/m_e)
+!	  v0_Ar = sqrt(2.0_mp*T0/EV_TO_K*q_e/m_Ar)
+!	  wp0 = sqrt(n0*q_e*q_e/m_e/eps)
+!	  lambda0 = sqrt(eps*T0/n0/q_e)
+!
+!	  print *, 'L = ',L,', lambda0 = ',lambda0,' e = lambda/L = ',lambda0/L
+!
+!	  dt = 7.20179E-11
+!	  print *, 'dt = ',dt,', wp*dt=',wp0*dt
+!	  call init_random_seed
+!	  call null_collision(gden,dt)
+!	  print *, 'P_e = ',col_prob_e,', P_Ar = ', col_prob_Ar
+!
+!	  call buildPM1D(pm,40000.0_mp*dt,100.0_mp*dt,Ng,2,pBC=1,mBC=2,order=1,dt=dt,L=L,eps=eps)
+!	  call buildRecord(r,pm%nt,2,pm%L,pm%ng,'rf_Ar4',20)
+!	  open(unit=301,file='data/rf_Ar4/input',status='replace',form='unformatted',access='stream')
+!	  write(301) TN, PN, v0_e, v0_Ar, I0, L, area, dt
+!	  close(301)
+!
+!	  call set_Ar_discharge(pm,(/spwt, spwt/),(/TN,gden,I0,I_f/),r)
+!	  call RANDOM_NUMBER(xp0)
+!	  vp0 = randn(Np,3)*v0_e
+!	  call setSpecies(pm%p(1),Np,xp0*L,vp0)
+!	  call RANDOM_NUMBER(xp0)
+!	  vp0 = randn(Np,3)*v0_Ar
+!	  call setSpecies(pm%p(2),Np,xp0*L,vp0)
+!
 !      call forwardsweep(pm,r,RF_current,Null_source)
 !
 !      call printPlasma(r)
 !
 !      call destroyPM1D(pm)
 !      call destroyRecord(r)
-!   end subroutine
+   end subroutine
 !
 !	subroutine cross_section
 !		integer, parameter :: N=10000
