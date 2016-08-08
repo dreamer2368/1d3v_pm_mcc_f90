@@ -1,5 +1,7 @@
 module constants
 
+!   use mpi
+
 	implicit none
 
 	include 'mpif.h'

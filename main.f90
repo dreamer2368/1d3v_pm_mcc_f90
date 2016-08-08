@@ -22,7 +22,8 @@ program main
 !	call twostream
 !	call Landau
 !	call adjoint_convergence(Landau)
-	call random_test
+!	call random_test
+   call Landau_adjoint_sampling
 
 	! print to screen
 	print *, 'program main...done.'
@@ -37,8 +38,10 @@ type(adjoint) :: adj
 type(PM1D) :: pm
 type(recordData) :: r
 integer, parameter :: Nsample = 10
-integer :: sample_per_core, recvbuf(Nsample), sendcnt,
-integer, allocatable :: sendbuf(:), recvcnt(:)
+integer :: sample_per_core, sendcnt
+integer, allocatable :: recvcnt(:), displc(:)
+real(mp), allocatable :: sendbuf(:,:)
+real(mp) :: recvbuf(Nsample,3)                     !(/J0, J1, dJdA/)
 real(mp) :: Tf = 20.1_mp, Ti = 20.0_mp
 integer, parameter :: Ng=64, Np=3*10**5, N=1
 real(mp) :: xp0(Np), vp0(Np,3)
@@ -46,6 +49,7 @@ real(mp) :: vT = 1.0_mp, L=4.0_mp*pi
 real(mp) :: dt=0.1_mp
 character(len=100)::dir
 real(mp) :: J0,J1,grad(1)
+integer :: i
 
 call MPI_INIT(ierr)
 call MPI_COMM_RANK(MPI_COMM_WORLD,my_rank,ierr)
@@ -53,33 +57,49 @@ call MPI_COMM_SIZE(MPI_COMM_WORLD,s,ierr)
 sample_per_core = Nsample/s
 
 if( my_rank.eq.s-1 ) then
-	allocate(recvcnt(s))
-	recvcnt(1:MOD(Nsample,s)+1) = sample_per_core+1
-	recvcnt(MOD(Nsample,s)+1:s) = sample_per_core
+   print *, 'size: ',s
+   print *, 'sample/core: ',sample_per_core
+   print *, 'remainder: ',MOD(Nsample,s)
+	allocate(recvcnt(0:s-1))
+   allocate(displc(0:s-1))
+	recvcnt(0:MOD(Nsample,s)-1) = sample_per_core+1
+	recvcnt(MOD(Nsample,s):s+1) = sample_per_core
+   print *, recvcnt
+   displc = 0
+   do i=0,s-1
+      displc(i) = SUM(recvcnt(0:i-1))
+   end do
+   print *, displc
 end if
 
 call init_random_seed(my_rank)
 
-if( MOD(Nsample,s)<my_rank ) then
+if(my_rank<MOD(Nsample,s) ) then
 	sendcnt = sample_per_core+1
-	allocate(sendbuf(sendcnt))
+	allocate(sendbuf(sendcnt,3))
 	call RANDOM_NUMBER(sendbuf)
 	print *, 'My rank: ',my_rank
 	print *, sendbuf
 else
 	sendcnt = sample_per_core
-	allocate(sendbuf(sendcnt))
+	allocate(sendbuf(sendcnt,3))
 	call RANDOM_NUMBER(sendbuf)
 	print *, 'My rank: ',my_rank
 	print *, sendbuf
 end if
-call MPI_GATHER(sendbuf,sendcnt,MPI_INT,recvbuf,recvcnt,MPI_INT,s-1,MPI_COMM_WORLD,ierr)
-print *, 'Gathering'
-print *, recvbuf
+call MPI_GATHERV(sendbuf,sendcnt,MPI_DOUBLE,recvbuf,recvcnt,displc,MPI_DOUBLE,s-1,MPI_COMM_WORLD,ierr)
+
+call MPI_FINALIZE(ierr)
+if( my_rank.eq.s-1 ) then
+   print *, 'Gathering'
+   print *, recvbuf
+end if
 
 deallocate(sendbuf)
-deallocate(recvbuf)
-
+if( my_rank.eq.s-1) then
+   deallocate(recvcnt)
+   deallocate(displc)
+end if
 !call buildPM1D(pm,Tf,Ti,Ng,N,0,0,1,dt=dt,L=L,A=(/0.1_mp,0.0_mp/))
 !dir = str//'/before'
 !call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
@@ -95,7 +115,6 @@ deallocate(recvbuf)
 !
 !print *, 'dJdA=',grad
 
-call MPI_FINALIZE(ierr)
 end subroutine
 
 	subroutine adjoint_convergence(problem)
