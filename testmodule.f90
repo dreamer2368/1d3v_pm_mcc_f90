@@ -16,11 +16,10 @@ contains
 
 		call init_random_seed(my_rank)
 		call RANDOM_NUMBER(test)
-		write(6,100) my_rank, test
+      print *, 'My rank: ', my_rank
+      print *, test
 
 		call MPI_FINALIZE(ierr)
-
-100   format('Hello World! I am rank ', I2, /, 'and my random number is',/, f4.4)
 	end subroutine
 
 	subroutine Landau(fk,Ti,str,k,output)
