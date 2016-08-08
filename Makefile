@@ -1,5 +1,5 @@
 ### Compilers & flags
-F90=gfortran
+F90=mpifort
 
 FFTWLIBS=~/bin/FFTW/lib/libfftw3.a
 VECLIBSMACOSX=

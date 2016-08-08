@@ -9,15 +9,18 @@ contains
 
 	subroutine random_test
 		real(mp) :: test(5)
+		integer :: ierr, my_rank, s
 
-		call init_random_seed
+		call MPI_INIT(ierr)
+		call MPI_COMM_RANK(MPI_COMM_WORLD,my_rank,ierr)
+
+		call init_random_seed(my_rank)
 		call RANDOM_NUMBER(test)
-		print *, test
-		call RANDOM_NUMBER(test)
-		print *, test
-		call init_random_seed
-		call RANDOM_NUMBER(test)
-		print *, test
+		write(6,100) my_rank, test
+
+		call MPI_FINALIZE(ierr)
+
+100   format('Hello World! I am rank ', I2, /, 'and my random number is',/, I2)
 	end subroutine
 
 	subroutine Landau(fk,Ti,str,k,output)
