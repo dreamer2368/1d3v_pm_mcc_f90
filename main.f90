@@ -6,8 +6,6 @@ program main
 
 	implicit none
 
-	include 'mpif.h'
-
 	! print to screen
 	print *, 'calling program main'
 
