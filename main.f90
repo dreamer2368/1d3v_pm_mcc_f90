@@ -37,12 +37,12 @@ integer :: ierr, my_rank, s
 type(adjoint) :: adj
 type(PM1D) :: pm
 type(recordData) :: r
-integer, parameter :: Nsample = 10
+integer, parameter :: Nsample = 10000
 integer :: sample_per_core, sendcnt
 integer, allocatable :: recvcnt(:), displc(:)
 real(mp), allocatable :: sendbuf(:,:)
 real(mp) :: recvbuf(Nsample,3)                     !(/J0, J1, dJdA/)
-real(mp) :: Tf = 5.1_mp, Ti = 5.0_mp
+real(mp) :: Tf = 20.1_mp, Ti = 20.0_mp
 integer, parameter :: Ng=64, Np=3*10**5, N=1
 real(mp) :: xp0(Np), vp0(Np,3)
 real(mp) :: vT = 1.0_mp, L=4.0_mp*pi
@@ -108,6 +108,7 @@ do i=1,sendcnt
 	dir = 'Landau_sampling/after'//trim(adjustl(rank_str))
 	pm%A0 = (/0.1_mp,(0.1_mp)**9 /)
 	call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
+   call destroySpecies(pm%p(1))
 	call setSpecies(pm%p(1),Np,xp0,vp0)
 	call forwardsweep(pm,r,Te,Null_source,MPE,J1)
 	!call printPlasma(r)
@@ -125,7 +126,15 @@ end do
 
 call MPI_FINALIZE(ierr)
 if( my_rank.eq.s-1 ) then
-	open(unit=301,file='data/Landau_sampling/sample.bin',status='replace',form='unformatted',access='stream')
+	open(unit=301,file='data/Landau_sampling/sample_J0.bin',status='replace',form='unformatted',access='stream')
+  	open(unit=302,file='data/Landau_sampling/sample_J1.bin',status='replace',form='unformatted',access='stream')
+	open(unit=303,file='data/Landau_sampling/sample_grad.bin',status='replace',form='unformatted',access='stream')
+   write(301) recvbuf(:,1)
+   write(302) recvbuf(:,2)
+   write(303) recvbuf(:,3)
+   close(301)
+   close(302)
+   close(303)
 end if
 
 deallocate(sendbuf)
