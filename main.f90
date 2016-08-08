@@ -31,6 +31,73 @@ contains
 
 	! You can add custom subroutines/functions here later, if you want
 
+subroutine Landau_adjoint_sampling
+integer :: ierr, my_rank, s
+type(adjoint) :: adj
+type(PM1D) :: pm
+type(recordData) :: r
+integer, parameter :: Nsample = 10
+integer :: sample_per_core, recvbuf(Nsample), sendcnt,
+integer, allocatable :: sendbuf(:), recvcnt(:)
+real(mp) :: Tf = 20.1_mp, Ti = 20.0_mp
+integer, parameter :: Ng=64, Np=3*10**5, N=1
+real(mp) :: xp0(Np), vp0(Np,3)
+real(mp) :: vT = 1.0_mp, L=4.0_mp*pi
+real(mp) :: dt=0.1_mp
+character(len=100)::dir
+real(mp) :: J0,J1,grad(1)
+
+call MPI_INIT(ierr)
+call MPI_COMM_RANK(MPI_COMM_WORLD,my_rank,ierr)
+call MPI_COMM_SIZE(MPI_COMM_WORLD,s,ierr)
+sample_per_core = Nsample/s
+
+if( my_rank.eq.s-1 ) then
+	allocate(recvcnt(s))
+	recvcnt(1:MOD(Nsample,s)+1) = sample_per_core+1
+	recvcnt(MOD(Nsample,s)+1:s) = sample_per_core
+end if
+
+call init_random_seed(my_rank)
+
+if( MOD(Nsample,s)<my_rank ) then
+	sendcnt = sample_per_core+1
+	allocate(sendbuf(sendcnt))
+	call RANDOM_NUMBER(sendbuf)
+	print *, 'My rank: ',my_rank
+	print *, sendbuf
+else
+	sendcnt = sample_per_core
+	allocate(sendbuf(sendcnt))
+	call RANDOM_NUMBER(sendbuf)
+	print *, 'My rank: ',my_rank
+	print *, sendbuf
+end if
+call MPI_GATHER(sendbuf,sendcnt,MPI_INT,recvbuf,recvcnt,MPI_INT,s-1,MPI_COMM_WORLD,ierr)
+print *, 'Gathering'
+print *, recvbuf
+
+deallocate(sendbuf)
+deallocate(recvbuf)
+
+!call buildPM1D(pm,Tf,Ti,Ng,N,0,0,1,dt=dt,L=L,A=(/0.1_mp,0.0_mp/))
+!dir = str//'/before'
+!call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
+!call set_null_discharge(r)
+!call init_random_seed
+!call Landau_initialize(pm,Np,vT)
+!call forwardsweep(pm,r,Te,Null_source,MPE,J0)
+!call printPlasma(r)
+!print *, 'J0=',J0
+!
+!call buildAdjoint(adj,pm)
+!call backward_sweep(adj,pm,r,grad,dMPE,dTe,dTedA,Te,Null_source)
+!
+!print *, 'dJdA=',grad
+
+call MPI_FINALIZE(ierr)
+end subroutine
+
 	subroutine adjoint_convergence(problem)
 		integer, parameter :: N=20, Nt=5
 		real(mp) :: fk(N)
