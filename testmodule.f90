@@ -20,7 +20,7 @@ contains
 
 		call MPI_FINALIZE(ierr)
 
-100   format('Hello World! I am rank ', I2, /, 'and my random number is',/, I2)
+100   format('Hello World! I am rank ', I2, /, 'and my random number is',/, f4.4)
 	end subroutine
 
 	subroutine Landau(fk,Ti,str,k,output)
