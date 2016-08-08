@@ -7,6 +7,19 @@ module testmodule
 
 contains
 
+	subroutine random_test
+		real(mp) :: test(5)
+
+		call init_random_seed
+		call RANDOM_NUMBER(test)
+		print *, test
+		call RANDOM_NUMBER(test)
+		print *, test
+		call init_random_seed
+		call RANDOM_NUMBER(test)
+		print *, test
+	end subroutine
+
 	subroutine Landau(fk,Ti,str,k,output)
 		real(mp), intent(in) :: fk, Ti
 		character(len=*), intent(in) ::str
@@ -30,6 +43,7 @@ contains
 				dir = str//'/before'
 				call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
 				call set_null_discharge(r)
+				call init_random_seed
 				call Landau_initialize(pm,Np,vT)
 				call forwardsweep(pm,r,Te,Null_source,MPE,J0)
 !				call printPlasma(r)
@@ -49,6 +63,7 @@ contains
 				dir = str//'/after'
 				call buildPM1D(pm,Tf,Ti,Ng,N,0,0,1,dt=dt,L=L,A=(/0.1_mp,fk/))
 				call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
+				call init_random_seed
 				call Landau_initialize(pm,Np,vT)
 				call forwardsweep(pm,r,Te,Null_source,MPE,J1)
 !				call printPlasma(r)

@@ -20,7 +20,7 @@ contains
 		ms = -qs
 		rho_back = -qs*pm%n*Np/L
 
-		call init_random_seed
+!		call init_random_seed
 		vp0 = vT*randn(Np,3)
 		call RANDOM_NUMBER(xp0)
 		xp0 = xp0*L

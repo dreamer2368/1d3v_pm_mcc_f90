@@ -6,6 +6,8 @@ program main
 
 	implicit none
 
+!	include 'mpif.h'
+
 	! print to screen
 	print *, 'calling program main'
 
@@ -21,7 +23,8 @@ program main
 !	call test_backward_sweep
 !	call twostream
 !	call Landau
-	call adjoint_convergence(Landau)
+!	call adjoint_convergence(Landau)
+	call random_test
 
 	! print to screen
 	print *, 'program main...done.'
