@@ -54,7 +54,9 @@ contains
 
 		do i=1,this%n
 			!spatial distribution initialize
-			xp0 = (/ ( j*L/Np, j=0,Np-1 ) /) + 0.5_mp*(i-1)*L/Np
+!			xp0 = (/ ( j*L/Np, j=0,Np-1 ) /) + 0.5_mp*(i-1)*L/Np
+			call RANDOM_NUMBER(xp0)
+			xp0 = xp0*L
 			xp0 = xp0 + this%A0(1)*L/Np*SIN( 2.0_mp*pi*xp0/L*mode )
 
 			call buildSpecies(this%p(i),qs,ms,1.0_mp)

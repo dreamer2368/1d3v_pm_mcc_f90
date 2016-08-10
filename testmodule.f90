@@ -22,6 +22,61 @@ contains
 		call MPI_FINALIZE(ierr)
 	end subroutine
 
+	subroutine twostream_grad(fk,Ti,str,k,output)
+		real(mp), intent(in) :: fk, Ti
+		character(len=*), intent(in) ::str
+		integer, intent(in) :: k
+		real(mp), intent(out) :: output(:)
+		type(adjoint) :: adj
+		type(PM1D) :: pm
+		type(recordData) :: r
+		real(mp) :: Tf
+		integer, parameter :: Ng=64, Np=100000, N=1
+		real(mp) :: v0 = 0.2_mp, vT = 0.0_mp, dt=0.1_mp
+		integer :: mode=1
+		character(len=100)::dir
+		real(mp) :: J0,J1,grad(1)
+		output = 0.0_mp
+		Tf = 0.1_mp + Ti
+
+		SELECT CASE(k)
+			CASE(0)
+				call buildPM1D(pm,Tf,Ti,Ng,N,0,0,1,dt=dt,A=(/1.0_mp,0.0_mp/))
+				dir = str//'/before'
+				call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
+				call set_null_discharge(r)
+				call init_random_seed
+				call twostream_initialize(pm,Np,v0,vT,mode)
+				call forwardsweep(pm,r,Te,Null_source,MPE,J0)
+!				call printPlasma(r)
+				print *, 'J0=',J0
+
+				call buildAdjoint(adj,pm)
+				call backward_sweep(adj,pm,r,grad,dMPE,dTe,dTedA,Te,Null_source)
+
+				print *, 'dJdA=',grad
+
+				output(1:2) = (/J0, grad(1)/)
+
+				call destroyAdjoint(adj)
+				call destroyPM1D(pm)
+				call destroyRecord(r)
+			CASE(1)
+				dir = str//'/after'
+				call buildPM1D(pm,Tf,Ti,Ng,N,0,0,1,dt=dt,A=(/1.0_mp,fk/))
+				call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
+				call init_random_seed
+				call twostream_initialize(pm,Np,v0,vT,mode)
+				call forwardsweep(pm,r,Te,Null_source,MPE,J1)
+!				call printPlasma(r)
+				print *, 'J1=',J1
+				output(1) = J1
+
+				call destroyRecord(r)
+				call destroyPM1D(pm)
+		END SELECT
+	end subroutine
+
 	subroutine Landau(fk,Ti,str,k,output)
 		real(mp), intent(in) :: fk, Ti
 		character(len=*), intent(in) ::str
