@@ -21,9 +21,10 @@ program main
 !	call test_backward_sweep
 !	call twostream(fk(i),ek(i))
 !	call Landau
-	call adjoint_convergence(twostream_grad)
+!	call adjoint_convergence(twostream_grad)
 !	call random_test
 !   call Landau_adjoint_sampling
+   call twostream_adjoint_sampling   
 
 	! print to screen
 	print *, 'program main...done.'
@@ -45,7 +46,7 @@ contains
 		real(mp) :: Tf = 30.1_mp, Ti = 30.0_mp
 		integer, parameter :: Ng=64, Np=10**5, N=1
 		real(mp) :: xp0(Np), vp0(Np,3)
-		real(mp) :: v0 = 0.2_mp, vT = 0.0_mp
+		real(mp) :: v0 = 0.2_mp, vT = 0.01_mp
 		integer :: mode = 1
 		real(mp) :: dt=0.1_mp
 		character(len=100)::dir,rank_str
@@ -65,7 +66,7 @@ contains
 			allocate(recvcnt(0:s-1))
 			allocate(displc(0:s-1))
 			recvcnt(0:MOD(Nsample,s)-1) = sample_per_core+1
-			recvcnt(MOD(Nsample,s):s+1) = sample_per_core
+			recvcnt(MOD(Nsample,s):s-1) = sample_per_core
 			print *, recvcnt
 			displc = 0
 			do i=0,s-1
@@ -87,7 +88,7 @@ contains
 
 		do i=1,sendcnt
 			call buildPM1D(pm,Tf,Ti,Ng,N,0,0,1,dt=dt,A=(/0.1_mp,0.0_mp/))
-			dir = 'twostream_sampling/before'//trim(adjustl(rank_str))
+			dir = 'twostream_sampling2/before'//trim(adjustl(rank_str))
 			call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
 			call set_null_discharge(r)
 			call twostream_initialize(pm,Np,v0,vT,mode)
@@ -106,7 +107,7 @@ contains
 			call destroyAdjoint(adj)
 			call destroyRecord(r)
 
-			dir = 'twostream_sampling/after'//trim(adjustl(rank_str))
+			dir = 'twostream_sampling2/after'//trim(adjustl(rank_str))
 			pm%A0 = (/0.1_mp,(0.1_mp)**10 /)
 			call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
 			call destroySpecies(pm%p(1))
@@ -127,9 +128,9 @@ contains
 
 		call MPI_FINALIZE(ierr)
 		if( my_rank.eq.s-1 ) then
-			open(unit=301,file='data/twostream_sampling/sample_J0.bin',status='replace',form='unformatted',access='stream')
-			open(unit=302,file='data/twostream_sampling/sample_J1.bin',status='replace',form='unformatted',access='stream')
-			open(unit=303,file='data/twostream_sampling/sample_grad.bin',status='replace',form='unformatted',access='stream')
+			open(unit=301,file='data/twostream_sampling2/sample_J0.bin',status='replace',form='unformatted',access='stream')
+			open(unit=302,file='data/twostream_sampling2/sample_J1.bin',status='replace',form='unformatted',access='stream')
+			open(unit=303,file='data/twostream_sampling2/sample_grad.bin',status='replace',form='unformatted',access='stream')
 			write(301) recvbuf(:,1)
 			write(302) recvbuf(:,2)
 			write(303) recvbuf(:,3)
@@ -177,7 +178,7 @@ contains
 			allocate(recvcnt(0:s-1))
 		   allocate(displc(0:s-1))
 			recvcnt(0:MOD(Nsample,s)-1) = sample_per_core+1
-			recvcnt(MOD(Nsample,s):s+1) = sample_per_core
+			recvcnt(MOD(Nsample,s):s-1) = sample_per_core
 		   print *, recvcnt
 		   displc = 0
 		   do i=0,s-1
