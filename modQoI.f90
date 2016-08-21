@@ -36,7 +36,7 @@ contains
 		real(mp), intent(inout) :: J
 
 		if( k.ge.1 .and. k.le.pm%ni ) then
-			J = J + 1.0_mp/pm%L/pm%ni*SUM( pm%m%E**2 )
+			J = J + 1.0_mp/pm%ng/pm%ni*SUM( pm%m%E**2 )
 		end if
 	end subroutine
 
@@ -46,7 +46,7 @@ contains
 		integer, intent(in) :: nk
 
 		if( nk.ge.1 .and. nk.le.pm%ni ) then
-			adj%dm%E = adj%dm%E - 2.0_mp/pm%L/pm%ni*pm%m%E
+			adj%dm%E = adj%dm%E - 2.0_mp/pm%ng/pm%ni*pm%m%E
 		end if
 	end subroutine
 
