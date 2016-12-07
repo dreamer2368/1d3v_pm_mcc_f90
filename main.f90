@@ -21,10 +21,10 @@ program main
 !	call test_backward_sweep
 !	call twostream(fk(i),ek(i))
 !	call Landau
-!	call adjoint_convergence(twostream_grad)
+!	call adjoint_convergence(Landau)
 !	call random_test
-!   call Landau_adjoint_sampling
-   call twostream_adjoint_sampling   
+   call Landau_adjoint_sampling
+!   call twostream_adjoint_sampling   
 
 	! print to screen
 	print *, 'program main...done.'
@@ -157,7 +157,7 @@ contains
 		real(mp), allocatable :: sendbuf(:,:)
 		real(mp) :: recvbuf(Nsample,3)                     !(/J0, J1, dJdA/)
 		real(mp) :: Tf = 20.1_mp, Ti = 20.0_mp
-		integer, parameter :: Ng=64, Np=3*10**5, N=1
+		integer, parameter :: Ng=64, Np=3*10**6, N=1
 		real(mp) :: xp0(Np), vp0(Np,3)
 		real(mp) :: vT = 1.0_mp, L=4.0_mp*pi
 		real(mp) :: dt=0.1_mp
@@ -283,9 +283,10 @@ contains
 
 		fk = (/ ( 0.1_mp**i,i=-1,N-2 ) /)
 		Tk = (/ 0.2_mp, 0.5_mp, 5.0_mp, 20.0_mp, 30.0_mp /)
+!		Tk = (/ 0.2_mp, 120.0_mp /)
 		ek = 0.0_mp
 
-		dir = 'twostream'
+		dir = 'Landau'
 
 		do j=1,size(Tk)
 			call problem(fk(i),Tk(j),trim(dir),0,temp)
@@ -446,6 +447,32 @@ contains
 
 		call destroyRecord(r)
 		call destroyPM1D(sheath)
+	end subroutine
+
+	subroutine debye_shielding
+		type(PM1D) :: debye
+		type(recordData) :: r
+		real(mp) :: n0 = 1.0e10, lambda0 = 1.0e-2
+		integer :: N = 10000, Ng = 128
+		real(mp) :: L = 10.0_mp, Wp, Q = 1.0_mp
+		real(mp) :: dx
+		real(mp) :: Time = 100.0_mp
+		real(mp) :: A(2)
+
+		Wp = L/N
+		A = (/ n0, lambda0 /)
+		call buildPM1D(debye,Time,0.0_mp,Ng,1,pBC=0,mBC=1,order=1,A=A,L=L,dt=0.1_mp)
+		call buildRecord(r,debye%nt,1,debye%L,debye%ng,'debye',20)
+
+		call buildSpecies(debye%p(1),-1.0_mp,1.0_mp,Wp)
+		call Debye_initialize(debye,N,Q)
+
+		call forwardsweep(debye,r,Null_input,Null_source)
+
+		call printPlasma(r)
+
+		call destroyRecord(r)
+		call destroyPM1D(debye)
 	end subroutine
 
 end program

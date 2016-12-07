@@ -6,6 +6,28 @@ module init
 
 contains
 
+	subroutine Debye_initialize(pm,Np,Q)
+		type(PM1D), intent(inout) :: pm
+		integer, intent(in) :: Np
+		real(mp), intent(in) :: Q
+		real(mp) :: xp0(Np), vp0(Np,3),rho_back(pm%ng)
+		real(mp) :: L
+		integer :: i,j,N
+		L=pm%L
+		N=pm%n
+
+!		call init_random_seed
+		vp0 = randn(Np,3)
+		call RANDOM_NUMBER(xp0)
+		xp0 = xp0*L
+
+		rho_back = 1.0_mp
+		rho_back(pm%ng/2) = rho_back(pm%ng/2) + Q/pm%m%dx
+
+		call setSpecies(pm%p(1),Np,xp0,vp0)
+		call setMesh(pm%m,rho_back)
+	end subroutine
+
 	subroutine Landau_initialize(pm,Np,vT)
 		type(PM1D), intent(inout) :: pm
 		integer, intent(in) :: Np

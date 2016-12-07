@@ -32,7 +32,7 @@ contains
 		type(recordData) :: r
 		real(mp) :: Tf
 		integer, parameter :: Ng=64, Np=100000, N=1
-		real(mp) :: v0 = 0.2_mp, vT = 0.0_mp, dt=0.1_mp
+		real(mp) :: v0 = 0.2_mp, vT = 0.01_mp, dt=0.1_mp
 		integer :: mode=1
 		character(len=100)::dir
 		real(mp) :: J0,J1,grad(1)
