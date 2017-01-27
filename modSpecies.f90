@@ -9,37 +9,39 @@ module modSpecies
 		real(mp), allocatable :: xp(:)
 		real(mp), allocatable :: vp(:,:)
 		real(mp), allocatable :: Ep(:)
+		real(mp), allocatable :: spwt(:)
 
-		real(mp) :: ms, qs, spwt
+		real(mp) :: ms, qs
 	end type
 
 contains
 
-	subroutine buildSpecies(this,qs,ms,spwt)
+	subroutine buildSpecies(this,qs,ms)
 		type(species), intent(out) :: this
-		real(mp), intent(in) :: ms, qs, spwt
+		real(mp), intent(in) :: ms, qs
 
 		this%ms = ms
 		this%qs = qs
-		this%spwt = spwt
 
-		print *, 'Species built up: ms=',ms,', qs=',qs,', specific weight=',spwt
+		print *, 'Species built up: ms=',ms,', qs=',qs
 	end subroutine
 
-	subroutine setSpecies(this,np0,xp0,vp0)
+	subroutine setSpecies(this,np0,xp0,vp0,spwt0)
 		type(species), intent(inout) :: this
 		integer, intent(in) :: np0
-		real(mp), intent(in) :: xp0(np0)
+		real(mp), intent(in) :: xp0(np0), spwt0(np0)
 		real(mp), intent(in) :: vp0(np0,3)
 
 		this%np = np0
 		allocate(this%xp(np0))
+		allocate(this%spwt(np0))
 		allocate(this%vp(np0,3))
 		allocate(this%Ep(np0))
 
 		this%xp = xp0
 		this%vp = vp0
 		this%Ep = 0.0_mp
+		this%spwt = spwt0
 	end subroutine
 
 	subroutine destroySpecies(this)
@@ -48,6 +50,7 @@ contains
 		deallocate(this%xp)
 		deallocate(this%vp)
 		deallocate(this%Ep)
+		deallocate(this%spwt)
 	end subroutine
 
 	subroutine moveSpecies(this,dt)

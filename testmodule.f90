@@ -2,6 +2,7 @@ module testmodule
 
 	use init
 	use timeStep
+	use modMPI
 
 	implicit none
 
@@ -132,7 +133,7 @@ contains
 		END SELECT
 	end subroutine
 
-	subroutine twostream(fk,ek)
+	subroutine twostream_adj(fk,ek)
 		real(mp), intent(out) :: ek
 		real(mp), intent(in) :: fk
 		type(PM1D) :: pm
@@ -170,7 +171,8 @@ contains
 		print *, 'J1=',J1
 		print *, 'dJdA=',(J1-J0)/fk
 
-		ek = ABS( grad(1) - (J1-J0)/fk )
+		ek = ABS( (grad(1) - (J1-J0)/fk)/grad(1) )
+		print *, 'ek=',ek
 
 		call destroyAdjoint(adj)
 		call destroyRecord(r)
@@ -192,16 +194,16 @@ contains
 		dir1='test_backward_sweep/before'
 		call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir1),3)
 		call set_null_discharge(r)
-		call buildSpecies(pm%p(1),qs,ms,spwt)
-		call buildSpecies(pm%p(2),-qs,ms,spwt)
+		call buildSpecies(pm%p(1),qs,ms)
+		call buildSpecies(pm%p(2),-qs,ms)
 
 		print *, 'Original xp'
 		xp = 0.4_mp*pm%L*(/ (j,j=1,Np) /)
 		vp = 0.1_mp
 		print *, xp
 		print *, vp
-		call setSpecies(pm%p(1),Np,xp,vp)
-		call setSpecies(pm%p(2),Np,pm%L-xp,0.2_mp*vp)
+		call setSpecies(pm%p(1),Np,xp,vp,(/spwt,spwt/))
+		call setSpecies(pm%p(2),Np,pm%L-xp,0.2_mp*vp,(/spwt,spwt/))
 		rho_back = 0.0_mp
 		call setMesh(pm%m,rho_back)
 
@@ -218,10 +220,10 @@ contains
 
 		call destroySpecies(pm%p(1))
 		call destroySpecies(pm%p(2))
-		call setSpecies(pm%p(2),Np,pm%L-xp,0.2_mp*vp)
+		call setSpecies(pm%p(2),Np,pm%L-xp,0.2_mp*vp,(/spwt,spwt/))
 		dxp = xp(2)*fxp
 		xp(2) = xp(2) + dxp
-		call setSpecies(pm%p(1),Np,xp,vp)
+		call setSpecies(pm%p(1),Np,xp,vp,(/spwt,spwt/))
 		print *, 'Perturbed xp'
 		do j=1,pm%n
 		print *, j,'-th species'
@@ -249,21 +251,22 @@ contains
 		type(PM1D) :: pm
 		type(adjoint) :: adj
 		integer :: i,j,k
-		real(mp) :: qs = 3.4_mp, ms = 2.7_mp, spwt = 1.9_mp, xp(Np), vp(Np,3)
+		real(mp) :: qs = 3.4_mp, ms = 2.7_mp, xp(Np), vp(Np,3), spwt(Np)
 		real(mp) :: rho_back(Ng)
 		real(mp) :: weight(Ng), J0, J1
 		real(mp) :: rhs(Ng), rho1(Ng-1), dxp1(Np), dxp2(Np)
 		real(mp) :: fxp = (0.1_mp)**9, dxp
 
 		call buildPM1D(pm,40.0_mp,20.0_mp,Ng,1,0,0,1,eps=2.3_mp)
-		call buildSpecies(pm%p(1),qs,ms,spwt)
+		call buildSpecies(pm%p(1),qs,ms)
 		!particle, mesh setup
 		print *, 'Original xp'
 		xp = 0.4_mp*pm%L*(/ (j,j=1,Np) /)
 		vp = 0.1_mp
+		spwt = 1.9_mp
 		print *, xp
 		print *, vp
-		call setSpecies(pm%p(1),Np,xp,vp)
+		call setSpecies(pm%p(1),Np,xp,vp,spwt)
 		rho_back = -qs*Np/pm%L
 		call setMesh(pm%m,rho_back)
 		!one time-step
@@ -309,7 +312,7 @@ contains
 		print *, 'Perturbed xp'
 		print *, xp
 		call destroySpecies(pm%p(1))
-		call setSpecies(pm%p(1),Np,xp,vp)
+		call setSpecies(pm%p(1),Np,xp,vp,spwt)
 
 		call moveSpecies(pm%p(1),pm%dt)
 		call applyBC(pm)
@@ -334,7 +337,7 @@ contains
 		type(recordData) :: r
 		integer, parameter :: Ng=64, N=10000, order=1
 		real(mp) :: Ti=20, Tf = 40
-		real(mp) :: xp0(N), vp0(N,3), rho_back(Ng), qe, me
+		real(mp) :: xp0(N), vp0(N,3), spwt0(N) = 1.0_mp, rho_back(Ng), qe, me
 		integer :: i
 
 		call buildPM1D(reflux,Tf,Ti,Ng,1,pBC=2,mBC=2,order=order,A=(/ 1.0_mp, 1.0_mp /))
@@ -346,8 +349,8 @@ contains
 		qe = -(0.1_mp)**2/(N/reflux%L)
 		me = -qe
 		rho_back(Ng) = -qe
-		call buildSpecies(reflux%p(1),qe,me,1.0_mp)
-		call setSpecies(reflux%p(1),N,xp0,vp0)
+		call buildSpecies(reflux%p(1),qe,me)
+		call setSpecies(reflux%p(1),N,xp0,vp0,spwt0)
 		call setMesh(reflux%m,rho_back)
 
 		call applyBC(reflux)

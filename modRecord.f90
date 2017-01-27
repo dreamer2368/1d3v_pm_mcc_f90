@@ -57,9 +57,11 @@ contains
 
 		call system('mkdir -p data/'//this%dir//'/xp')
 		call system('mkdir -p data/'//this%dir//'/vp')
+		call system('mkdir -p data/'//this%dir//'/spwt')
 
 		call system('rm data/'//this%dir//'/xp/*.*')
 		call system('rm data/'//this%dir//'/vp/*.*')
+		call system('rm data/'//this%dir//'/spwt/*.*')
 	end subroutine
 
 	subroutine destroyRecord(this)
@@ -98,13 +100,17 @@ contains
 					//trim(adjustl(nstr))//'.bin',status='replace',form='unformatted',access='stream')
 				open(unit=306,file='data/'//this%dir//'/vp/'//trim(adjustl(kstr))//'_'	&
 					//trim(adjustl(nstr))//'.bin',status='replace',form='unformatted',access='stream')
+				open(unit=307,file='data/'//this%dir//'/spwt/'//trim(adjustl(kstr))//'_'	&
+					//trim(adjustl(nstr))//'.bin',status='replace',form='unformatted',access='stream')
 				write(305) pm%p(n)%xp
 				write(306) pm%p(n)%vp
+				write(307) pm%p(n)%spwt
 				close(305)
 				close(306)
+				close(307)
 				!time step: 0~Nt, in array: 1~(Nt+1) (valgrind prefers this way of allocation)
 				this%np(n,kr+1) = pm%p(n)%np
-				this%KE(n,kr+1) = 0.5_mp*pm%p(n)%ms*pm%p(n)%spwt*SUM(pm%p(n)%vp**2)
+				this%KE(n,kr+1) = 0.5_mp*pm%p(n)%ms*SUM( pm%p(n)%spwt*SUM(pm%p(n)%vp**2,2) )
 			end do
 
 			this%phidata(:,kr+1) = pm%m%phi
@@ -136,7 +142,7 @@ contains
 			write(s,*) i
 			open(unit=307+i,file='data/'//this%dir//'/KE_'//trim(adjustl(s))//'.bin',status='replace',form='unformatted',access='stream')
 		end do
-print *, this%n, this%ng, this%nt, this%L, this%mod
+		print *, this%n, this%ng, this%nt, this%L, this%mod
 		write(300,*) this%n, this%ng, this%nt, this%L, this%mod
 		close(300)
 

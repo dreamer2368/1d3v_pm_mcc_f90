@@ -12,21 +12,20 @@ module ArMCC
 
 contains
 
-	subroutine set_Ar_discharge(pm, spwt, A, r)
+	subroutine set_Ar_discharge(pm, A, r)
 		type(PM1D), intent(inout) :: pm
       type(recordData), intent(inout), optional :: r
 		real(mp), intent(in) :: A(4)						!A(1): temperature of neutral(eV),	A(2): density of neutral(m-3),
                                                    !A(3): discharge current density(A/m2), A(4): discharge frequency(Hz)
-		real(mp), intent(in) :: spwt(2)
 		if( pm%n .ne. 2 ) then
 			print *, 'ERROR : the number of species should be two corresponding to electon and Argon+. stopped the simulation.'
 			stop
 		end if
 
 		!Electron species
-		call buildSpecies(pm%p(1),-q_e,m_e,spwt(1))
+		call buildSpecies(pm%p(1),-q_e,m_e)
 		!Argon cation species
-		call buildSpecies(pm%p(2),q_e,m_Ar,spwt(2))
+		call buildSpecies(pm%p(2),q_e,m_Ar)
 
 		deallocate(pm%A0)
 		allocate(pm%A0(4))

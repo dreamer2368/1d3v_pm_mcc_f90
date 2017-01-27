@@ -62,14 +62,14 @@ contains
 				p%xp(i) = p%xp(np1)					!replacement with the last particle
 				p%vp(i,:) = p%vp(np1,:)
 				p%Ep(i) = p%Ep(np1)
-				m%rho_back(1) = m%rho_back(1) + p%spwt*p%qs
+				m%rho_back(1) = m%rho_back(1) + p%spwt(i)*p%qs
 				np1 = np1-1
 				i = i-1
 			elseif( p%xp(i).ge.m%L ) then
 				p%xp(i) = p%xp(np1)
 				p%vp(i,:) = p%vp(np1,:)
 				p%Ep(i) = p%Ep(np1)
-				m%rho_back(m%ng) = m%rho_back(m%ng) + p%spwt*p%qs
+				m%rho_back(m%ng) = m%rho_back(m%ng) + p%spwt(i)*p%qs
 				np1 = np1-1
 				i = i-1
 			end if
@@ -126,7 +126,7 @@ contains
 				p%xp(i) = p%xp(np1)
 				p%vp(i,:) = p%vp(np1,:)
 				p%Ep(i) = p%Ep(np1)
-				m%rho_back(m%ng) = m%rho_back(m%ng) + p%spwt*p%qs
+				m%rho_back(m%ng) = m%rho_back(m%ng) + p%spwt(i)*p%qs
 				np1 = np1-1
 				i = i-1
 			end if

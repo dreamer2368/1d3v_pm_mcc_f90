@@ -1,13 +1,10 @@
 program main
 
-	use init
-	use timeStep
-	use modMPI
-!	use testmodule
+	use testmodule
 
 	implicit none
 
-	real(mp) :: output(2)
+	real(mp) :: output(2) = (/(0.1_mp)**6,0.0_mp/)
 
 	! print to screen
 	print *, 'calling program main'
@@ -20,9 +17,9 @@ program main
 !	call test_mcc_Argon
 !	call test_ext_voltage_Poisson
 !   call Ar_discharge
-!	call test_particle_adj(64,2)
+	call test_particle_adj(64,2)
 !	call test_backward_sweep
-	call twostream
+!	call twostream_adj(output(1),output(2))
 !	call Landau(0.0_mp, 60.0_mp, ,'Landau', 1,output )
 !	call adjoint_convergence(Landau)
 !	call random_test
@@ -49,7 +46,7 @@ contains
 		real(mp) :: recvbuf(Nsample,3)                     !(/J0, J1, dJdA/)
 		real(mp) :: Tf = 30.1_mp, Ti = 30.0_mp
 		integer, parameter :: Ng=64, Np=10**5, N=1
-		real(mp) :: xp0(Np), vp0(Np,3)
+		real(mp) :: xp0(Np), vp0(Np,3), spwt0(Np)
 		real(mp) :: v0 = 0.2_mp, vT = 0.01_mp
 		integer :: mode = 1
 		real(mp) :: dt=0.1_mp
@@ -98,6 +95,7 @@ contains
 			call twostream_initialize(pm,Np,v0,vT,mode)
 			xp0 = pm%p(1)%xp
 			vp0 = pm%p(1)%vp
+			spwt0 = pm%p(1)%spwt
 
 			call forwardsweep(pm,r,Te,Null_source,MPE,J0)
 			!call printPlasma(r)
@@ -115,7 +113,7 @@ contains
 			pm%A0 = (/0.1_mp,(0.1_mp)**10 /)
 			call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
 			call destroySpecies(pm%p(1))
-			call setSpecies(pm%p(1),Np,xp0,vp0)
+			call setSpecies(pm%p(1),Np,xp0,vp0,spwt0)
 			call forwardsweep(pm,r,Te,Null_source,MPE,J1)
 			!call printPlasma(r)
 			print *, 'J1=',J1
@@ -162,7 +160,7 @@ contains
 		real(mp) :: recvbuf(Nsample,3)                     !(/J0, J1, dJdA/)
 		real(mp) :: Tf = 20.1_mp, Ti = 20.0_mp
 		integer, parameter :: Ng=64, Np=3*10**6, N=1
-		real(mp) :: xp0(Np), vp0(Np,3)
+		real(mp) :: xp0(Np), vp0(Np,3), spwt0(Np)
 		real(mp) :: vT = 1.0_mp, L=4.0_mp*pi
 		real(mp) :: dt=0.1_mp
 		character(len=100)::dir,rank_str
@@ -210,6 +208,7 @@ contains
 			call Landau_initialize(pm,Np,vT)
 			xp0 = pm%p(1)%xp
 			vp0 = pm%p(1)%vp
+			spwt0 = pm%p(1)%spwt
 
 			call forwardsweep(pm,r,Te,Null_source,MPE,J0)
 			!call printPlasma(r)
@@ -227,7 +226,7 @@ contains
 			pm%A0 = (/0.1_mp,(0.1_mp)**9 /)
 			call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
 		   call destroySpecies(pm%p(1))
-			call setSpecies(pm%p(1),Np,xp0,vp0)
+			call setSpecies(pm%p(1),Np,xp0,vp0,spwt0)
 			call forwardsweep(pm,r,Te,Null_source,MPE,J1)
 			!call printPlasma(r)
 			print *, 'J1=',J1
@@ -327,7 +326,7 @@ contains
 !	  real(mp) :: T0=1.0_mp, wp0, lambda0, v0_e, v0_Ar
 !	  real(mp), parameter :: L = 0.02_mp, area = 0.016_mp               !L(m), area(m2)
 !	  integer, parameter :: nc2p = 10**6, Np=CEILING(n0*L*area/nc2p), Ng = 300
-!	  real(mp) :: spwt, xp0(Np), vp0(Np,3)
+!	  real(mp) :: spwt(Np), xp0(Np), vp0(Np,3)
 !	  real(mp) :: dt
 !	  integer :: i
 !	  gden = (PN*mTorr_to_Pa)/(q_e*TN)
@@ -356,13 +355,13 @@ contains
 !	  write(301) TN, PN, v0_e, v0_Ar, I0, L, area, dt
 !	  close(301)
 !
-!	  call set_Ar_discharge(pm,(/spwt, spwt/),(/TN,gden,I0,I_f/),r)
+!	  call set_Ar_discharge(pm,(/TN,gden,I0,I_f/),r)
 !	  call RANDOM_NUMBER(xp0)
 !	  vp0 = randn(Np,3)*v0_e
-!	  call setSpecies(pm%p(1),Np,xp0*L,vp0)
+!	  call setSpecies(pm%p(1),Np,xp0*L,vp0,spwt)
 !	  call RANDOM_NUMBER(xp0)
 !	  vp0 = randn(Np,3)*v0_Ar
-!	  call setSpecies(pm%p(2),Np,xp0*L,vp0)
+!	  call setSpecies(pm%p(2),Np,xp0*L,vp0,spwt)
 !
 !      call forwardsweep(pm,r,RF_current,Null_source)
 !
@@ -441,10 +440,10 @@ contains
 		sheath%wp = wp0
 		call buildRecord(r,sheath%nt,2,sheath%L,sheath%ng,'test',20)
 
-		call buildSpecies(sheath%p(1),-qe,me,n0*L/Ne)
-		call buildSpecies(sheath%p(2),qe,mi,n0*L/Ni)
+		call buildSpecies(sheath%p(1),-qe,me)
+		call buildSpecies(sheath%p(2),qe,mi)
 
-		call sheath_initialize(sheath,Ne,Ni,Te,Ti,Kb)
+		call sheath_initialize(sheath,Ne,Ni,Te,Ti,Kb,n0)
 		call forwardsweep(sheath,r,Null_input,Null_source)
 
 		call printPlasma(r)
@@ -463,12 +462,11 @@ contains
 		real(mp) :: Time = 100.0_mp
 		real(mp) :: A(2)
 
-		Wp = L/N
 		A = (/ vT, lambda0 /)
 		call buildPM1D(debye,Time,0.0_mp,Ng,1,pBC=3,mBC=1,order=1,A=A,L=L,dt=0.01_mp)
 		call buildRecord(r,debye%nt,1,debye%L,debye%ng,'debye2',50)
 
-		call buildSpecies(debye%p(1),-1.0_mp,1.0_mp,Wp)
+		call buildSpecies(debye%p(1),-1.0_mp,1.0_mp)
 		call Debye_initialize(debye,N,Q)
 
 		call forwardsweep(debye,r,Null_input,Null_source)

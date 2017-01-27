@@ -29,14 +29,14 @@ contains
 		allocate(this%p(pm%n))
 		allocate(this%dp(pm%n))
 		do i=1,pm%n
-			call buildSpecies(this%p(i),pm%p(i)%qs,pm%p(i)%ms,pm%p(i)%spwt)
-			call buildSpecies(this%dp(i),0.0_mp,0.0_mp,0.0_mp)
+			call buildSpecies(this%p(i),pm%p(i)%qs,pm%p(i)%ms)
+			call buildSpecies(this%dp(i),0.0_mp,0.0_mp)
 			allocate(vec(pm%p(i)%np))
 			allocate(vec2(pm%p(i)%np,3))
 			vec = 0.0_mp
 			vec2 = 0.0_mp
-			call setSpecies(this%p(i),pm%p(i)%np,vec,vec2)
-			call setSpecies(this%dp(i),pm%p(i)%np,vec,vec2)
+			call setSpecies(this%p(i),pm%p(i)%np,vec,vec2,pm%p(i)%spwt)
+			call setSpecies(this%dp(i),pm%p(i)%np,vec,vec2,pm%p(i)%spwt)
 			deallocate(vec)
 			deallocate(vec2)
 		end do
