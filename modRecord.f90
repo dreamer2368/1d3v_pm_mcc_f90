@@ -136,7 +136,7 @@ contains
 			write(s,*) i
 			open(unit=307+i,file='data/'//this%dir//'/KE_'//trim(adjustl(s))//'.bin',status='replace',form='unformatted',access='stream')
 		end do
-
+print *, this%n, this%ng, this%nt, this%L, this%mod
 		write(300,*) this%n, this%ng, this%nt, this%L, this%mod
 		close(300)
 

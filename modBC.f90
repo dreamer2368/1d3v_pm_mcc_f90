@@ -26,6 +26,10 @@ contains
 				do i=1,pm%n
 					call applyBC_refluxing_absorbing(pm%p(i),pm%m,pm%dt,pm%A0(i))
 				end do
+			case(3) !refluxing-refluxing
+				do i=1,pm%n
+					call applyBC_refluxing_refluxing(pm%p(i),pm%m,pm%dt,pm%A0(i))
+				end do
 		end select
 	end subroutine
 
@@ -150,6 +154,33 @@ contains
 
 		deallocate(vec)
 		deallocate(vec2)
+	end subroutine
+
+	subroutine applyBC_refluxing_refluxing(p,m,dt,vT)			!refluxing at both planes
+		type(species), intent(inout) :: p
+		type(mesh), intent(inout) :: m
+		real(mp), intent(in) :: dt, vT
+		real(mp) :: temp(3)
+		integer :: i, np1
+		real(mp), allocatable :: vec(:), vec2(:,:)
+
+		!apply refluxing BC
+		do i=1,p%np
+			if( p%xp(i).le.0.0_mp ) then
+				temp = (vT*randn(3))
+				temp(1) = abs(temp(1))
+				p%vp(i,:) = temp
+				call RANDOM_NUMBER(temp)
+				p%xp(i) = temp(1)*dt*p%vp(i,1)
+			end if
+			if( p%xp(i).ge.m%L ) then
+				temp = (vT*randn(3))
+				temp(1) = -abs(temp(1))
+				p%vp(i,:) = temp
+				call RANDOM_NUMBER(temp)
+				p%xp(i) = m%L + temp(1)*dt*p%vp(i,1)
+			end if			
+		end do
 	end subroutine
 
 !===========================grid adjustment for BC=============================

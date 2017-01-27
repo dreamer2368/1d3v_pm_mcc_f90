@@ -2,9 +2,11 @@ program main
 
 	use init
 	use timeStep
-	use testmodule
+!	use testmodule
 
 	implicit none
+
+	real(mp) :: output(2)
 
 	! print to screen
 	print *, 'calling program main'
@@ -19,12 +21,13 @@ program main
 !   call Ar_discharge
 !	call test_particle_adj(64,2)
 !	call test_backward_sweep
-!	call twostream(fk(i),ek(i))
-!	call Landau
+	call twostream
+!	call Landau(0.0_mp, 60.0_mp, ,'Landau', 1,output )
 !	call adjoint_convergence(Landau)
 !	call random_test
-   call Landau_adjoint_sampling
-!   call twostream_adjoint_sampling   
+!   call Landau_adjoint_sampling
+!   call twostream_adjoint_sampling
+!    call debye_shielding
 
 	! print to screen
 	print *, 'program main...done.'
@@ -33,285 +36,285 @@ contains
 
 	! You can add custom subroutines/functions here later, if you want
 
-	subroutine twostream_adjoint_sampling
-		integer :: ierr, my_rank, s
-		type(adjoint) :: adj
-		type(PM1D) :: pm
-		type(recordData) :: r
-		integer, parameter :: Nsample = 10000
-		integer :: sample_per_core, sendcnt
-		integer, allocatable :: recvcnt(:), displc(:)
-		real(mp), allocatable :: sendbuf(:,:)
-		real(mp) :: recvbuf(Nsample,3)                     !(/J0, J1, dJdA/)
-		real(mp) :: Tf = 30.1_mp, Ti = 30.0_mp
-		integer, parameter :: Ng=64, Np=10**5, N=1
-		real(mp) :: xp0(Np), vp0(Np,3)
-		real(mp) :: v0 = 0.2_mp, vT = 0.01_mp
-		integer :: mode = 1
-		real(mp) :: dt=0.1_mp
-		character(len=100)::dir,rank_str
-		real(mp) :: J0,J1,grad(1)
-		integer :: i
-
-		call MPI_INIT(ierr)
-		call MPI_COMM_RANK(MPI_COMM_WORLD,my_rank,ierr)
-		call MPI_COMM_SIZE(MPI_COMM_WORLD,s,ierr)
-		sample_per_core = Nsample/s
-		write(rank_str,*) my_rank
-
-		if( my_rank.eq.s-1 ) then
-			print *, 'size: ',s
-			print *, 'sample/core: ',sample_per_core
-			print *, 'remainder: ',MOD(Nsample,s)
-			allocate(recvcnt(0:s-1))
-			allocate(displc(0:s-1))
-			recvcnt(0:MOD(Nsample,s)-1) = sample_per_core+1
-			recvcnt(MOD(Nsample,s):s-1) = sample_per_core
-			print *, recvcnt
-			displc = 0
-			do i=0,s-1
-				displc(i) = SUM(recvcnt(0:i-1))
-			end do
-			print *, displc
-		end if
-
-		if(my_rank<MOD(Nsample,s) ) then
-			sendcnt = sample_per_core+1
-			allocate(sendbuf(sendcnt,3))
-		else
-			sendcnt = sample_per_core
-			allocate(sendbuf(sendcnt,3))
-		end if
-		sendbuf = 0.0_mp
-
-		call init_random_seed(my_rank)
-
-		do i=1,sendcnt
-			call buildPM1D(pm,Tf,Ti,Ng,N,0,0,1,dt=dt,A=(/0.1_mp,0.0_mp/))
-			dir = 'twostream_sampling2/before'//trim(adjustl(rank_str))
-			call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
-			call set_null_discharge(r)
-			call twostream_initialize(pm,Np,v0,vT,mode)
-			xp0 = pm%p(1)%xp
-			vp0 = pm%p(1)%vp
-
-			call forwardsweep(pm,r,Te,Null_source,MPE,J0)
-			!call printPlasma(r)
-			print *, 'J0=',J0
-
-			call buildAdjoint(adj,pm)
-			call backward_sweep(adj,pm,r,grad,dMPE,dTe,dTedA,Te,Null_source)
-
-			print *, 'dJdA=',grad
-
-			call destroyAdjoint(adj)
-			call destroyRecord(r)
-
-			dir = 'twostream_sampling2/after'//trim(adjustl(rank_str))
-			pm%A0 = (/0.1_mp,(0.1_mp)**10 /)
-			call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
-			call destroySpecies(pm%p(1))
-			call setSpecies(pm%p(1),Np,xp0,vp0)
-			call forwardsweep(pm,r,Te,Null_source,MPE,J1)
-			!call printPlasma(r)
-			print *, 'J1=',J1
-
-			call destroyRecord(r)
-			call destroyPM1D(pm)
-
-			sendbuf(i,:) = (/ J0, J1, grad(1) /)
-		end do
-
-		do i=1,3
-			call MPI_GATHERV(sendbuf(:,i),sendcnt,MPI_DOUBLE,recvbuf(:,i),recvcnt,displc,MPI_DOUBLE,s-1,MPI_COMM_WORLD,ierr)
-		end do
-
-		call MPI_FINALIZE(ierr)
-		if( my_rank.eq.s-1 ) then
-			open(unit=301,file='data/twostream_sampling2/sample_J0.bin',status='replace',form='unformatted',access='stream')
-			open(unit=302,file='data/twostream_sampling2/sample_J1.bin',status='replace',form='unformatted',access='stream')
-			open(unit=303,file='data/twostream_sampling2/sample_grad.bin',status='replace',form='unformatted',access='stream')
-			write(301) recvbuf(:,1)
-			write(302) recvbuf(:,2)
-			write(303) recvbuf(:,3)
-			close(301)
-			close(302)
-			close(303)
-		end if
-
-		deallocate(sendbuf)
-		if( my_rank.eq.s-1) then
-			deallocate(recvcnt)
-			deallocate(displc)
-		end if
-	end subroutine
-
-	subroutine Landau_adjoint_sampling
-		integer :: ierr, my_rank, s
-		type(adjoint) :: adj
-		type(PM1D) :: pm
-		type(recordData) :: r
-		integer, parameter :: Nsample = 10000
-		integer :: sample_per_core, sendcnt
-		integer, allocatable :: recvcnt(:), displc(:)
-		real(mp), allocatable :: sendbuf(:,:)
-		real(mp) :: recvbuf(Nsample,3)                     !(/J0, J1, dJdA/)
-		real(mp) :: Tf = 20.1_mp, Ti = 20.0_mp
-		integer, parameter :: Ng=64, Np=3*10**6, N=1
-		real(mp) :: xp0(Np), vp0(Np,3)
-		real(mp) :: vT = 1.0_mp, L=4.0_mp*pi
-		real(mp) :: dt=0.1_mp
-		character(len=100)::dir,rank_str
-		real(mp) :: J0,J1,grad(1)
-		integer :: i
-
-		call MPI_INIT(ierr)
-		call MPI_COMM_RANK(MPI_COMM_WORLD,my_rank,ierr)
-		call MPI_COMM_SIZE(MPI_COMM_WORLD,s,ierr)
-		sample_per_core = Nsample/s
-		write(rank_str,*) my_rank
-
-		if( my_rank.eq.s-1 ) then
-		   print *, 'size: ',s
-		   print *, 'sample/core: ',sample_per_core
-		   print *, 'remainder: ',MOD(Nsample,s)
-			allocate(recvcnt(0:s-1))
-		   allocate(displc(0:s-1))
-			recvcnt(0:MOD(Nsample,s)-1) = sample_per_core+1
-			recvcnt(MOD(Nsample,s):s-1) = sample_per_core
-		   print *, recvcnt
-		   displc = 0
-		   do i=0,s-1
-			  displc(i) = SUM(recvcnt(0:i-1))
-		   end do
-		   print *, displc
-		end if
-
-		if(my_rank<MOD(Nsample,s) ) then
-			sendcnt = sample_per_core+1
-			allocate(sendbuf(sendcnt,3))
-		else
-			sendcnt = sample_per_core
-			allocate(sendbuf(sendcnt,3))
-		end if
-		sendbuf = 0.0_mp
-
-		call init_random_seed(my_rank)
-
-		do i=1,sendcnt
-			call buildPM1D(pm,Tf,Ti,Ng,N,0,0,1,dt=dt,L=L,A=(/0.1_mp,0.0_mp/))
-			dir = 'Landau_sampling/before'//trim(adjustl(rank_str))
-			call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
-			call set_null_discharge(r)
-			call Landau_initialize(pm,Np,vT)
-			xp0 = pm%p(1)%xp
-			vp0 = pm%p(1)%vp
-
-			call forwardsweep(pm,r,Te,Null_source,MPE,J0)
-			!call printPlasma(r)
-			print *, 'J0=',J0
-
-			call buildAdjoint(adj,pm)
-			call backward_sweep(adj,pm,r,grad,dMPE,dTe,dTedA,Te,Null_source)
-
-			print *, 'dJdA=',grad
-
-			call destroyAdjoint(adj)
-			call destroyRecord(r)
-
-			dir = 'Landau_sampling/after'//trim(adjustl(rank_str))
-			pm%A0 = (/0.1_mp,(0.1_mp)**9 /)
-			call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
-		   call destroySpecies(pm%p(1))
-			call setSpecies(pm%p(1),Np,xp0,vp0)
-			call forwardsweep(pm,r,Te,Null_source,MPE,J1)
-			!call printPlasma(r)
-			print *, 'J1=',J1
-
-			call destroyRecord(r)
-			call destroyPM1D(pm)
-
-			sendbuf(i,:) = (/ J0, J1, grad(1) /)
-		end do
-
-		do i=1,3
-			call MPI_GATHERV(sendbuf(:,i),sendcnt,MPI_DOUBLE,recvbuf(:,i),recvcnt,displc,MPI_DOUBLE,s-1,MPI_COMM_WORLD,ierr)
-		end do
-
-		call MPI_FINALIZE(ierr)
-		if( my_rank.eq.s-1 ) then
-			open(unit=301,file='data/Landau_sampling/sample_J0.bin',status='replace',form='unformatted',access='stream')
-			open(unit=302,file='data/Landau_sampling/sample_J1.bin',status='replace',form='unformatted',access='stream')
-			open(unit=303,file='data/Landau_sampling/sample_grad.bin',status='replace',form='unformatted',access='stream')
-		   write(301) recvbuf(:,1)
-		   write(302) recvbuf(:,2)
-		   write(303) recvbuf(:,3)
-		   close(301)
-		   close(302)
-		   close(303)
-		end if
-
-		deallocate(sendbuf)
-		if( my_rank.eq.s-1) then
-		   deallocate(recvcnt)
-		   deallocate(displc)
-		end if
-	end subroutine
-
-	subroutine adjoint_convergence(problem)
-		integer, parameter :: N=20, Nt=5
-		real(mp) :: fk(N)
-		real(mp) :: Tk(Nt)
-		real(mp) :: ek(N,Nt)
-		character(len=100) :: dir
-		integer :: i,j
-		real(mp) :: J0,J1,grad(Nt),temp(2)
-		interface
-			subroutine problem(fk,Ti,str,k,output)
-				use modPM1D
-				use modAdj
-				use modRecord
-				real(mp), intent(in) :: fk, Ti
-				character(len=*), intent(in) ::str
-				integer, intent(in) :: k
-				real(mp), intent(out) :: output(:)
-				type(adjoint) :: adj
-				type(PM1D) :: pm
-				type(recordData) :: r
-			end subroutine
-		end interface
-
-		fk = (/ ( 0.1_mp**i,i=-1,N-2 ) /)
-		Tk = (/ 0.2_mp, 0.5_mp, 5.0_mp, 20.0_mp, 30.0_mp /)
-!		Tk = (/ 0.2_mp, 120.0_mp /)
-		ek = 0.0_mp
-
-		dir = 'Landau'
-
-		do j=1,size(Tk)
-			call problem(fk(i),Tk(j),trim(dir),0,temp)
-			J0 = temp(1)
-			grad(j) = temp(2)
-			do i=1,N
-				call problem(fk(i),Tk(j),trim(dir),1,temp)
-				J1 = temp(1)
-				ek(i,j) = ABS( ((J1-J0)/fk(i) - grad(j))/grad(j) )
-			end do
-		end do
-
-		open(unit=301,file='data/'//trim(dir)//'/fk.bin',status='replace',form='unformatted',access='stream')
-		write(301) fk
-		close(301)
-		open(unit=301,file='data/'//trim(dir)//'/ek.bin',status='replace',form='unformatted',access='stream')
-		write(301) ek
-		close(301)
-		open(unit=301,file='data/'//trim(dir)//'/grad.bin',status='replace',form='unformatted',access='stream')
-		write(301) grad
-		close(301)
-		open(unit=301,file='data/'//trim(dir)//'/output.bin',status='replace',form='unformatted',access='stream')
-		write(301) N,Nt
-		close(301)
-	end subroutine
+!	subroutine twostream_adjoint_sampling
+!		integer :: ierr, my_rank, s
+!		type(adjoint) :: adj
+!		type(PM1D) :: pm
+!		type(recordData) :: r
+!		integer, parameter :: Nsample = 10000
+!		integer :: sample_per_core, sendcnt
+!		integer, allocatable :: recvcnt(:), displc(:)
+!		real(mp), allocatable :: sendbuf(:,:)
+!		real(mp) :: recvbuf(Nsample,3)                     !(/J0, J1, dJdA/)
+!		real(mp) :: Tf = 30.1_mp, Ti = 30.0_mp
+!		integer, parameter :: Ng=64, Np=10**5, N=1
+!		real(mp) :: xp0(Np), vp0(Np,3)
+!		real(mp) :: v0 = 0.2_mp, vT = 0.01_mp
+!		integer :: mode = 1
+!		real(mp) :: dt=0.1_mp
+!		character(len=100)::dir,rank_str
+!		real(mp) :: J0,J1,grad(1)
+!		integer :: i
+!
+!		call MPI_INIT(ierr)
+!		call MPI_COMM_RANK(MPI_COMM_WORLD,my_rank,ierr)
+!		call MPI_COMM_SIZE(MPI_COMM_WORLD,s,ierr)
+!		sample_per_core = Nsample/s
+!		write(rank_str,*) my_rank
+!
+!		if( my_rank.eq.s-1 ) then
+!			print *, 'size: ',s
+!			print *, 'sample/core: ',sample_per_core
+!			print *, 'remainder: ',MOD(Nsample,s)
+!			allocate(recvcnt(0:s-1))
+!			allocate(displc(0:s-1))
+!			recvcnt(0:MOD(Nsample,s)-1) = sample_per_core+1
+!			recvcnt(MOD(Nsample,s):s-1) = sample_per_core
+!			print *, recvcnt
+!			displc = 0
+!			do i=0,s-1
+!				displc(i) = SUM(recvcnt(0:i-1))
+!			end do
+!			print *, displc
+!		end if
+!
+!		if(my_rank<MOD(Nsample,s) ) then
+!			sendcnt = sample_per_core+1
+!			allocate(sendbuf(sendcnt,3))
+!		else
+!			sendcnt = sample_per_core
+!			allocate(sendbuf(sendcnt,3))
+!		end if
+!		sendbuf = 0.0_mp
+!
+!		call init_random_seed(my_rank)
+!
+!		do i=1,sendcnt
+!			call buildPM1D(pm,Tf,Ti,Ng,N,0,0,1,dt=dt,A=(/0.1_mp,0.0_mp/))
+!			dir = 'twostream_sampling2/before'//trim(adjustl(rank_str))
+!			call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
+!			call set_null_discharge(r)
+!			call twostream_initialize(pm,Np,v0,vT,mode)
+!			xp0 = pm%p(1)%xp
+!			vp0 = pm%p(1)%vp
+!
+!			call forwardsweep(pm,r,Te,Null_source,MPE,J0)
+!			!call printPlasma(r)
+!			print *, 'J0=',J0
+!
+!			call buildAdjoint(adj,pm)
+!			call backward_sweep(adj,pm,r,grad,dMPE,dTe,dTedA,Te,Null_source)
+!
+!			print *, 'dJdA=',grad
+!
+!			call destroyAdjoint(adj)
+!			call destroyRecord(r)
+!
+!			dir = 'twostream_sampling2/after'//trim(adjustl(rank_str))
+!			pm%A0 = (/0.1_mp,(0.1_mp)**10 /)
+!			call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
+!			call destroySpecies(pm%p(1))
+!			call setSpecies(pm%p(1),Np,xp0,vp0)
+!			call forwardsweep(pm,r,Te,Null_source,MPE,J1)
+!			!call printPlasma(r)
+!			print *, 'J1=',J1
+!
+!			call destroyRecord(r)
+!			call destroyPM1D(pm)
+!
+!			sendbuf(i,:) = (/ J0, J1, grad(1) /)
+!		end do
+!
+!		do i=1,3
+!			call MPI_GATHERV(sendbuf(:,i),sendcnt,MPI_DOUBLE,recvbuf(:,i),recvcnt,displc,MPI_DOUBLE,s-1,MPI_COMM_WORLD,ierr)
+!		end do
+!
+!		call MPI_FINALIZE(ierr)
+!		if( my_rank.eq.s-1 ) then
+!			open(unit=301,file='data/twostream_sampling2/sample_J0.bin',status='replace',form='unformatted',access='stream')
+!			open(unit=302,file='data/twostream_sampling2/sample_J1.bin',status='replace',form='unformatted',access='stream')
+!			open(unit=303,file='data/twostream_sampling2/sample_grad.bin',status='replace',form='unformatted',access='stream')
+!			write(301) recvbuf(:,1)
+!			write(302) recvbuf(:,2)
+!			write(303) recvbuf(:,3)
+!			close(301)
+!			close(302)
+!			close(303)
+!		end if
+!
+!		deallocate(sendbuf)
+!		if( my_rank.eq.s-1) then
+!			deallocate(recvcnt)
+!			deallocate(displc)
+!		end if
+!	end subroutine
+!
+!	subroutine Landau_adjoint_sampling
+!		integer :: ierr, my_rank, s
+!		type(adjoint) :: adj
+!		type(PM1D) :: pm
+!		type(recordData) :: r
+!		integer, parameter :: Nsample = 10000
+!		integer :: sample_per_core, sendcnt
+!		integer, allocatable :: recvcnt(:), displc(:)
+!		real(mp), allocatable :: sendbuf(:,:)
+!		real(mp) :: recvbuf(Nsample,3)                     !(/J0, J1, dJdA/)
+!		real(mp) :: Tf = 20.1_mp, Ti = 20.0_mp
+!		integer, parameter :: Ng=64, Np=3*10**6, N=1
+!		real(mp) :: xp0(Np), vp0(Np,3)
+!		real(mp) :: vT = 1.0_mp, L=4.0_mp*pi
+!		real(mp) :: dt=0.1_mp
+!		character(len=100)::dir,rank_str
+!		real(mp) :: J0,J1,grad(1)
+!		integer :: i
+!
+!		call MPI_INIT(ierr)
+!		call MPI_COMM_RANK(MPI_COMM_WORLD,my_rank,ierr)
+!		call MPI_COMM_SIZE(MPI_COMM_WORLD,s,ierr)
+!		sample_per_core = Nsample/s
+!		write(rank_str,*) my_rank
+!
+!		if( my_rank.eq.s-1 ) then
+!		   print *, 'size: ',s
+!		   print *, 'sample/core: ',sample_per_core
+!		   print *, 'remainder: ',MOD(Nsample,s)
+!			allocate(recvcnt(0:s-1))
+!		   allocate(displc(0:s-1))
+!			recvcnt(0:MOD(Nsample,s)-1) = sample_per_core+1
+!			recvcnt(MOD(Nsample,s):s-1) = sample_per_core
+!		   print *, recvcnt
+!		   displc = 0
+!		   do i=0,s-1
+!			  displc(i) = SUM(recvcnt(0:i-1))
+!		   end do
+!		   print *, displc
+!		end if
+!
+!		if(my_rank<MOD(Nsample,s) ) then
+!			sendcnt = sample_per_core+1
+!			allocate(sendbuf(sendcnt,3))
+!		else
+!			sendcnt = sample_per_core
+!			allocate(sendbuf(sendcnt,3))
+!		end if
+!		sendbuf = 0.0_mp
+!
+!		call init_random_seed(my_rank)
+!
+!		do i=1,sendcnt
+!			call buildPM1D(pm,Tf,Ti,Ng,N,0,0,1,dt=dt,L=L,A=(/0.1_mp,0.0_mp/))
+!			dir = 'Landau_sampling/before'//trim(adjustl(rank_str))
+!			call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
+!			call set_null_discharge(r)
+!			call Landau_initialize(pm,Np,vT)
+!			xp0 = pm%p(1)%xp
+!			vp0 = pm%p(1)%vp
+!
+!			call forwardsweep(pm,r,Te,Null_source,MPE,J0)
+!			!call printPlasma(r)
+!			print *, 'J0=',J0
+!
+!			call buildAdjoint(adj,pm)
+!			call backward_sweep(adj,pm,r,grad,dMPE,dTe,dTedA,Te,Null_source)
+!
+!			print *, 'dJdA=',grad
+!
+!			call destroyAdjoint(adj)
+!			call destroyRecord(r)
+!
+!			dir = 'Landau_sampling/after'//trim(adjustl(rank_str))
+!			pm%A0 = (/0.1_mp,(0.1_mp)**9 /)
+!			call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
+!		   call destroySpecies(pm%p(1))
+!			call setSpecies(pm%p(1),Np,xp0,vp0)
+!			call forwardsweep(pm,r,Te,Null_source,MPE,J1)
+!			!call printPlasma(r)
+!			print *, 'J1=',J1
+!
+!			call destroyRecord(r)
+!			call destroyPM1D(pm)
+!
+!			sendbuf(i,:) = (/ J0, J1, grad(1) /)
+!		end do
+!
+!		do i=1,3
+!			call MPI_GATHERV(sendbuf(:,i),sendcnt,MPI_DOUBLE,recvbuf(:,i),recvcnt,displc,MPI_DOUBLE,s-1,MPI_COMM_WORLD,ierr)
+!		end do
+!
+!		call MPI_FINALIZE(ierr)
+!		if( my_rank.eq.s-1 ) then
+!			open(unit=301,file='data/Landau_sampling/sample_J0.bin',status='replace',form='unformatted',access='stream')
+!			open(unit=302,file='data/Landau_sampling/sample_J1.bin',status='replace',form='unformatted',access='stream')
+!			open(unit=303,file='data/Landau_sampling/sample_grad.bin',status='replace',form='unformatted',access='stream')
+!		   write(301) recvbuf(:,1)
+!		   write(302) recvbuf(:,2)
+!		   write(303) recvbuf(:,3)
+!		   close(301)
+!		   close(302)
+!		   close(303)
+!		end if
+!
+!		deallocate(sendbuf)
+!		if( my_rank.eq.s-1) then
+!		   deallocate(recvcnt)
+!		   deallocate(displc)
+!		end if
+!	end subroutine
+!
+!	subroutine adjoint_convergence(problem)
+!		integer, parameter :: N=20, Nt=5
+!		real(mp) :: fk(N)
+!		real(mp) :: Tk(Nt)
+!		real(mp) :: ek(N,Nt)
+!		character(len=100) :: dir
+!		integer :: i,j
+!		real(mp) :: J0,J1,grad(Nt),temp(2)
+!		interface
+!			subroutine problem(fk,Ti,str,k,output)
+!				use modPM1D
+!				use modAdj
+!				use modRecord
+!				real(mp), intent(in) :: fk, Ti
+!				character(len=*), intent(in) ::str
+!				integer, intent(in) :: k
+!				real(mp), intent(out) :: output(:)
+!				type(adjoint) :: adj
+!				type(PM1D) :: pm
+!				type(recordData) :: r
+!			end subroutine
+!		end interface
+!
+!		fk = (/ ( 0.1_mp**i,i=-1,N-2 ) /)
+!		Tk = (/ 0.2_mp, 0.5_mp, 5.0_mp, 20.0_mp, 30.0_mp /)
+!!		Tk = (/ 0.2_mp, 120.0_mp /)
+!		ek = 0.0_mp
+!
+!		dir = 'Landau'
+!
+!		do j=1,size(Tk)
+!			call problem(fk(i),Tk(j),trim(dir),0,temp)
+!			J0 = temp(1)
+!			grad(j) = temp(2)
+!			do i=1,N
+!				call problem(fk(i),Tk(j),trim(dir),1,temp)
+!				J1 = temp(1)
+!				ek(i,j) = ABS( ((J1-J0)/fk(i) - grad(j))/grad(j) )
+!			end do
+!		end do
+!
+!		open(unit=301,file='data/'//trim(dir)//'/fk.bin',status='replace',form='unformatted',access='stream')
+!		write(301) fk
+!		close(301)
+!		open(unit=301,file='data/'//trim(dir)//'/ek.bin',status='replace',form='unformatted',access='stream')
+!		write(301) ek
+!		close(301)
+!		open(unit=301,file='data/'//trim(dir)//'/grad.bin',status='replace',form='unformatted',access='stream')
+!		write(301) grad
+!		close(301)
+!		open(unit=301,file='data/'//trim(dir)//'/output.bin',status='replace',form='unformatted',access='stream')
+!		write(301) N,Nt
+!		close(301)
+!	end subroutine
 
 !   subroutine Ar_discharge
 !      type(PM1D) :: pm
@@ -452,17 +455,17 @@ contains
 	subroutine debye_shielding
 		type(PM1D) :: debye
 		type(recordData) :: r
-		real(mp) :: n0 = 1.0e10, lambda0 = 1.0e-2
-		integer :: N = 10000, Ng = 128
-		real(mp) :: L = 10.0_mp, Wp, Q = 1.0_mp
+		real(mp) :: n0 = 1.0e10, lambda0 = 1.0e-2, vT = 3.0_mp
+		integer :: N = 100000, Ng = 512
+		real(mp) :: L = 20.0_mp, Wp, Q = 3.0_mp
 		real(mp) :: dx
 		real(mp) :: Time = 100.0_mp
 		real(mp) :: A(2)
 
 		Wp = L/N
-		A = (/ n0, lambda0 /)
-		call buildPM1D(debye,Time,0.0_mp,Ng,1,pBC=0,mBC=1,order=1,A=A,L=L,dt=0.1_mp)
-		call buildRecord(r,debye%nt,1,debye%L,debye%ng,'debye',20)
+		A = (/ vT, lambda0 /)
+		call buildPM1D(debye,Time,0.0_mp,Ng,1,pBC=3,mBC=1,order=1,A=A,L=L,dt=0.01_mp)
+		call buildRecord(r,debye%nt,1,debye%L,debye%ng,'debye2',50)
 
 		call buildSpecies(debye%p(1),-1.0_mp,1.0_mp,Wp)
 		call Debye_initialize(debye,N,Q)
@@ -473,6 +476,29 @@ contains
 
 		call destroyRecord(r)
 		call destroyPM1D(debye)
+	end subroutine
+
+	subroutine twostream
+		type(PM1D) :: pm
+		type(adjoint) :: adj
+		type(recordData) :: r
+		integer, parameter :: Ng=64, Np=10**5, N=1
+		real(mp) :: v0 = 0.2_mp, vT = 0.0_mp
+		integer :: mode=1
+		real(mp) :: J0,J1, grad(1)
+		character(len=100)::dir1
+
+		call buildPM1D(pm,70.0_mp,65.0_mp,Ng,N,0,0,1,A=(/1.0_mp,0.0_mp/))
+		dir1='twostream_test'
+		call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir1),5)
+		call set_null_discharge(r)
+		call twostream_initialize(pm,Np,v0,vT,mode)
+		call forwardsweep(pm,r,Null_input,Null_source,MKE,J0)
+		call printPlasma(r)
+		print *, 'J0=',J0
+
+		call destroyPM1D(pm)
+		call destroyRecord(r)
 	end subroutine
 
 end program

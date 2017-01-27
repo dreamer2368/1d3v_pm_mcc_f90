@@ -18,11 +18,15 @@ contains
 
 !		call init_random_seed
 		vp0 = randn(Np,3)
+		vp0 = pm%A0(1)*vp0
 		call RANDOM_NUMBER(xp0)
-		xp0 = xp0*L
+		xp0 = L*(xp0 - 0.5_mp) + 0.5_mp*L
 
 		rho_back = 1.0_mp
+		rho_back = rho_back - Q/L
+!		pm%p(1)%qs = pm%p(1)%qs - Q/L
 		rho_back(pm%ng/2) = rho_back(pm%ng/2) + Q/pm%m%dx
+		rho_back(pm%ng) = 0.0_mp
 
 		call setSpecies(pm%p(1),Np,xp0,vp0)
 		call setMesh(pm%m,rho_back)
@@ -69,6 +73,7 @@ contains
 		rho_back = -qs*this%n*Np/L
 
 		!velocity distribution initialize
+print *, 'vT: ',vT
 		vp0 = vT*randn(Np,3)
 		pm = (/ ( i, i=1,Np ) /)
 		pm = 1 - 2*MOD(pm,2)
@@ -76,9 +81,9 @@ contains
 
 		do i=1,this%n
 			!spatial distribution initialize
-!			xp0 = (/ ( j*L/Np, j=0,Np-1 ) /) + 0.5_mp*(i-1)*L/Np
-			call RANDOM_NUMBER(xp0)
-			xp0 = xp0*L
+			xp0 = (/ ( j*L/Np, j=0,Np-1 ) /) + 0.5_mp*(i-1)*L/Np
+!			call RANDOM_NUMBER(xp0)
+!			xp0 = xp0*L
 			xp0 = xp0 + this%A0(1)*L/Np*SIN( 2.0_mp*pi*xp0/L*mode )
 
 			call buildSpecies(this%p(i),qs,ms,1.0_mp)
