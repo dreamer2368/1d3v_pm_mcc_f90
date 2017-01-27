@@ -39,18 +39,36 @@ contains
 !=======================================================
 !	MCC global subroutine
 !=======================================================
+
+	!No collision --- Use for collisionless PIC
 	subroutine mcc_collision(pm,n_coll)
 		type(PM1D), intent(inout) :: pm
-      integer, intent(out), optional :: n_coll(7)
+		integer, intent(out), optional :: n_coll(7)
 
-		if( present(n_coll) ) then
-			call mcc_Argon(pm,n_coll(5:7))
-			call mcc_electron(pm,n_coll(1:4))
-		else
-			call mcc_Argon(pm)
-			call mcc_electron(pm)
+	end subroutine
+
+	subroutine set_null_discharge(r)
+		type(recordData), intent(inout), optional :: r
+
+		if( present(r) ) then
+			allocate(r%n_coll(1,r%nt))
+			r%n_coll = 0
 		end if
 	end subroutine
+
+	!Argon-Electron collision
+!	subroutine mcc_collision(pm,n_coll)
+!		type(PM1D), intent(inout) :: pm
+!      integer, intent(out), optional :: n_coll(7)
+!
+!		if( present(n_coll) ) then
+!			call mcc_Argon(pm,n_coll(5:7))
+!			call mcc_electron(pm,n_coll(1:4))
+!		else
+!			call mcc_Argon(pm)
+!			call mcc_electron(pm)
+!		end if
+!	end subroutine
 
 !=======================================================
 !	Compute null collision for each species (e, Ar+)

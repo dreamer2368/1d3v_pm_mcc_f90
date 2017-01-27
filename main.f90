@@ -17,7 +17,7 @@ program main
 !	call test_mcc_Argon
 !	call test_ext_voltage_Poisson
 !   call Ar_discharge
-	call test_particle_adj(64,2)
+!	call test_particle_adj(64,2)
 !	call test_backward_sweep
 !	call twostream_adj(output(1),output(2))
 !	call Landau(0.0_mp, 60.0_mp, ,'Landau', 1,output )
