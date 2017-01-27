@@ -72,4 +72,14 @@ contains
 		end if
 	end subroutine
 
+!==============Debye-length?
+
+	subroutine Debye(pm,k,J)
+		type(PM1D), intent(in) :: pm
+		integer, intent(in) :: k
+		real(mp), intent(inout) :: J
+
+		J = J + 1.0_mp/pm%p(1)%np/pm%nt*SUM( (pm%p(1)%xp-0.5_mp*pm%L)**2 )
+	end subroutine
+
 end module

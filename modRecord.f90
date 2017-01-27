@@ -110,7 +110,7 @@ contains
 				close(307)
 				!time step: 0~Nt, in array: 1~(Nt+1) (valgrind prefers this way of allocation)
 				this%np(n,kr+1) = pm%p(n)%np
-				this%KE(n,kr+1) = 0.5_mp*pm%p(n)%ms*SUM( pm%p(n)%spwt*SUM(pm%p(n)%vp**2,2) )
+				this%KE(n,kr+1) = 0.5_mp*pm%p(n)%ms*SUM( pm%p(n)%spwt*pm%p(n)%vp(:,1)**2 )
 			end do
 
 			this%phidata(:,kr+1) = pm%m%phi
@@ -120,7 +120,7 @@ contains
 
 			print *, '============= ',k,'-th Time Step ================='
 			do n=1,pm%n
-				print *, 'Species(',n,'): ',pm%p(n)%np, ', KE: ', 0.5_mp*pm%p(n)%ms*sum((pm%p(n)%vp)**2),'J'
+				print *, 'Species(',n,'): ',pm%p(n)%np, ', KE: ', this%KE(n,kr+1),'J'
 			end do
          print *, 'Voltage = ',pm%m%phi(pm%ng),'V'
 		end if

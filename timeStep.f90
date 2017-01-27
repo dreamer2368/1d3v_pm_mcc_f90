@@ -46,7 +46,7 @@ contains
 		k=0
 
 		!Time stepping
-!		call halfStep(this,target_input)
+		call halfStep(this,target_input)
 		if( present(J) ) then
 			call QoI(this,k,J)
 		end if

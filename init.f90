@@ -10,11 +10,13 @@ contains
 		type(PM1D), intent(inout) :: pm
 		integer, intent(in) :: Np
 		real(mp), intent(in) :: Q
-		real(mp) :: xp0(Np), vp0(Np,3), spwt0(Np), rho_back(pm%ng)
-		real(mp) :: L
+		real(mp) :: xp0(Np), vp0(Np,3), spwt0(Np), rho_back(pm%ng), xg(pm%ng)
+		real(mp) :: L,w
 		integer :: i,j,N
 		L=pm%L
 		N=pm%n
+		w=L/10.0_mp
+		xg=(/ ((i-0.5_mp)*pm%m%dx,i=1,pm%ng) /)
 
 !		call init_random_seed
 		vp0 = randn(Np,3)
@@ -23,11 +25,12 @@ contains
 		xp0 = L*(xp0 - 0.5_mp) + 0.5_mp*L
 		spwt0 = L/Np
 
-		rho_back = 1.0_mp
-		rho_back = rho_back - Q/L
+		rho_back = 1.0_mp - Q/L + Q/sqrt(2.0_mp*pi)/w*exp( -(xg-0.5_mp*L)**2/2.0_mp/w/w )
+!		rho_back = 1.0_mp
+!		rho_back = rho_back - Q/L
 !		pm%p(1)%qs = pm%p(1)%qs - Q/L
-		rho_back(pm%ng/2) = rho_back(pm%ng/2) + Q/pm%m%dx
-		rho_back(pm%ng) = 0.0_mp
+!		rho_back(pm%ng/2) = rho_back(pm%ng/2) + Q/pm%m%dx
+!		rho_back(pm%ng) = 0.0_mp
 
 		call setSpecies(pm%p(1),Np,xp0,vp0,spwt0)
 		call setMesh(pm%m,rho_back)
