@@ -1,5 +1,5 @@
 ### Compilers & flags
-F90=gfortran
+F90=mpifort
 
 FFTWLIBS=~/bin/FFTW/lib/libfftw3.a
 VECLIBSMACOSX=
@@ -11,8 +11,8 @@ LIBS    =
 
 
 EXE = exec
-F90SRC = main.f90 constants.f90 MatrixVector.f90 modSpecies.f90 modMesh.f90 modAssign.f90 modRecord.f90 modPM1D.f90 random.f90 nullMCC.f90 init.f90 modBC.f90 modTarget.f90 modSource.f90 timeStep.f90 modAdj.f90 modQoI.f90
-F90OBJ = main.o constants.o MatrixVector.o modSpecies.o modMesh.o modAssign.o modRecord.o modPM1D.o random.o nullMCC.o init.o modBC.o modTarget.o modSource.o timeStep.o modAdj.o modQoI.f90
+F90SRC = main.f90 constants.f90 modMPI.f90 MatrixVector.f90 modSpecies.f90 modMesh.f90 modAssign.f90 modRecord.f90 modPM1D.f90 random.f90 nullMCC.f90 init.f90 modBC.f90 modTarget.f90 modSource.f90 timeStep.f90 modAdj.f90 modQoI.f90
+F90OBJ = main.o constants.o modMPI.f90 MatrixVector.o modSpecies.o modMesh.o modAssign.o modRecord.o modPM1D.o random.o nullMCC.o init.o modBC.o modTarget.o modSource.o timeStep.o modAdj.o modQoI.f90
 
 ### Targets
 all: $(EXE)
@@ -30,6 +30,7 @@ $(EXE): $(F90OBJ)
 # Dependencies
 random.o : constants.o
 MatrixVector.o : constants.o
+modMPI.o : constants.o
 modSpecies.o : constants.o
 modMesh.o : MatrixVector.o
 modAssign.o : modSpecies.o modMesh.o
@@ -43,7 +44,7 @@ modBC.o : modPM1D.o random.o
 modTarget.o : modAdj.o
 modSource.o : modPM1D.o random.o
 timeStep.o : modTarget.o modSource.o modBC.o modRecord.o nullMCC.o modAdj.o modQoI.o
-main.o : init.o timeStep.o
+main.o : init.o timeStep.o modMPI.o
 
 clean:
 	rm *.o *.mod $(EXE)
