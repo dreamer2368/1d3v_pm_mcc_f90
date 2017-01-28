@@ -23,15 +23,16 @@ contains
 		call MPI_COMM_RANK(MPI_COMM_WORLD,this%my_rank,this%ierr)
 		call MPI_COMM_SIZE(MPI_COMM_WORLD,this%size,this%ierr)
 		write(this%rank_str,*) this%my_rank
-		call MPI_FINALIZE(this%ierr)
 	end subroutine
 
 	subroutine destroyMPIHandler(this)
 		type(mpiHandler), intent(inout) :: this
+
+      call MPI_FINALIZE(this%ierr)
 		if( allocated(this%sendbuf) ) deallocate(this%sendbuf)
-		if( allocated(this%sendbuf) ) deallocate(this%recvbuf)
-		if( allocated(this%sendbuf) ) deallocate(this%recvcnt)
-		if( allocated(this%sendbuf) ) deallocate(this%displc)
+		if( allocated(this%recvbuf) ) deallocate(this%recvbuf)
+		if( allocated(this%recvcnt) ) deallocate(this%recvcnt)
+		if( allocated(this%displc) ) deallocate(this%displc)
 	end subroutine
 
 	subroutine allocateBuffer(Nsample,Ndata,this)
@@ -71,13 +72,11 @@ contains
 		type(mpiHandler), intent(inout) :: this
 		integer :: i
 
-		call MPI_INIT(this%ierr)
 		do i=1,size(this%sendbuf,2)
 			call MPI_GATHERV(this%sendbuf(:,i),this%sendcnt,MPI_DOUBLE,	&
 							this%recvbuf(:,i),this%recvcnt,this%displc,MPI_DOUBLE,	&
 							this%size-1,MPI_COMM_WORLD,this%ierr)
 		end do
-		call MPI_FINALIZE(this%ierr)
 	end subroutine
 
 end module
