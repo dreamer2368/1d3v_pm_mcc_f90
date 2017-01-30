@@ -1,6 +1,7 @@
 program main
 
 	use testmodule
+	use modFSens
 
 	implicit none
 
@@ -19,14 +20,14 @@ program main
 !   call Ar_discharge
 !	call test_particle_adj(64,2)
 !	call test_backward_sweep
-!	call twostream_adj(output(1),output(2))
+	call twostream_adj(output(1),output(2))
 !	call Landau(0.0_mp, 60.0_mp, ,'Landau', 1,output )
 !	call adjoint_convergence(Landau)
 !	call random_test
 !   call Landau_adjoint_sampling
 !   call twostream_adjoint_sampling
 !   call debye_shielding
-	call debye_characterization
+!	call debye_characterization
 
 	! print to screen
 	print *, 'program main...done.'

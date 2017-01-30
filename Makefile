@@ -11,8 +11,8 @@ LIBS    =
 
 
 EXE = exec
-F90SRC = main.f90 constants.f90 modMPI.f90 MatrixVector.f90 modSpecies.f90 modMesh.f90 modAssign.f90 modRecord.f90 modPM1D.f90 random.f90 ArMCC.f90 init.f90 modBC.f90 modTarget.f90 modSource.f90 timeStep.f90 modAdj.f90 modQoI.f90 testmodule.f90
-F90OBJ = main.o constants.o modMPI.f90 MatrixVector.o modSpecies.o modMesh.o modAssign.o modRecord.o modPM1D.o random.o ArMCC.o init.o modBC.o modTarget.o modSource.o timeStep.o modAdj.o modQoI.f90 testmodule.o
+F90SRC = main.f90 constants.f90 modMPI.f90 MatrixVector.f90 modSpecies.f90 modMesh.f90 modAssign.f90 modRecord.f90 modPM1D.f90 random.f90 ArMCC.f90 init.f90 modBC.f90 modTarget.f90 modSource.f90 timeStep.f90 modAdj.f90 modQoI.f90  testmodule.f90 modFSens.f90
+F90OBJ = main.o constants.o modMPI.f90 MatrixVector.o modSpecies.o modMesh.o modAssign.o modRecord.o modPM1D.o random.o ArMCC.o init.o modBC.o modTarget.o modSource.o timeStep.o modAdj.o modQoI.f90 testmodule.o modFSens.o
 
 ### Targets
 all: $(EXE)
@@ -45,7 +45,8 @@ modTarget.o : modAdj.o
 modSource.o : modPM1D.o random.o
 timeStep.o : modTarget.o modSource.o modBC.o modRecord.o ArMCC.o modAdj.o modQoI.o
 testmodule.o : init.o timeStep.o modMPI.o
-main.o : testmodule.o
+modFSens.o : modBC.o
+main.o : testmodule.o modFSens.o
 
 clean:
 	rm *.o *.mod $(EXE)

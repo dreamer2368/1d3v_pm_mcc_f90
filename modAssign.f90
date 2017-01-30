@@ -13,12 +13,21 @@ module modAssign
 		integer, allocatable :: g(:,:)
 		real(mp), allocatable :: frac(:,:)
 		real(mp), allocatable :: h(:)
+	contains
+		procedure, pass(this) :: buildAssign
+		procedure, pass(this) :: destroyAssign
+		procedure, pass(this) :: assignMatrix
+!		procedure, pass(this) :: chargeAssign				!We handle chargeAssign subroutine globally, since it handles multiple species
+		procedure, pass(this) :: forceAssign
+		procedure, pass(this) :: Adj_chargeAssign
+		procedure, pass(this) :: Adj_forceAssign_E
+		procedure, pass(this) :: Adj_forceAssign_xp
 	end type
 
 contains
 
 	subroutine buildAssign(this,ng,order)
-		type(pmAssign), intent(out) :: this
+		class(pmAssign), intent(out) :: this
 		integer, intent(in) :: ng, order
 
 		this%ng = ng
@@ -33,7 +42,7 @@ contains
 	end subroutine
 
 	subroutine destroyAssign(this)
-		type(pmAssign), intent(inout) :: this
+		class(pmAssign), intent(inout) :: this
 
 		deallocate(this%g)
 		deallocate(this%frac)
@@ -41,7 +50,7 @@ contains
 	end subroutine
 
 	subroutine assignMatrix(this,m,xp)
-		type(pmAssign), intent(inout) :: this
+		class(pmAssign), intent(inout) :: this
 		type(mesh), intent(inout) :: m
 		real(mp), intent(inout) :: xp(:)
 
@@ -141,7 +150,7 @@ contains
 	end subroutine
 
 	subroutine forceAssign(this,p,m)
-		type(pmAssign), intent(inout) :: this
+		class(pmAssign), intent(inout) :: this
 		type(species), intent(inout) :: p
 		type(mesh), intent(inout) :: m
 		integer :: i
@@ -151,5 +160,59 @@ contains
 			p%Ep(i) = sum( this%frac(i,:)*m%E(this%g(i,:)) )
 		end do
 	end subroutine
+
+!======================= Adjoint assignment ==========================================================
+
+	subroutine Adj_chargeAssign(this,p,m,rhos,xps)
+		class(pmAssign), intent(inout) :: this
+		type(species), intent(in) :: p
+		type(mesh), intent(in) :: m
+		real(mp), intent(in) :: rhos(this%ng)
+		real(mp), intent(out) :: xps(this%np)
+		real(mp) :: dxps(this%np)
+		real(mp) :: dV
+		integer :: i
+
+		dV = m%dx
+		dxps = 0.0_mp
+		dxps = 1.0_mp/m%dx*( rhos( this%g(:,2) ) - rhos( this%g(:,1) ) )
+		dxps = - p%qs*p%spwt/dV*dxps
+		xps = xps + dxps
+	end subroutine
+
+	subroutine Adj_forceAssign_E(this,Eps,Es)
+		class(pmAssign), intent(inout) :: this
+		real(mp), intent(in) :: Eps(this%np)
+		real(mp), intent(inout) :: Es(this%ng)
+		integer :: i, g(2)
+
+!		Es = 0.0_mp
+		do i=1,this%np
+			g = this%g(i,:)
+			Es( g ) = Es( g ) + Eps(i)*this%frac(i,:)
+		end do
+	end subroutine
+
+	subroutine Adj_forceAssign_xp(this,m,E,Eps,xps)
+		class(pmAssign), intent(inout) :: this
+		type(mesh), intent(in) :: m
+		real(mp), intent(in) :: E(this%ng)
+		real(mp), intent(in) :: Eps(this%np)
+		real(mp), intent(out) :: xps(this%np)
+		real(mp) :: dxps(this%np)
+		integer :: i
+
+		dxps = 0.0_mp
+		!sum : sum in each direction --- this rank will be added by the gradient of assignment
+		do i=1,this%np
+			dxps(i) = dxps(i) + Eps(i)/m%dx*( E(this%g(i,2)) - E(this%g(i,1)) )			!gradient of fraction = +/- 1/dx
+		end do
+		dxps = - dxps
+
+		xps = xps + dxps
+	end subroutine
+
+!======================= Forward sensitivity calculation =============================================
+
 
 end module

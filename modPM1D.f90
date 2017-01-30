@@ -15,12 +15,15 @@ module modPM1D
 		type(species), allocatable :: p(:)
 		type(mesh) :: m
 		type(pmAssign), allocatable :: a(:)
+	contains
+		procedure, pass(this) :: buildPM1D
+		procedure, pass(this) :: destroyPM1D
 	end type
 
 contains
 
 	subroutine buildPM1D(this,Tf,Ti,Ng,N,pBC,mBC,order,dt,L,A,eps)
-		type(PM1D), intent(out) :: this
+		class(PM1D), intent(out) :: this
 		real(mp), intent(in) :: Tf,Ti
 		integer, intent(in) :: Ng, N, pBC, mBC, order
 		real(mp), intent(in), optional :: dt, A(:), L, eps
@@ -73,7 +76,7 @@ contains
 	end subroutine
 
 	subroutine destroyPM1D(this)
-		type(PM1D), intent(inout) :: this
+		class(PM1D), intent(inout) :: this
 		integer :: i
 
 		deallocate(this%A0)

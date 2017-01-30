@@ -12,12 +12,18 @@ module modSpecies
 		real(mp), allocatable :: spwt(:)
 
 		real(mp) :: ms, qs
+	contains
+		procedure, pass(this) :: buildSpecies
+		procedure, pass(this) :: setSpecies
+		procedure, pass(this) :: destroySpecies
+		procedure, pass(this) :: moveSpecies
+		procedure, pass(this) :: accelSpecies
 	end type
 
 contains
 
 	subroutine buildSpecies(this,qs,ms)
-		type(species), intent(out) :: this
+		class(species), intent(out) :: this
 		real(mp), intent(in) :: ms, qs
 
 		this%ms = ms
@@ -27,7 +33,7 @@ contains
 	end subroutine
 
 	subroutine setSpecies(this,np0,xp0,vp0,spwt0)
-		type(species), intent(inout) :: this
+		class(species), intent(inout) :: this
 		integer, intent(in) :: np0
 		real(mp), intent(in) :: xp0(np0), spwt0(np0)
 		real(mp), intent(in) :: vp0(np0,3)
@@ -45,7 +51,7 @@ contains
 	end subroutine
 
 	subroutine destroySpecies(this)
-		type(species), intent(inout) :: this
+		class(species), intent(inout) :: this
 
 		deallocate(this%xp)
 		deallocate(this%vp)
@@ -54,14 +60,14 @@ contains
 	end subroutine
 
 	subroutine moveSpecies(this,dt)
-		type(species), intent(inout) :: this
+		class(species), intent(inout) :: this
 		real(mp), intent(in) :: dt
 
 		this%xp = this%xp + dt*this%vp(:,1)
 	end subroutine
 
 	subroutine accelSpecies(this,dt)
-		type(species), intent(inout) :: this
+		class(species), intent(inout) :: this
 		real(mp), intent(in) :: dt
 
 		this%vp(:,1) = this%vp(:,1) + dt*this%qs/this%ms*this%Ep

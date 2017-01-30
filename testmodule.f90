@@ -309,8 +309,8 @@ contains
 		k = 2
 		dxp = vp(k,1)*fxp
 		vp(k,1) = vp(k,1) + dxp
-		print *, 'Perturbed xp'
-		print *, xp
+		print *, 'Perturbed vp'
+		print *, vp
 		call destroySpecies(pm%p(1))
 		call setSpecies(pm%p(1),Np,xp,vp,spwt)
 
@@ -326,7 +326,7 @@ contains
 		J1 = sum( pm%p(1)%vp(:,1)**2 )
 		!J1 = pm%m%dx*sum( weight*pm%m%E**2 )
 		print *, 'J1 = ',J1
-		print *, 'dJdxp(',k,')=', (J1-J0)/dxp
+		print *, 'dJdvp(',k,')=', (J1-J0)/dxp
 
 		call destroyPM1D(pm)
 		call destroyAdjoint(adj)

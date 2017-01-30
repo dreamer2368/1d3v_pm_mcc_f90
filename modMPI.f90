@@ -1,6 +1,6 @@
 module modMPI
 
-   use constants
+	use constants
 
 	implicit none
 
@@ -12,12 +12,17 @@ module modMPI
 		integer :: sendcnt
 		real(mp), allocatable :: sendbuf(:,:), recvbuf(:,:)
 		integer, allocatable :: recvcnt(:), displc(:)
+	contains
+		procedure, pass(this) :: buildMPIHandler
+		procedure, pass(this) :: destroyMPIHandler
+		procedure, pass(this) :: allocateBuffer
+		procedure, pass(this) :: gatherData
 	end type
 
 contains
 
 	subroutine buildMPIHandler(this)
-		type(mpiHandler), intent(out) :: this
+		class(mpiHandler), intent(out) :: this
 
 		call MPI_INIT(this%ierr)
 		call MPI_COMM_RANK(MPI_COMM_WORLD,this%my_rank,this%ierr)
@@ -26,9 +31,9 @@ contains
 	end subroutine
 
 	subroutine destroyMPIHandler(this)
-		type(mpiHandler), intent(inout) :: this
+		class(mpiHandler), intent(inout) :: this
 
-      call MPI_FINALIZE(this%ierr)
+		call MPI_FINALIZE(this%ierr)
 		if( allocated(this%sendbuf) ) deallocate(this%sendbuf)
 		if( allocated(this%recvbuf) ) deallocate(this%recvbuf)
 		if( allocated(this%recvcnt) ) deallocate(this%recvcnt)
@@ -37,7 +42,7 @@ contains
 
 	subroutine allocateBuffer(Nsample,Ndata,this)
 		integer, intent(in) :: Nsample, Ndata
-		type(mpiHandler), intent(inout) :: this
+		class(mpiHandler), intent(inout) :: this
 		integer :: sample_per_core, i
 
 		sample_per_core = Nsample/this%size
@@ -69,7 +74,7 @@ contains
 	end subroutine
 
 	subroutine gatherData(this)
-		type(mpiHandler), intent(inout) :: this
+		class(mpiHandler), intent(inout) :: this
 		integer :: i
 
 		do i=1,size(this%sendbuf,2)

@@ -14,13 +14,18 @@ module modRecord
 		real(mp), allocatable :: Edata(:,:)
 		real(mp), allocatable :: rhodata(:,:)
 		real(mp), allocatable :: PE(:), KE(:,:)
-      integer, allocatable :: n_coll(:,:)               !(species*collision type, time)
+		integer, allocatable :: n_coll(:,:)               !(species*collision type, time)
+	contains
+		procedure, pass(this) :: buildRecord
+		procedure, pass(this) :: destroyRecord
+		procedure, pass(this) :: recordPlasma
+		procedure, pass(this) :: printPlasma
 	end type
 
 contains
 
 	subroutine buildRecord(this,nt,n,L,ng,input_dir,mod)
-		type(recordData), intent(out) :: this
+		class(recordData), intent(out) :: this
 		integer, intent(in) :: nt, n, ng, mod
 		real(mp), intent(in) :: L
 		character(len=*), intent(in), optional :: input_dir
@@ -65,7 +70,7 @@ contains
 	end subroutine
 
 	subroutine destroyRecord(this)
-		type(recordData), intent(inout) :: this
+		class(recordData), intent(inout) :: this
 		integer :: i,j
 
 		deallocate(this%np)
@@ -84,7 +89,7 @@ contains
 	end subroutine
 
 	subroutine recordPlasma(this,pm,k)
-		type(recordData), intent(inout) :: this
+		class(recordData), intent(inout) :: this
 		type(PM1D), intent(in) :: pm
 		integer, intent(in) :: k					!k : time step
 		integer :: n,j, kr								!n : species
@@ -127,7 +132,7 @@ contains
 	end subroutine
 
 	subroutine printPlasma(this)
-		type(recordData), intent(in) :: this
+		class(recordData), intent(in) :: this
 		character(len=100) :: s
 		integer :: i,j
 

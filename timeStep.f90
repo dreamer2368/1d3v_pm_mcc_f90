@@ -46,17 +46,17 @@ contains
 		k=0
 
 		!Time stepping
-		call halfStep(this,target_input)
+!		call halfStep(this,target_input)
 		if( present(J) ) then
 			call QoI(this,k,J)
 		end if
-		call recordPlasma(r, this, k)									!record for n=1~Nt
+		call r%recordPlasma(this, k)									!record for n=1~Nt
 		do k=1,this%nt
 			call updatePlasma(this,target_input,source,k,r)
 			if( present(J) ) then
 				call QoI(this,k,J)
 			end if
-			call recordPlasma(r, this, k)									!record for n=1~Nt
+			call r%recordPlasma(this, k)									!record for n=1~Nt
 		end do
 	end subroutine
 
@@ -82,7 +82,7 @@ contains
 
 		call applyBC(this)
 		do i=1,this%n
-			call assignMatrix(this%a(i),this%m,this%p(i)%xp)
+			call this%a(i)%assignMatrix(this%m,this%p(i)%xp)
 		end do
 		call adjustGrid(this)
 
@@ -90,19 +90,19 @@ contains
 		call chargeAssign(this%a,this%p,this%m)
 
 		call target_input(this,0,'rho_back')
-		call solveMesh(this%m,this%eps0)
+		call this%m%solveMesh(this%eps0)
 
 		!Electric field : -D*phi
 		this%m%E = - multiplyD(this%m%phi,this%m%dx,this%m%BCindex)
 
 		!Force assignment : mat'*E
 		do i=1, this%n
-			call forceAssign(this%a(i),this%p(i),this%m)
+			call this%a(i)%forceAssign(this%p(i),this%m)
 		end do
 
 		!Half time step advancement in velocity
 		do i=1, this%n
-			call accelSpecies(this%p(i),dt/2.0_mp)
+			call this%p(i)%accelSpecies(dt/2.0_mp)
 		end do
 	end subroutine
 
@@ -137,12 +137,12 @@ contains
 		call source(this)
 
 		do i=1,this%n
-			call moveSpecies(this%p(i),dt)
+			call this%p(i)%moveSpecies(dt)
 		end do
 
 		call applyBC(this)
 		do i=1, this%n
-			call assignMatrix(this%a(i),this%m,this%p(i)%xp)
+			call this%a(i)%assignMatrix(this%m,this%p(i)%xp)
 		end do
 		call adjustGrid(this)
 
@@ -150,18 +150,18 @@ contains
 		call chargeAssign(this%a,this%p,this%m)
 
 		call target_input(this,k,'rho_back')
-		call solveMesh(this%m,this%eps0)
+		call this%m%solveMesh(this%eps0)
 
 		!Electric field : -D*phi
 		this%m%E = - multiplyD(this%m%phi,this%m%dx,this%m%BCindex)
 
 		!Force assignment : mat'*E
 		do i=1, this%n
-			call forceAssign(this%a(i), this%p(i), this%m)
+			call this%a(i)%forceAssign(this%p(i), this%m)
 		end do
 
 		do i=1, this%n
-			call accelSpecies(this%p(i),dt)
+			call this%p(i)%accelSpecies(dt)
 		end do
 
 		if( present(r) ) then
@@ -241,7 +241,7 @@ contains
 		do k=1,pm%nt
 			nk = pm%nt+1-k
 
-			call reset_Dadj(adj)
+			call adj%reset_Dadj
 
 			!=====  Checkpointing  =====
 			call checkpoint(pm,r,nk,target_input,source)
@@ -254,7 +254,7 @@ contains
 
 			!======= dv_p =============
 			call Dtarget_input(adj,pm,nk,'vp')
-			call Adj_accel(adj)
+			call adj%Adj_accel
 
 !			!Check when adjoint reach to the initial step
 !			if( k .eq. pm%nt ) then
@@ -269,7 +269,7 @@ contains
 			!======= dE_g =============
 			adj%m%E = 0.0_mp
 			do i=1,adj%n
-				call Adj_forceAssign_E(pm%a(i),adj%p(i)%Ep,adj%m%E)
+				call pm%a(i)%Adj_forceAssign_E(adj%p(i)%Ep,adj%m%E)
 			end do
 			adj%m%E = adj%m%E + adj%dm%E
 
@@ -278,11 +278,11 @@ contains
 
 			!======= dx_p =============
 			do i=1,adj%n
-				call Adj_chargeAssign(pm%a(i),pm%p(i),pm%m,adj%m%rho,adj%dp(i)%xp)
-				call Adj_forceAssign_xp(pm%a(i),pm%m,pm%m%E,adj%p(i)%Ep,adj%dp(i)%xp)
+				call pm%a(i)%Adj_chargeAssign(pm%p(i),pm%m,adj%m%rho,adj%dp(i)%xp)
+				call pm%a(i)%Adj_forceAssign_xp(pm%m,pm%m%E,adj%p(i)%Ep,adj%dp(i)%xp)
 			end do
 			call Dtarget_input(adj,pm,nk,'xp')
-			call Adj_move(adj)
+			call adj%Adj_move
 
 			!===== dJdA : 2nd sensitivity calculation ======
 			call dJdA(adj,pm,nk,'after',grad)
@@ -300,11 +300,11 @@ contains
 
 		!======= dv_p =============
 		call Dtarget_input(adj,pm,nk,'vp')
-		call Adj_accel(adj)
+		call adj%Adj_accel
 
 		!======= dx_p =============
 		call Dtarget_input(adj,pm,nk,'xp')
-		call Adj_move(adj)
+		call adj%Adj_move
 
 		!===== dJdA : 2nd sensitivity calculation ======
 		call dJdA(adj,pm,nk,'after',grad)
@@ -351,15 +351,15 @@ contains
 			close(305)
 			close(306)
 			close(307)
-			call destroySpecies(pm%p(i))
-			call setSpecies(pm%p(i),r%np(i,kr+1),xp0,vp0,spwt0)
+			call pm%p(i)%destroySpecies
+			call pm%p(i)%setSpecies(r%np(i,kr+1),xp0,vp0,spwt0)
 			deallocate(xp0)
 			deallocate(vp0)
 			deallocate(spwt0)
 		end do
 		if( nk-kr*r%mod.eq.0 ) then
 			do i=1, pm%n
-				call assignMatrix(pm%a(i),pm%m,pm%p(i)%xp)
+				call pm%a(i)%assignMatrix(pm%m,pm%p(i)%xp)
 			end do
 			call adjustGrid(pm)
 
@@ -367,14 +367,14 @@ contains
 			call chargeAssign(pm%a,pm%p,pm%m)
 
 			call target_input(pm,nk,'rho_back')
-			call solveMesh(pm%m,pm%eps0)
+			call pm%m%solveMesh(pm%eps0)
 
 			!Electric field : -D*phi
 			pm%m%E = - multiplyD(pm%m%phi,pm%m%dx,pm%m%BCindex)
 
 			!Force assignment : mat'*E
 			do i=1, pm%n
-				call forceAssign(pm%a(i), pm%p(i), pm%m)
+				call pm%a(i)%forceAssign(pm%p(i), pm%m)
 			end do
 		else
 			do i=1,nk-kr*r%mod

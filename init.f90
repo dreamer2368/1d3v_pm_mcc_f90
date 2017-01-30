@@ -32,8 +32,8 @@ contains
 !		rho_back(pm%ng/2) = rho_back(pm%ng/2) + Q/pm%m%dx
 !		rho_back(pm%ng) = 0.0_mp
 
-		call setSpecies(pm%p(1),Np,xp0,vp0,spwt0)
-		call setMesh(pm%m,rho_back)
+		call pm%p(1)%setSpecies(Np,xp0,vp0,spwt0)
+		call pm%m%setMesh(rho_back)
 	end subroutine
 
 	subroutine Landau_initialize(pm,Np,vT)
@@ -57,10 +57,10 @@ contains
 		xp0 = xp0 + pm%A0(1)*SIN( 2.0_mp*pi*xp0/L )
 		spwt0 = 1.0_mp
 		do i=1,N
-			call buildSpecies(pm%p(i),qs,ms)
-			call setSpecies(pm%p(i),Np,xp0,vp0,spwt0)
+			call pm%p(i)%buildSpecies(qs,ms)
+			call pm%p(i)%setSpecies(Np,xp0,vp0,spwt0)
 		end do
-		call setMesh(pm%m,rho_back*(/ ( 1.0_mp, i=1,pm%m%ng) /))
+		call pm%m%setMesh(rho_back*(/ ( 1.0_mp, i=1,pm%m%ng) /))
 	end subroutine
 
 	subroutine twostream_initialize(this,Np,v0,vT,mode)		!generate initial distribution
@@ -93,10 +93,10 @@ contains
 !			xp0 = xp0*L
 			xp0 = xp0 + this%A0(1)*L/Np*SIN( 2.0_mp*pi*xp0/L*mode )
 
-			call buildSpecies(this%p(i),qs,ms)
-			call setSpecies(this%p(i),Np,xp0,vp0,spwt0)
+			call this%p(i)%buildSpecies(qs,ms)
+			call this%p(i)%setSpecies(Np,xp0,vp0,spwt0)
 		end do
-		call setMesh(this%m,rho_back*(/ ( 1, i=1,this%m%ng) /))
+		call this%m%setMesh(rho_back*(/ ( 1, i=1,this%m%ng) /))
 	end subroutine
 
 	subroutine sheath_initialize(this,Ne,Ni,Te,Ti,Kb,n0)
@@ -127,10 +127,10 @@ contains
 		spwt_e = n0*this%L/Ne
 		spwt_i = n0*this%L/Ni
 
-		call setSpecies(this%p(1),Ne,xpe,vpe,spwt_e)
-		call setSpecies(this%p(2),Ni,xpi,vpi,spwt_i)
+		call this%p(1)%setSpecies(Ne,xpe,vpe,spwt_e)
+		call this%p(2)%setSpecies(Ni,xpi,vpi,spwt_i)
 
-		call setMesh(this%m, (/ (0.0_mp, i=1,this%m%ng) /))
+		call this%m%setMesh((/ (0.0_mp, i=1,this%m%ng) /))
 	end subroutine
 
 end module
