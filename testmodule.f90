@@ -11,6 +11,7 @@ contains
 	subroutine MPITest
 		type(mpiHandler) :: mpih
 		integer, parameter :: Nsample=10000, Ndata=3
+      integer :: i
 
 		call mpih%buildMPIHandler
 		call mpih%allocateBuffer(Nsample,Ndata)

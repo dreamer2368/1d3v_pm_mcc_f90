@@ -28,6 +28,7 @@ contains
 		call MPI_COMM_RANK(MPI_COMM_WORLD,this%my_rank,this%ierr)
 		call MPI_COMM_SIZE(MPI_COMM_WORLD,this%size,this%ierr)
 		write(this%rank_str,*) this%my_rank
+
 	end subroutine
 
 	subroutine destroyMPIHandler(this)
@@ -51,6 +52,7 @@ contains
 			print *, 'size: ',this%size
 			print *, 'sample/core: ',sample_per_core
 			print *, 'remainder: ',MOD(Nsample,this%size)
+         allocate(this%recvbuf(Nsample,Ndata))
 			allocate(this%recvcnt(0:this%size-1))
 			allocate(this%displc(0:this%size-1))
 			this%recvcnt(0:MOD(Nsample,this%size)-1) = sample_per_core+1
@@ -76,7 +78,6 @@ contains
 	subroutine gatherData(this)
 		class(mpiHandler), intent(inout) :: this
 		integer :: i
-
 		do i=1,size(this%sendbuf,2)
 			call MPI_GATHERV(this%sendbuf(:,i),this%sendcnt,MPI_DOUBLE,	&
 							this%recvbuf(:,i),this%recvcnt,this%displc,MPI_DOUBLE,	&
