@@ -2,7 +2,7 @@ module timeStep
 
 	use modSource
 	use modTarget
-	use modBC
+	use modFSens
 	use modRecord
 	use ArMCC
 	use modAdj
@@ -381,6 +381,64 @@ contains
 				call updatePlasma(pm,target_input,source,i)
 			end do
 		end if
+	end subroutine
+
+!===============Forward, continuum Sensitivity
+
+	subroutine forwardsweep_sensitivity(this,r,fs,fsr,target_input,source,QoI,J)
+		type(PM1D), intent(inout) :: this
+		type(FSens), intent(inout) :: fs
+		type(recordData), intent(inout) :: r, fsr
+		integer :: i,k
+		real(mp), intent(out), optional :: J
+		interface
+			subroutine target_input(pm,k,str)
+				use modPM1D
+				type(PM1D), intent(inout) :: pm
+				integer, intent(in) :: k
+				character(len=*), intent(in) :: str
+			end subroutine
+		end interface
+		interface
+			subroutine source(pm)
+				use modPM1D
+				type(PM1D), intent(inout) :: pm
+			end subroutine
+		end interface
+		interface
+			subroutine QoI(pm,k,J)
+				use modQoI
+				type(PM1D), intent(in) :: pm
+				real(mp), intent(inout) :: J
+				integer, intent(in) :: k
+			end subroutine
+		end interface
+		optional :: QoI
+		if( present(J) ) then
+			J = 0.0_mp
+		end if
+		k=0
+
+		!Time stepping
+		call halfStep(this,target_input)
+		if( present(J) ) then
+			call QoI(this,k,J)
+		end if
+		call r%recordPlasma(this, k)										!record for n=1~Nt
+		call halfStep(fs%dpm,target_input)
+		call fsr%recordPlasma(fs%dpm, k)
+		do k=1,this%nt
+			call updatePlasma(this,target_input,source,k,r)
+			if( present(J) ) then
+				call QoI(this,k,J)
+			end if
+			call r%recordPlasma(this, k)									!record for n=1~Nt
+
+			call updatePlasma(fs%dpm,target_input,source,k,fsr)
+			call fs%FSensSourceTerm(this)
+			call fs%InjectSource
+			call fsr%recordPlasma(fs%dpm, k)
+		end do
 	end subroutine
 
 end module

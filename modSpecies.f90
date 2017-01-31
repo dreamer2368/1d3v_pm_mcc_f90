@@ -38,6 +38,11 @@ contains
 		real(mp), intent(in) :: xp0(np0), spwt0(np0)
 		real(mp), intent(in) :: vp0(np0,3)
 
+		if( allocated(this%xp) ) deallocate(this%xp)
+		if( allocated(this%vp) ) deallocate(this%vp)
+		if( allocated(this%Ep) ) deallocate(this%Ep)
+		if( allocated(this%spwt) ) deallocate(this%spwt)
+
 		this%np = np0
 		allocate(this%xp(np0))
 		allocate(this%spwt(np0))
@@ -53,10 +58,10 @@ contains
 	subroutine destroySpecies(this)
 		class(species), intent(inout) :: this
 
-		deallocate(this%xp)
-		deallocate(this%vp)
-		deallocate(this%Ep)
-		deallocate(this%spwt)
+		if( allocated(this%xp) ) deallocate(this%xp)
+		if( allocated(this%vp) ) deallocate(this%vp)
+		if( allocated(this%Ep) ) deallocate(this%Ep)
+		if( allocated(this%spwt) ) deallocate(this%spwt)
 	end subroutine
 
 	subroutine moveSpecies(this,dt)

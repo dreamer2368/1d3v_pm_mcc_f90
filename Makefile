@@ -43,10 +43,10 @@ init.o : modPM1D.o random.o
 modBC.o : modPM1D.o random.o
 modTarget.o : modAdj.o
 modSource.o : modPM1D.o random.o
-timeStep.o : modTarget.o modSource.o modBC.o modRecord.o ArMCC.o modAdj.o modQoI.o
-testmodule.o : init.o timeStep.o modMPI.o
 modFSens.o : modBC.o
-main.o : testmodule.o modFSens.o
+timeStep.o : modTarget.o modSource.o modFSens.o modRecord.o ArMCC.o modAdj.o modQoI.o
+testmodule.o : init.o timeStep.o modMPI.o
+main.o : testmodule.o
 
 clean:
 	rm *.o *.mod $(EXE)

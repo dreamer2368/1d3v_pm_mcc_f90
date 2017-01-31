@@ -8,6 +8,104 @@ module testmodule
 
 contains
 
+	subroutine MPITest
+		type(mpiHandler) :: mpih
+		integer, parameter :: Nsample=10000, Ndata=3
+
+		call mpih%buildMPIHandler
+		call mpih%allocateBuffer(Nsample,Ndata)
+
+		do i=1,mpih%sendcnt
+			mpih%sendbuf(i,:) = (/i*0.2_mp,i*0.7_mp,i*1.7_mp/)
+		end do
+
+		call mpih%gatherData
+
+		call mpih%destroyMPIHandler
+	end subroutine
+
+	subroutine InjectionTest
+		type(PM1D) :: pm
+		type(FSens) :: fs
+		type(recordData) :: r
+		real(mp), parameter :: Tf=1.0_mp, Ti=0.5_mp, dt = 1.0_mp
+		real(mp), parameter :: L = 1.0_mp, Lv=0.5_mp, w = 0.1_mp
+		integer, parameter :: Ng=64, N=1000000, NInject=1000000
+		integer :: i,k
+		real(mp) :: xp0(N), vp0(N,3), spwt0(N)
+
+		call pm%buildPM1D(Tf,Ti,Ng,N=1,pBC=0,mBC=0,order=1,L=L,dt=dt)
+		call pm%p(1)%buildSpecies(1.0_mp,1.0_mp)
+		call fs%buildFSens(pm,Lv,Ng/2,NInject)
+		call fs%dpm%p(1)%setSpecies(1,(/0.0_mp/),(/0.0_mp,0.0_mp,0.0_mp/),(/0.0_mp/))
+		call r%buildRecord(pm%nt,N,pm%L,Ng,'InjectionTest',1)
+
+		call RANDOM_NUMBER(xp0)
+		xp0 = xp0*pm%L
+		vp0 = randn(N,3)
+		vp0 = vp0*w
+!		spwt0 = 1.0_mp/N
+		spwt0 = SQRT(2.0_mp*pi)*w/EXP( -vp0(:,1)**2/2.0_mp/w/w )/N
+		call pm%p(1)%setSpecies(N,xp0,vp0,spwt0)
+!		fs%dpm%m%E = 1.0_mp
+		fs%dpm%m%E = (/ (SIN( 2.0_mp*pi*i/Ng ),i=1,Ng) /)
+
+		call applyBC(pm)
+		call pm%a(1)%assignMatrix(pm%m,pm%p(1)%xp)
+		call adjustGrid(pm)
+
+		call fs%FSensSourceTerm(pm)
+
+		open(unit=300,file='data/InjectionTest/record.bin',status='replace',form='unformatted',access='stream')
+		open(unit=301,file='data/InjectionTest/xp.bin',status='replace',form='unformatted',access='stream')
+		open(unit=302,file='data/InjectionTest/vp.bin',status='replace',form='unformatted',access='stream')
+		open(unit=303,file='data/InjectionTest/spwt.bin',status='replace',form='unformatted',access='stream')
+		open(unit=304,file='data/InjectionTest/j.bin',status='replace',form='unformatted',access='stream')
+		write(300) Ng, Ng/2, N
+		write(301) xp0
+		write(302) vp0
+		write(303) spwt0
+		write(304) fs%j
+		close(300)
+		close(301)
+		close(302)
+		close(303)
+		close(304)
+
+		do k=1,Ng+1
+			do i=1,Ng
+				fs%j(i,k) = SIN( 2.0_mp*pi*i/Ng )/SQRT(2.0_mp*pi)/w*EXP( -((k-Ng/2-1)*fs%dv)**2/2.0_mp/w/w )
+			end do
+		end do
+		fs%dpm%m%E = 1.0_mp
+		open(unit=304,file='data/InjectionTest/j_source.bin',status='replace',form='unformatted',access='stream')
+		write(304) fs%j
+		close(304)
+		call fs%InjectSource
+
+		call applyBC(fs%dpm)
+		call fs%dpm%a(1)%assignMatrix(fs%dpm%m,fs%dpm%p(1)%xp)
+		call adjustGrid(fs%dpm)
+		call fs%FSensSourceTerm(fs%dpm)
+
+		open(unit=301,file='data/InjectionTest/xp_inject.bin',status='replace',form='unformatted',access='stream')
+		open(unit=302,file='data/InjectionTest/vp_inject.bin',status='replace',form='unformatted',access='stream')
+		open(unit=303,file='data/InjectionTest/spwt_inject.bin',status='replace',form='unformatted',access='stream')
+		open(unit=304,file='data/InjectionTest/j_inject.bin',status='replace',form='unformatted',access='stream')
+		write(301) fs%dpm%p(1)%xp
+		write(302) fs%dpm%p(1)%vp
+		write(303) fs%dpm%p(1)%spwt
+		write(304) fs%j
+		close(301)
+		close(302)
+		close(303)
+		close(304)
+
+		call pm%destroyPM1D
+		call fs%destroyFSens
+		call r%destroyRecord
+	end subroutine
+
 	subroutine random_test
 		real(mp) :: test(5)
 		integer :: ierr, my_rank, s
