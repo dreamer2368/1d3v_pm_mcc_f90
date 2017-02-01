@@ -48,21 +48,21 @@ contains
 
 		sample_per_core = Nsample/this%size
 
+		allocate(this%recvcnt(0:this%size-1))
+		allocate(this%displc(0:this%size-1))
+		this%recvcnt(0:MOD(Nsample,this%size)-1) = sample_per_core+1
+		this%recvcnt(MOD(Nsample,this%size):this%size-1) = sample_per_core
+		this%displc = 0
+		do i=0,this%size-1
+			this%displc(i) = SUM(this%recvcnt(0:i-1))
+		end do
 		if( this%my_rank.eq.this%size-1 ) then
 			print *, 'size: ',this%size
 			print *, 'sample/core: ',sample_per_core
 			print *, 'remainder: ',MOD(Nsample,this%size)
          allocate(this%recvbuf(Nsample,Ndata))
-			allocate(this%recvcnt(0:this%size-1))
-			allocate(this%displc(0:this%size-1))
-			this%recvcnt(0:MOD(Nsample,this%size)-1) = sample_per_core+1
-			this%recvcnt(MOD(Nsample,this%size):this%size-1) = sample_per_core
-			print *, this%recvcnt
-			this%displc = 0
-			do i=0,this%size-1
-				this%displc(i) = SUM(this%recvcnt(0:i-1))
-			end do
-			print *, this%displc
+		   print *, this%recvcnt
+		   print *, this%displc
 		end if
 
 		if( this%my_rank<MOD(Nsample,this%size) ) then

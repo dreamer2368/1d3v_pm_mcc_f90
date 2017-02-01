@@ -26,9 +26,9 @@ program main
 !   call Landau_adjoint_sampling
 !   call twostream_adjoint_sampling
 !   call debye_shielding
-!	call debye_characterization
+	call debye_characterization
 !	call InjectionTest
-	call MPITest
+!	call MPITest
 
 	! print to screen
 	print *, 'program main...done.'
@@ -499,7 +499,7 @@ contains
 
 		call init_random_seed
 		do i=1,mpih%sendcnt
-			A = (/ vT(i), 0.0_mp /)
+			A = (/ vT(mpih%displc(mpih%my_rank)+i), 0.0_mp /)
 			call buildPM1D(d,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=0.01_mp)
 			dir = 'Debye_characterization/'//trim(adjustl(mpih%rank_str))
 			call buildRecord(r,d%nt,1,d%L,d%ng,trim(dir),20)
