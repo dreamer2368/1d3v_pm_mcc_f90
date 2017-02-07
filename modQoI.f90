@@ -79,7 +79,7 @@ contains
 		integer, intent(in) :: k
 		real(mp), intent(inout) :: J
 
-		J = J + 1.0_mp/pm%p(1)%np/pm%nt*SUM( (pm%p(1)%xp-0.5_mp*pm%L)**2 )
+		J = J + 1.0_mp/pm%nt*SUM( pm%p(1)%spwt*(pm%p(1)%xp-0.5_mp*pm%L)**2 )
 	end subroutine
 
 end module

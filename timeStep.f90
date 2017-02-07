@@ -385,12 +385,14 @@ contains
 
 !===============Forward, continuum Sensitivity
 
-	subroutine forwardsweep_sensitivity(this,r,fs,fsr,target_input,source,QoI,J)
+	subroutine forwardsweep_sensitivity(this,r,fs,fsr,target_input,source,QoI,J,grad)
 		type(PM1D), intent(inout) :: this
 		type(FSens), intent(inout) :: fs
 		type(recordData), intent(inout) :: r, fsr
-		integer :: i,k
-		real(mp), intent(out), optional :: J
+		integer :: i,k,kr
+		character(len=100) :: kstr
+		real(mp), intent(out) :: J,grad
+		real(mp) :: grad_hist(this%nt)
 		interface
 			subroutine target_input(pm,k,str)
 				use modPM1D
@@ -413,32 +415,159 @@ contains
 				integer, intent(in) :: k
 			end subroutine
 		end interface
-		optional :: QoI
-		if( present(J) ) then
-			J = 0.0_mp
-		end if
+		J = 0.0_mp
+		grad = 0.0_mp
+		grad_hist = 0.0_mp
 		k=0
 
 		!Time stepping
 		call halfStep(this,target_input)
-		if( present(J) ) then
-			call QoI(this,k,J)
-		end if
+		call QoI(this,k,J)
 		call r%recordPlasma(this, k)										!record for n=1~Nt
-		call halfStep(fs%dpm,target_input)
+
+		call halfStep_Sensitivity(fs%dpm,this,target_input)
 		call fsr%recordPlasma(fs%dpm, k)
 		do k=1,this%nt
 			call updatePlasma(this,target_input,source,k,r)
-			if( present(J) ) then
-				call QoI(this,k,J)
-			end if
+			call QoI(this,k,J)
 			call r%recordPlasma(this, k)									!record for n=1~Nt
 
-			call updatePlasma(fs%dpm,target_input,source,k,fsr)
+			call updateSensitivity(fs%dpm,this,target_input,source,k,fsr)
+			call fs%FSensDistribution
+!			call fs%Redistribute
 			call fs%FSensSourceTerm(this)
-			call fs%InjectSource
+			call fs%InjectSource(fs%j,fs%NInject)
+
+			call QoI(fs%dpm,k,grad)
+			grad_hist(k) = grad
 			call fsr%recordPlasma(fs%dpm, k)
+
+			if( (fsr%mod.eq.1) .or. (mod(k,fsr%mod).eq.0) ) then
+				kr = merge(k,k/fsr%mod,fsr%mod.eq.1)
+				write(kstr,*) kr
+				open(unit=305,file='data/'//fsr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
+						status='replace',form='unformatted',access='stream')
+				write(305) fs%f_A
+				close(305)
+			end if
 		end do
+		open(unit=305,file='data/'//fsr%dir//'/grad_hist.bin',	&
+					status='replace',form='unformatted',access='stream')
+		write(305) grad_hist
+		close(305)
+	end subroutine
+
+	subroutine halfStep_Sensitivity(dpm,pm,Dtarget_input)
+		type(PM1D), intent(inout) :: dpm
+		type(PM1D), intent(in) :: pm
+		integer :: i, j
+		real(mp) :: rhs(dpm%ng-1)
+		real(mp) :: phi1(dpm%ng-1)
+		real(mp) :: dt, L
+		integer :: N,Ng
+		interface
+			subroutine Dtarget_input(pm,k,str)
+				use modPM1D
+				type(PM1D), intent(inout) :: pm
+				integer, intent(in) :: k
+				character(len=*), intent(in) :: str
+			end subroutine
+		end interface
+		dt = dpm%dt
+		L = dpm%L
+		N = dpm%N
+		Ng = dpm%ng
+
+		call applyBC(dpm)
+		do i=1,dpm%n
+			call dpm%a(i)%assignMatrix(dpm%m,dpm%p(i)%xp)
+		end do
+		call adjustGrid(dpm)
+
+		!charge assignment
+		call chargeAssign(dpm%a,dpm%p,dpm%m)
+
+		call Dtarget_input(dpm,0,'rho_back')
+		call dpm%m%solveMesh(dpm%eps0)
+
+		!Electric field : -D*phi
+		dpm%m%E = - multiplyD(dpm%m%phi,dpm%m%dx,dpm%m%BCindex)
+
+		!Force assignment : mat'*E
+		do i=1, dpm%n
+			call dpm%a(i)%forceAssign(dpm%p(i),pm%m)
+		end do
+
+		!Half time step advancement in velocity
+		do i=1, dpm%n
+			call dpm%p(i)%accelSpecies(dt/2.0_mp)
+		end do
+	end subroutine
+
+	subroutine updateSensitivity(dpm,pm,Dtarget_input,Dsource,k,r)
+		type(PM1D), intent(inout) :: dpm
+		type(PM1D), intent(in) :: pm
+		type(recordData), intent(inout), optional :: r
+		integer, intent(in) :: k
+		real(mp) :: rhs(dpm%ng-1), phi1(dpm%ng-1)
+		real(mp) :: dt, L
+		integer :: N, Ng, i
+		interface
+			subroutine Dtarget_input(pm,k,str)
+				use modPM1D
+				type(PM1D), intent(inout) :: pm
+				integer, intent(in) :: k
+				character(len=*), intent(in) :: str
+			end subroutine
+		end interface
+		interface
+			subroutine Dsource(pm)
+				use modPM1D
+				type(PM1D), intent(inout) :: pm
+			end subroutine
+		end interface
+		dt = dpm%dt
+		L = dpm%L
+		N = dpm%n
+		Ng = dpm%ng
+
+		call Dtarget_input(dpm,k,'xp')
+
+		call Dsource(dpm)
+
+		do i=1,dpm%n
+			call dpm%p(i)%moveSpecies(dt)
+		end do
+
+		call applyBC(dpm)
+		do i=1, dpm%n
+			call dpm%a(i)%assignMatrix(dpm%m,dpm%p(i)%xp)
+		end do
+		call adjustGrid(dpm)
+
+		!charge assignment: rho_A
+		call chargeAssign(dpm%a,dpm%p,dpm%m)
+
+		call Dtarget_input(dpm,k,'rho_back')
+		call dpm%m%solveMesh(dpm%eps0)
+
+		!Electric field : E_A = -D*phi_A
+		dpm%m%E = - multiplyD(dpm%m%phi,dpm%m%dx,dpm%m%BCindex)
+
+		!Force assignment : mat'*E  (NOT E_A !!)
+		do i=1, dpm%n
+			call dpm%a(i)%forceAssign(dpm%p(i), pm%m)
+		end do
+
+		do i=1, dpm%n
+			call dpm%p(i)%accelSpecies(dt)
+		end do
+
+!		if( present(r) ) then
+!			call mcc_collision(this,r%n_coll(:,k))
+!		else
+!			call mcc_collision(this)
+!		end if
 	end subroutine
 
 end module

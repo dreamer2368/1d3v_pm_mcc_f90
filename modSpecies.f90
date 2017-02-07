@@ -62,6 +62,7 @@ contains
 		if( allocated(this%vp) ) deallocate(this%vp)
 		if( allocated(this%Ep) ) deallocate(this%Ep)
 		if( allocated(this%spwt) ) deallocate(this%spwt)
+		this%np = 0
 	end subroutine
 
 	subroutine moveSpecies(this,dt)

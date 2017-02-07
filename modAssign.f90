@@ -152,7 +152,7 @@ contains
 	subroutine forceAssign(this,p,m)
 		class(pmAssign), intent(inout) :: this
 		type(species), intent(inout) :: p
-		type(mesh), intent(inout) :: m
+		type(mesh), intent(in) :: m
 		integer :: i
 
 		p%Ep = 0.0_mp

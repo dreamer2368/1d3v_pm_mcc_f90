@@ -8,6 +8,116 @@ module testmodule
 
 contains
 
+	subroutine RedistributionTest
+		type(PM1D) :: pm
+		type(FSens) :: fs
+		type(recordData) :: r
+		real(mp), parameter :: Tf=1.0_mp, Ti=0.5_mp, dt = 1.0_mp
+		real(mp), parameter :: L = 1.0_mp, Lv=0.5_mp, w = 0.1_mp
+		integer, parameter :: Ng=64, N=2E6, NInject=1E6
+		integer :: i,k
+		real(mp) :: xp0(N), vp0(N,3), spwt0(N)
+
+		call pm%buildPM1D(Tf,Ti,Ng,N=1,pBC=0,mBC=0,order=1,L=L,dt=dt)
+		call pm%p(1)%buildSpecies(1.0_mp,1.0_mp)
+		call fs%buildFSens(pm,Lv,Ng/2,NInject,NInject)
+		call fs%dpm%p(1)%setSpecies(1,(/0.0_mp/),(/0.0_mp,0.0_mp,0.0_mp/),(/0.0_mp/))
+		call r%buildRecord(pm%nt,N,pm%L,Ng,'RedistributionTest',1)
+
+		call RANDOM_NUMBER(xp0)
+		xp0 = xp0*pm%L
+		vp0 = randn(N,3)
+		vp0 = vp0*w
+		spwt0 = pm%L*SIN(2.0_mp*pi*xp0/pm%L)/N
+		call fs%dpm%p(1)%setSpecies(N,xp0,vp0,spwt0)
+
+		call applyBC(fs%dpm)
+		call fs%dpm%a(1)%assignMatrix(fs%dpm%m,fs%dpm%p(1)%xp)
+		call adjustGrid(fs%dpm)
+
+		call fs%FSensDistribution
+
+		open(unit=300,file='data/RedistributionTest/record.bin',status='replace',form='unformatted',access='stream')
+		open(unit=301,file='data/RedistributionTest/xp.bin',status='replace',form='unformatted',access='stream')
+		open(unit=302,file='data/RedistributionTest/vp.bin',status='replace',form='unformatted',access='stream')
+		open(unit=303,file='data/RedistributionTest/spwt.bin',status='replace',form='unformatted',access='stream')
+		open(unit=304,file='data/RedistributionTest/f_A.bin',status='replace',form='unformatted',access='stream')
+		write(300) Ng, Ng/2, N
+		write(301) xp0
+		write(302) vp0
+		write(303) spwt0
+		write(304) fs%f_A
+		close(300)
+		close(301)
+		close(302)
+		close(303)
+		close(304)
+
+		call fs%Redistribute
+		call fs%FSensDistribution
+
+		open(unit=301,file='data/RedistributionTest/xp_rdst.bin',status='replace',form='unformatted',access='stream')
+		open(unit=302,file='data/RedistributionTest/vp_rdst.bin',status='replace',form='unformatted',access='stream')
+		open(unit=303,file='data/RedistributionTest/spwt_rdst.bin',status='replace',form='unformatted',access='stream')
+		open(unit=304,file='data/RedistributionTest/f_A_rdst.bin',status='replace',form='unformatted',access='stream')
+		write(301) fs%dpm%p(1)%xp
+		write(302) fs%dpm%p(1)%vp
+		write(303) fs%dpm%p(1)%spwt
+		write(304) fs%f_A
+		close(301)
+		close(302)
+		close(303)
+		close(304)
+
+		call pm%destroyPM1D
+		call fs%destroyFSens
+		call r%destroyRecord
+	end subroutine
+
+	subroutine SensitivityInitializeTest
+		type(PM1D) :: pm
+		type(FSens) :: fs
+		type(recordData) :: r
+		real(mp), parameter :: Tf=1.0_mp, Ti=0.5_mp, vT=1.0_mp, dt = 1.0_mp
+		real(mp), parameter :: L = 20.0_mp, Lv=5.0_mp, w = 1.0_mp
+		integer, parameter :: Ng=256, N=1000000, NInit=1000000
+		integer :: i,k
+		real(mp) :: xp0(N), vp0(N,3), spwt0(N)
+
+		call pm%buildPM1D(Tf,Ti,Ng,N=1,pBC=0,mBC=0,order=1,L=L,dt=dt,A=(/vT/))
+		call pm%p(1)%buildSpecies(1.0_mp,1.0_mp)
+		call fs%buildFSens(pm,Lv,Ng/2,NInit,NInit)
+		call r%buildRecord(pm%nt,N,pm%L,Ng,'SensitivityInitTest',1)
+
+		open(unit=300,file='data/SensitivityInitTest/record.bin',status='replace',form='unformatted',access='stream')
+		write(300) Ng, Ng/2, N
+		close(300)
+
+		call Debye_sensitivity_init(fs,NInit,fs%dpm%A0(1))
+		call applyBC(fs%dpm)
+		call fs%dpm%a(1)%assignMatrix(fs%dpm%m,fs%dpm%p(1)%xp)
+		call adjustGrid(fs%dpm)
+		fs%dpm%m%E = 1.0_mp
+		call fs%FSensSourceTerm(fs%dpm)
+
+		open(unit=301,file='data/SensitivityInitTest/xp.bin',status='replace',form='unformatted',access='stream')
+		open(unit=302,file='data/SensitivityInitTest/vp.bin',status='replace',form='unformatted',access='stream')
+		open(unit=303,file='data/SensitivityInitTest/spwt.bin',status='replace',form='unformatted',access='stream')
+		open(unit=304,file='data/SensitivityInitTest/j.bin',status='replace',form='unformatted',access='stream')
+		write(301) fs%dpm%p(1)%xp
+		write(302) fs%dpm%p(1)%vp
+		write(303) fs%dpm%p(1)%spwt
+		write(304) fs%j
+		close(301)
+		close(302)
+		close(303)
+		close(304)
+
+		call pm%destroyPM1D
+		call fs%destroyFSens
+		call r%destroyRecord
+	end subroutine
+
 	subroutine MPITest
 		type(mpiHandler) :: mpih
 		integer, parameter :: Nsample=10000, Ndata=3
@@ -37,7 +147,7 @@ contains
 
 		call pm%buildPM1D(Tf,Ti,Ng,N=1,pBC=0,mBC=0,order=1,L=L,dt=dt)
 		call pm%p(1)%buildSpecies(1.0_mp,1.0_mp)
-		call fs%buildFSens(pm,Lv,Ng/2,NInject)
+		call fs%buildFSens(pm,Lv,Ng/2,NInject,NInject)
 		call fs%dpm%p(1)%setSpecies(1,(/0.0_mp/),(/0.0_mp,0.0_mp,0.0_mp/),(/0.0_mp/))
 		call r%buildRecord(pm%nt,N,pm%L,Ng,'InjectionTest',1)
 
@@ -82,7 +192,7 @@ contains
 		open(unit=304,file='data/InjectionTest/j_source.bin',status='replace',form='unformatted',access='stream')
 		write(304) fs%j
 		close(304)
-		call fs%InjectSource
+		call fs%InjectSource(fs%j,fs%NInject)
 
 		call applyBC(fs%dpm)
 		call fs%dpm%a(1)%assignMatrix(fs%dpm%m,fs%dpm%p(1)%xp)
@@ -739,5 +849,60 @@ contains
 !
 !		print *, 'error: ', maxval( abs(sol - m%phi) )
 !	end subroutine
+
+	subroutine forYeoh
+		type(PM1D) :: pm
+		type(recordData) :: r
+		real(mp), parameter :: n0=10.0_mp**15
+		real(mp), parameter :: L = 0.02_mp, area = 0.016_mp               !L(m), area(m2)
+		integer, parameter :: nc2p = 10**7, Np=CEILING(n0*L*area/nc2p), Ng = 300
+		real(mp), parameter :: T=300.0_mp
+		real(mp), parameter :: me=9.11E-31, mi=100.0_mp*me
+		real(mp), parameter :: qe=-1.60E-19, qi=-qe
+		real(mp), parameter :: spwt=n0*L/Np					!spwt=nc2p/area
+      real(mp), parameter :: Kb = 1.38065E-23, eps = 8.85418782E-12
+		real(mp) :: wp0, lambda0, v0_e, v0_i
+		real(mp) :: spwt0(Np), xp0(Np), vp0(Np,3), rho_back(Ng)
+		real(mp) :: dt
+		integer :: i
+
+		print *, 'n0(m-3): ',n0,', spwt(m-2): ',spwt
+
+		v0_e = sqrt(2.0_mp*Kb*T/me)
+		v0_i = sqrt(2.0_mp*Kb*T/mi)
+		wp0 = sqrt(n0*q_e*q_e/m_e/eps)
+		lambda0 = sqrt(eps*Kb*T/n0/q_e/q_e)
+
+		print *, 'L = ',L,', lambda0 = ',lambda0,' e = lambda/L = ',lambda0/L
+
+		dt = 7.20179E-11
+		print *, 'dt = ',dt,', wp*dt=',wp0*dt
+
+		call buildPM1D(pm,400.0_mp*dt,100.0_mp*dt,Ng,2,pBC=0,mBC=0,order=1,dt=dt,L=L,eps=eps,A=(/Kb*T/))
+		call buildRecord(r,pm%nt,2,pm%L,pm%ng,'forYeoh',1)
+
+		call RANDOM_NUMBER(xp0)
+		xp0 = xp0*L
+		vp0 = ABS(randn(Np,3))*v0_e
+		spwt0 = spwt
+		call pm%p(1)%buildSpecies(qe,me)
+		call pm%p(1)%setSpecies(Np,xp0,vp0,spwt0)
+
+		call RANDOM_NUMBER(xp0)
+		xp0 = xp0*L
+		vp0 = ABS(randn(Np,3))*v0_i
+		spwt0 = spwt
+		call pm%p(2)%buildSpecies(qi,mi)
+		call pm%p(2)%setSpecies(Np,xp0,vp0,spwt0)
+
+		rho_back = 0.0_mp
+		call pm%m%setMesh(rho_back)
+
+		call forwardsweep(pm,r,Null_input,Null_source)
+		call printPlasma(r)
+
+		call destroyPM1D(pm)
+		call destroyRecord(r)
+	end subroutine
 
 end module

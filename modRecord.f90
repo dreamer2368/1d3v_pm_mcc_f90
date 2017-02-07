@@ -113,11 +113,11 @@ contains
 				close(305)
 				close(306)
 				close(307)
+
 				!time step: 0~Nt, in array: 1~(Nt+1) (valgrind prefers this way of allocation)
 				this%np(n,kr+1) = pm%p(n)%np
 				this%KE(n,kr+1) = 0.5_mp*pm%p(n)%ms*SUM( pm%p(n)%spwt*pm%p(n)%vp(:,1)**2 )
 			end do
-
 			this%phidata(:,kr+1) = pm%m%phi
 			this%Edata(:,kr+1) = pm%m%E
 			this%rhodata(:,kr+1) = pm%m%rho

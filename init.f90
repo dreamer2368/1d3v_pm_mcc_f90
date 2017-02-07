@@ -1,10 +1,37 @@
 module init
 
-	use modPM1D
-	use random
+	use modFSens
+
 	implicit none
 
 contains
+
+	subroutine Debye_sensitivity_init(fs,Np,vT)
+		type(FSens), intent(inout) :: fs
+		integer, intent(in) :: Np
+		real(mp), intent(in) :: vT
+		real(mp) :: w, xp0(Np), vp0(Np,3), spwt0(Np), rho_back(fs%dpm%ng)
+
+		call RANDOM_NUMBER(xp0)
+		xp0 = fs%dpm%L*xp0
+
+		vp0 = randn(Np,3)
+		w = vT*1.5_mp
+		vp0 = vp0*w
+
+		spwt0 = fs%dpm%L*w/EXP( -vp0(:,1)**2/2.0_mp/w/w )/Np	&
+					*( vp0(:,1)**2/vT/vT - 1.0_mp )/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )
+
+!		call RANDOM_NUMBER(vp0)
+!		w = vT*5.0_mp
+!		vp0 = (2.0_mp*vp0-1.0_mp)*w
+!		spwt0 = 2.0_mp*w/Np*( vp0(:,1)**2/vT/vT - 1.0_mp )/SQRT(2.0_mp*pi)/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )
+
+		call fs%dpm%p(1)%setSpecies(Np,xp0,vp0,spwt0)
+
+		rho_back = 0.0_mp
+		call fs%dpm%m%setMesh(rho_back)
+	end subroutine
 
 	subroutine Debye_initialize(pm,Np,Q)
 		type(PM1D), intent(inout) :: pm

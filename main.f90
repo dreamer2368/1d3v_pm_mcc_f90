@@ -25,10 +25,14 @@ program main
 !	call random_test
 !   call Landau_adjoint_sampling
 !   call twostream_adjoint_sampling
-!   call debye_shielding
-	call debye_characterization
+!	call debye_shielding
+!	call debye_characterization
 !	call InjectionTest
 !	call MPITest
+!	call SensitivityInitializeTest
+	call Debye_sensitivity
+!	call forYeoh
+!	call RedistributionTest
 
 	! print to screen
 	print *, 'program main...done.'
@@ -36,6 +40,29 @@ program main
 contains
 
 	! You can add custom subroutines/functions here later, if you want
+
+	subroutine twostream
+		type(PM1D) :: pm
+		type(adjoint) :: adj
+		type(recordData) :: r
+		integer, parameter :: Ng=64, Np=10**5, N=1
+		real(mp) :: v0 = 0.2_mp, vT = 0.0_mp
+		integer :: mode=1
+		real(mp) :: J0,J1, grad(1)
+		character(len=100)::dir1
+
+		call buildPM1D(pm,70.0_mp,65.0_mp,Ng,N,0,0,1,A=(/1.0_mp,0.0_mp/))
+		dir1='twostream_test'
+		call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir1),5)
+		call set_null_discharge(r)
+		call twostream_initialize(pm,Np,v0,vT,mode)
+		call forwardsweep(pm,r,Null_input,Null_source,MKE,J0)
+		call printPlasma(r)
+		print *, 'J0=',J0
+
+		call destroyPM1D(pm)
+		call destroyRecord(r)
+	end subroutine
 
 	subroutine twostream_adjoint_sampling
 		integer :: ierr, my_rank, s
@@ -458,16 +485,16 @@ contains
 	subroutine debye_shielding
 		type(PM1D) :: debye
 		type(recordData) :: r
-		real(mp) :: n0 = 1.0e10, lambda0 = 1.0e-2, vT = 3.0_mp
+		real(mp) :: n0 = 1.0e10, lambda0 = 1.0e-2, vT = 1.5_mp
 		integer :: N = 100000, Ng = 512
 		real(mp) :: L = 20.0_mp, Wp, Q = 3.0_mp
 		real(mp) :: dx
-		real(mp) :: Time = 20.0_mp
+		real(mp) :: Time = 150.0_mp
 		real(mp) :: A(2)
 
 		A = (/ vT, lambda0 /)
 		call buildPM1D(debye,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=0.01_mp)
-		call buildRecord(r,debye%nt,1,debye%L,debye%ng,'debye2',20)
+		call buildRecord(r,debye%nt,1,debye%L,debye%ng,'debye2',100)
 
 		call buildSpecies(debye%p(1),-1.0_mp,1.0_mp)
 		call Debye_initialize(debye,N,Q)
@@ -509,7 +536,7 @@ contains
 
 			call forwardsweep(d,r,Null_input,Null_source,Debye,J)
 
-			mpih%sendbuf(i,:) = (/vT(i),J/)
+			mpih%sendbuf(i,:) = (/vT(mpih%displc(mpih%my_rank)+i),J/)
 
 			call destroyRecord(r)
 			call destroyPM1D(d)
@@ -529,27 +556,45 @@ contains
 		call destroyMPIHandler(mpih)
 	end subroutine
 
-	subroutine twostream
+	subroutine Debye_sensitivity
 		type(PM1D) :: pm
-		type(adjoint) :: adj
-		type(recordData) :: r
-		integer, parameter :: Ng=64, Np=10**5, N=1
-		real(mp) :: v0 = 0.2_mp, vT = 0.0_mp
-		integer :: mode=1
-		real(mp) :: J0,J1, grad(1)
-		character(len=100)::dir1
+		type(FSens) :: fs
+		type(recordData) :: r, fsr
+		integer :: N=1E5, Ng=64
+		integer :: NInit=5E4, Ngv=32, NInject
+		real(mp) :: L = 20.0_mp, Lv, Q = 2.0_mp
+		real(mp) :: dt=0.01_mp, dx
+		real(mp) :: Time = 30.0_mp, vT = 1.5_mp
+		real(mp) :: A(2), J, grad
+		character(len=100)::dir
+		A = (/ vT, 0.0_mp /)
 
-		call buildPM1D(pm,70.0_mp,65.0_mp,Ng,N,0,0,1,A=(/1.0_mp,0.0_mp/))
-		dir1='twostream_test'
-		call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir1),5)
-		call set_null_discharge(r)
-		call twostream_initialize(pm,Np,v0,vT,mode)
-		call forwardsweep(pm,r,Null_input,Null_source,MKE,J0)
+		call buildPM1D(pm,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt)
+		dir = 'Debye_sensitivity'
+		call buildRecord(r,pm%nt,1,pm%L,pm%ng,trim(dir),20)
+
+		call buildSpecies(pm%p(1),-1.0_mp,1.0_mp)
+		call Debye_initialize(pm,N,Q)
+		
+		Lv = vT*5.0_mp
+		NInject = 5*N/pm%nt
+		call buildFSens(fs,pm,Lv,Ngv,NInject,NLimit=N)
+		dir = 'Debye_sensitivity/f_A'
+		call buildRecord(fsr,fs%dpm%nt,1,fs%dpm%L,fs%dpm%ng,trim(dir),20)
+		call Debye_sensitivity_init(fs,NInit,vT)
+
+		call forwardsweep_sensitivity(pm,r,fs,fsr,Null_input,Null_source,Debye,J,grad)
+
+		print *, 'J: ',J
+		print *, 'grad: ',grad
+
 		call printPlasma(r)
-		print *, 'J0=',J0
+		call printPlasma(fsr)
 
 		call destroyPM1D(pm)
 		call destroyRecord(r)
+		call destroyFSens(fs)
+		call destroyRecord(fsr)
 	end subroutine
 
 end program

@@ -1,6 +1,7 @@
 module modTarget
 
 	use modAdj
+	use random
 
 	implicit none
 
@@ -121,5 +122,82 @@ contains
      			this%m%rho_back(this%ng) = this%m%rho_back(this%ng) - dQwall
       END SELECT
    end subroutine
+
+!==================Injection from left wall=================================
+
+	subroutine Injection(this,k,str)
+		type(PM1D), intent(inout) :: this
+		integer, intent(in) :: k
+		character(len=*), intent(in) :: str
+		real(mp) :: vT_e, vT_i
+		integer, parameter :: NInject=1E3
+		real(mp) :: temp_x(NInject), temp_v(NInject,3), temp_w(NInject)
+		real(mp), allocatable :: new_x(:), new_v(:,:), new_w(:)
+		integer :: np
+
+		SELECT CASE (str)
+			CASE('xp')
+!				vT_e = SQRT(this%A0(1)*2.0_mp/this%p(1)%ms)
+!				vT_i = SQRT(this%A0(1)*2.0_mp/this%p(2)%ms)
+!
+!				temp_v = ABS(randn(NInject,3))*vT_e
+!				call RANDOM_NUMBER(temp_x)
+!				temp_x = temp_x*temp_v(:,1)*this%dt
+!				temp_w = this%p(1)%spwt(1)
+!
+!				np = this%p(1)%np
+!
+!				allocate(new_x(np+NInject))
+!				allocate(new_v(np+NInject,3))
+!				allocate(new_w(np+NInject))
+!
+!				new_x(1:np) = this%p(1)%xp
+!				new_v(1:np,:) = this%p(1)%vp
+!				new_w(1:np) = this%p(1)%spwt
+!			
+!				new_x(np+1:np+NInject) = temp_x
+!				new_v(np+1:np+NInject,:) = temp_v
+!				new_w(np+1:np+NInject) = temp_w
+!
+!				call this%p(1)%setSpecies(np+NInject,new_x,new_v,new_w)
+!
+!				deallocate(new_x)
+!				deallocate(new_v)
+!				deallocate(new_w)
+!
+!				temp_v = ABS(randn(NInject,3))*vT_i
+!				call RANDOM_NUMBER(temp_x)
+!				temp_x = temp_x*temp_v(:,1)*this%dt
+!				temp_w = this%p(2)%spwt(1)
+!
+!				np = this%p(2)%np
+!
+!				allocate(new_x(np+NInject))
+!				allocate(new_v(np+NInject,3))
+!				allocate(new_w(np+NInject))
+!
+!				new_x(1:np) = this%p(2)%xp
+!				new_v(1:np,:) = this%p(2)%vp
+!				new_w(1:np) = this%p(2)%spwt
+!			
+!				new_x(np+1:np+NInject) = temp_x
+!				new_v(np+1:np+NInject,:) = temp_v
+!				new_w(np+1:np+NInject) = temp_w
+!
+!				call this%p(2)%setSpecies(np+NInject,new_x,new_v,new_w)
+!
+!				deallocate(new_x)
+!				deallocate(new_v)
+!				deallocate(new_w)
+
+			CASE('rho_back')
+				if( k>this%ni ) then
+					this%m%rho_back(1) = 0.0_mp
+					this%m%rho_back(this%m%ng) = -0.1_mp
+				else
+					this%m%rho_back = 0.0_mp
+				end if
+		END SELECT	
+	end subroutine
 
 end module

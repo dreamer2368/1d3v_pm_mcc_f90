@@ -39,11 +39,11 @@ modRecord.o : modPM1D.o
 modAdj.o : modPM1D.o
 modQoI.o : modAdj.o
 ArMCC.o : modPM1D.o modRecord.o random.o
-init.o : modPM1D.o random.o
 modBC.o : modPM1D.o random.o
-modTarget.o : modAdj.o
-modSource.o : modPM1D.o random.o
 modFSens.o : modBC.o
+init.o : modFSens.o
+modTarget.o : modAdj.o random.o
+modSource.o : modPM1D.o random.o
 timeStep.o : modTarget.o modSource.o modFSens.o modRecord.o ArMCC.o modAdj.o modQoI.o
 testmodule.o : init.o timeStep.o modMPI.o
 main.o : testmodule.o
