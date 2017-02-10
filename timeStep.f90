@@ -434,10 +434,9 @@ contains
 
 			call updateSensitivity(fs%dpm,this,target_input,source,k,fsr)
 			call fs%FSensDistribution
-!			call fs%Redistribute
+			call fs%Redistribute
 			call fs%FSensSourceTerm(this)
 			call fs%InjectSource(fs%j,fs%NInject)
-
 			call QoI(fs%dpm,k,grad)
 			grad_hist(k) = grad
 			call fsr%recordPlasma(fs%dpm, k)
@@ -448,7 +447,6 @@ contains
 				open(unit=305,file='data/'//fsr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
 						status='replace',form='unformatted',access='stream')
 				write(305) fs%f_A
-				close(305)
 			end if
 		end do
 		open(unit=305,file='data/'//fsr%dir//'/grad_hist.bin',	&

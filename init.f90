@@ -10,17 +10,35 @@ contains
 		type(FSens), intent(inout) :: fs
 		integer, intent(in) :: Np
 		real(mp), intent(in) :: vT
-		real(mp) :: w, xp0(Np), vp0(Np,3), spwt0(Np), rho_back(fs%dpm%ng)
+		real(mp), allocatable :: xp0(:), vp0(:,:), spwt0(:)
+		real(mp) :: w, rho_back(fs%dpm%ng)
+		integer :: newN,Nx,i1, i2
+		Nx = INT(SQRT(Np*1.0_mp))
+		newN = Nx*Nx
+		allocate(xp0(newN))
+		allocate(vp0(newN,3))
+		allocate(spwt0(newN))
+		xp0 = 0.0_mp
+		vp0 = 0.0_mp
+		spwt0 = 0.0_mp
 
-		call RANDOM_NUMBER(xp0)
-		xp0 = fs%dpm%L*xp0
+!		call RANDOM_NUMBER(xp0)
+!		xp0 = fs%dpm%L*xp0
 
-		vp0 = randn(Np,3)
-		w = vT*1.5_mp
-		vp0 = vp0*w
+!		vp0 = randn(newN,3)
+!		w = vT*1.5_mp
+!		vp0 = vp0*w
 
-		spwt0 = fs%dpm%L*w/EXP( -vp0(:,1)**2/2.0_mp/w/w )/Np	&
-					*( vp0(:,1)**2/vT/vT - 1.0_mp )/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )
+		do i2=1,Nx
+			do i1=1,Nx
+				xp0(i1+Nx*(i2-1)) = (i1-0.5_mp)*fs%dpm%L/Nx
+				vp0(i1+Nx*(i2-1),:) = (i2-0.5_mp)*2.0_mp*fs%Lv/Nx - 1.0_mp*fs%Lv
+			end do
+		end do
+
+		spwt0 = ( vp0(:,1)**2/vT/vT - 1.0_mp )/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
+!					*fs%dpm%L*w/EXP( -vp0(:,1)**2/2.0_mp/w/w )/newN
+					*fs%dpm%L*2.0_mp*fs%Lv/newN
 
 !		call RANDOM_NUMBER(vp0)
 !		w = vT*5.0_mp
@@ -31,6 +49,10 @@ contains
 
 		rho_back = 0.0_mp
 		call fs%dpm%m%setMesh(rho_back)
+
+		deallocate(xp0)
+		deallocate(vp0)
+		deallocate(spwt0)
 	end subroutine
 
 	subroutine Debye_initialize(pm,Np,Q)

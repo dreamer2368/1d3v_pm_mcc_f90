@@ -8,6 +8,68 @@ module testmodule
 
 contains
 
+	subroutine updateWeightTest
+		type(PM1D) :: pm
+		type(FSens) :: fs
+		type(recordData) :: r
+		real(mp), parameter :: Tf=1.0_mp, Ti=0.5_mp, dt = 1.0_mp
+		real(mp), parameter :: L = 1.0_mp, Lv=0.5_mp, w = 0.1_mp
+		integer, parameter :: Ng=64, N=2E6, NInject=1E6
+		integer :: i,k
+		real(mp) :: xp0(N), vp0(N,3), spwt0(N)
+		real(mp), dimension(Ng,Ng+1) :: j
+
+		call pm%buildPM1D(Tf,Ti,Ng,N=1,pBC=0,mBC=0,order=1,L=L,dt=dt)
+		call pm%p(1)%buildSpecies(1.0_mp,1.0_mp)
+		call fs%buildFSens(pm,Lv,Ng/2,NInject,NInject)
+		call fs%dpm%p(1)%setSpecies(1,(/0.0_mp/),(/0.0_mp,0.0_mp,0.0_mp/),(/0.0_mp/))
+		call r%buildRecord(pm%nt,N,pm%L,Ng,'updateWeightTest',1)
+
+		call RANDOM_NUMBER(xp0)
+		xp0 = xp0*L
+		call RANDOM_NUMBER(vp0)
+		vp0 = (2.0_mp*vp0-1.0_mp)*Lv
+		xp0(1:N/2) = randn(N/2)*w + 0.5_mp*L
+		vp0(1:N/2,:) = randn(N/2,3)*w
+		spwt0 = 1.0_mp/N
+		call fs%dpm%p(1)%setSpecies(N,xp0,vp0,spwt0)
+
+		call applyBC(fs%dpm)
+		call fs%dpm%a(1)%assignMatrix(fs%dpm%m,fs%dpm%p(1)%xp)
+		call adjustGrid(fs%dpm)
+
+		call fs%FSensDistribution
+
+		open(unit=300,file='data/updateWeightTest/record.bin',status='replace',form='unformatted',access='stream')
+		open(unit=301,file='data/updateWeightTest/xp.bin',status='replace',form='unformatted',access='stream')
+		open(unit=302,file='data/updateWeightTest/vp.bin',status='replace',form='unformatted',access='stream')
+		open(unit=303,file='data/updateWeightTest/spwt.bin',status='replace',form='unformatted',access='stream')
+		open(unit=304,file='data/updateWeightTest/f_A_before.bin',status='replace',form='unformatted',access='stream')
+		write(300) Ng, Ng/2, N
+		write(301) xp0
+		write(302) vp0
+		write(303) spwt0
+		write(304) fs%f_A
+		close(300)
+		close(301)
+		close(302)
+		close(303)
+		close(304)
+
+		j = -1.0_mp
+
+		call fs%updateWeight(j)
+		call fs%FSensDistribution
+
+		open(unit=304,file='data/updateWeightTest/f_A_after.bin',status='replace',form='unformatted',access='stream')
+		write(304) fs%f_A
+		close(304)
+
+		call pm%destroyPM1D
+		call fs%destroyFSens
+		call r%destroyRecord
+	end subroutine
+
 	subroutine RedistributionTest
 		type(PM1D) :: pm
 		type(FSens) :: fs
@@ -155,8 +217,8 @@ contains
 		xp0 = xp0*pm%L
 		vp0 = randn(N,3)
 		vp0 = vp0*w
-!		spwt0 = 1.0_mp/N
-		spwt0 = SQRT(2.0_mp*pi)*w/EXP( -vp0(:,1)**2/2.0_mp/w/w )/N
+		spwt0 = 1.0_mp/N
+!		spwt0 = SQRT(2.0_mp*pi)*w/EXP( -vp0(:,1)**2/2.0_mp/w/w )/N
 		call pm%p(1)%setSpecies(N,xp0,vp0,spwt0)
 !		fs%dpm%m%E = 1.0_mp
 		fs%dpm%m%E = (/ (SIN( 2.0_mp*pi*i/Ng ),i=1,Ng) /)
@@ -188,7 +250,6 @@ contains
 				fs%j(i,k) = SIN( 2.0_mp*pi*i/Ng )/SQRT(2.0_mp*pi)/w*EXP( -((k-Ng/2-1)*fs%dv)**2/2.0_mp/w/w )
 			end do
 		end do
-		fs%dpm%m%E = 1.0_mp
 		open(unit=304,file='data/InjectionTest/j_source.bin',status='replace',form='unformatted',access='stream')
 		write(304) fs%j
 		close(304)
@@ -197,7 +258,7 @@ contains
 		call applyBC(fs%dpm)
 		call fs%dpm%a(1)%assignMatrix(fs%dpm%m,fs%dpm%p(1)%xp)
 		call adjustGrid(fs%dpm)
-		call fs%FSensSourceTerm(fs%dpm)
+		call fs%FSensDistribution
 
 		open(unit=301,file='data/InjectionTest/xp_inject.bin',status='replace',form='unformatted',access='stream')
 		open(unit=302,file='data/InjectionTest/vp_inject.bin',status='replace',form='unformatted',access='stream')
@@ -206,7 +267,7 @@ contains
 		write(301) fs%dpm%p(1)%xp
 		write(302) fs%dpm%p(1)%vp
 		write(303) fs%dpm%p(1)%spwt
-		write(304) fs%j
+		write(304) fs%f_A
 		close(301)
 		close(302)
 		close(303)
