@@ -59,6 +59,9 @@ contains
 		j = -1.0_mp
 
 		call fs%updateWeight(j)
+		open(unit=304,file='data/updateWeightTest/n_A.bin',status='replace',form='unformatted',access='stream')
+		write(304) fs%f_A
+		close(304)
 		call fs%FSensDistribution
 
 		open(unit=304,file='data/updateWeightTest/f_A_after.bin',status='replace',form='unformatted',access='stream')
