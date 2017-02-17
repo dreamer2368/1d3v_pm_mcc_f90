@@ -40,7 +40,7 @@ modAdj.o : modPM1D.o
 modQoI.o : modAdj.o
 ArMCC.o : modPM1D.o modRecord.o random.o
 modBC.o : modPM1D.o random.o
-modFSens.o : modBC.o
+modFSens.o : modBC.o modRecord.o
 init.o : modFSens.o
 modTarget.o : modAdj.o random.o
 modSource.o : modPM1D.o random.o

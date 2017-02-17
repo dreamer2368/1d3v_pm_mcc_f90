@@ -1,6 +1,7 @@
 module modFSens
 
 	use modBC
+	use modRecord
 
 	implicit none
 
@@ -56,16 +57,20 @@ contains
 		deallocate(this%f_A)
 	end subroutine
 
-	subroutine FSensSourceTerm(this,pm)
+	subroutine FSensSourceTerm(this,pm,nk,fsr)
 		class(FSens), intent(inout) :: this
 		type(PM1D), intent(in) :: pm
+		integer, intent(in), optional :: nk
+		type(recordData), intent(in), optional :: fsr
+		integer :: kr
+		character(len=100) :: kstr
 		integer :: i,k, g(pm%a(1)%order+1)
 		integer :: vgl, vgr
 		real(mp) :: vp, g0, h
 
 		!F to phase space
 		this%j = 0.0_mp
-		do i = 1, pm%n
+		do i=1,pm%n
 			do k = 1, pm%p(i)%np
 				vp = pm%p(i)%vp(k,1)
 				g0 = FLOOR(vp/this%dv)
@@ -87,6 +92,16 @@ contains
 		end do
 		this%j(:,1) = 0.0_mp
 		this%j(:,pm%m%ng) = 0.0_mp
+		if( present(nk) ) then
+			if( (fsr%mod.eq.1) .or. (mod(nk,fsr%mod).eq.0) ) then
+				kr = merge(nk,nk/fsr%mod,fsr%mod.eq.1)
+				write(kstr,*) kr
+				open(unit=305,file='data/'//fsr%dir//'/Dvf_'//trim(adjustl(kstr))//'.bin',	&
+						status='replace',form='unformatted',access='stream')
+				write(305) this%j
+				close(305)
+			end if
+		end if
 
 		!Multiply E_A
 		do i=1,2*this%ngv+1
@@ -142,7 +157,7 @@ contains
 !			vp0 = randn(newN,3)
 !			w = 0.4_mp*this%Lv
 !			vp0 = vp0*w
-			!Velocity distribution: Uniformly-random x dimension
+			!Velocity distribution: Uniformly-random x999999 dimension
 !			call RANDOM_NUMBER(vp0)
 !			vp0 = (2.0_mp*vp0-1.0_mp)*this%Lv
 
@@ -234,23 +249,27 @@ contains
 	subroutine updateWeight(this,j)
 		class(FSens), intent(inout) :: this
 		real(mp), intent(in), dimension(this%dpm%m%ng,2*this%ngv+1) :: j
+		real(mp), dimension(this%dpm%m%ng,2*this%ngv+3) :: n_temp
 		integer :: i,k, g(this%dpm%a(1)%order+1)
 		integer, allocatable :: g_v(:,:)
 		real(mp), allocatable :: frac_xv(:,:,:)
-		integer :: vgl, vgr
+		integer :: vgl, vgr, k_temp
 		real(mp) :: vp, h
 
 		do i = 1, this%dpm%n
 			!F_A to phase space
-			this%f_A = 0.0_mp
+			n_temp = 0.0_mp
+!			this%f_A = 0.0_mp
 			allocate(g_v(2,this%dpm%p(i)%np))
 			allocate(frac_xv(2,2,this%dpm%p(i)%np))
 			do k = 1, this%dpm%p(i)%np
 				vp = this%dpm%p(i)%vp(k,1)
-				vgl = FLOOR(vp/this%dv) + this%ngv+1
+!				vgl = FLOOR(vp/this%dv) + this%ngv+1
+				vgl = FLOOR(vp/this%dv) + this%ngv+2
 				vgr = vgl+1
-				if( vgl<1 .or. vgr>2*this%ngv+1 )	then
-					g_v(:,k) = 1
+!				if( vgl<1 .or. vgr>2*this%ngv+1 )	then
+				if( vgl<1 .or. vgr>2*this%ngv+3 )	then
+					g_v(:,k) = this%ngv+2
 					frac_xv(:,:,k) = 0.0_mp
 					cycle
 				end if
@@ -259,17 +278,31 @@ contains
 				h = vp/this%dv - FLOOR(vp/this%dv)
 				frac_xv(:,1,k) = (1.0_mp-h)*this%dpm%a(i)%frac(k,:)
 				frac_xv(:,2,k) = h*this%dpm%a(i)%frac(k,:)
-				this%f_A(g,g_v(:,k)) = this%f_A(g,g_v(:,k)) + frac_xv(:,:,k)/this%dpm%m%dx/this%dv
+!				this%f_A(g,g_v(:,k)) = this%f_A(g,g_v(:,k)) + frac_xv(:,:,k)/this%dpm%m%dx/this%dv
+				n_temp(g,g_v(:,k)) = n_temp(g,g_v(:,k)) + frac_xv(:,:,k)/this%dpm%m%dx/this%dv
 			end do
-			this%f_A(:,1) = this%f_A(:,1)*2.0_mp
-			this%f_A(:,2*this%ngv+1) = this%f_A(:,2*this%ngv+1)*2.0_mp
+			this%f_A = n_temp(:,2:2*this%ngv+2)
+!			this%f_A(:,1) = this%f_A(:,1)*2.0_mp
+!			this%f_A(:,2*this%ngv+1) = this%f_A(:,2*this%ngv+1)*2.0_mp
+
+			!Adjust grid
+			do k = 1, this%dpm%p(1)%np
+				if( g_v(1,k).eq.1 ) then
+					frac_xv(:,1,k) = 0.0_mp
+					g_v(1,k) = this%ngv+2
+				end if
+				if( g_v(2,k).eq.2*this%ngv+3 ) then
+					frac_xv(:,2,k) = 0.0_mp
+					g_v(2,k) = this%ngv+2
+				end if
+			end do
+			g_v = g_v-1
 
 			!Update weight
 			do k = 1, this%dpm%p(i)%np
 				g = this%dpm%a(i)%g(k,:)
 				this%dpm%p(i)%spwt(k) = this%dpm%p(i)%spwt(k)	&
 													+ SUM( j(g,g_v(:,k))*frac_xv(:,:,k)/this%f_A(g,g_v(:,k)) )
-!													+ SUM( j(g,g_v(:,k))*frac_xv(:,:,k) )
 			end do
 
 			deallocate(g_v)

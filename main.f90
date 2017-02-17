@@ -30,10 +30,10 @@ program main
 !	call InjectionTest
 !	call MPITest
 !	call SensitivityInitializeTest
-!	call Debye_sensitivity
+	call Debye_sensitivity
 !	call forYeoh
 !	call RedistributionTest
-	call updateWeightTest
+!	call updateWeightTest
 
 	! print to screen
 	print *, 'program main...done.'
@@ -484,28 +484,28 @@ contains
 	end subroutine
 
 	subroutine debye_shielding
-		type(PM1D) :: debye
+		type(PM1D) :: d
 		type(recordData) :: r
 		real(mp) :: n0 = 1.0e10, lambda0 = 1.0e-2, vT = 1.5_mp
-		integer :: N = 100000, Ng = 512
-		real(mp) :: L = 20.0_mp, Wp, Q = 3.0_mp
-		real(mp) :: dx
-		real(mp) :: Time = 150.0_mp
-		real(mp) :: A(2)
+		integer :: N = 100000, Ng = 64
+		real(mp) :: L = 20.0_mp, Wp, Q = 2.0_mp
+		real(mp) :: dt = 0.05_mp
+		real(mp) :: Time = 300.0_mp
+		real(mp) :: A(2),J
 
 		A = (/ vT, lambda0 /)
-		call buildPM1D(debye,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=0.01_mp)
-		call buildRecord(r,debye%nt,1,debye%L,debye%ng,'debye2',100)
+		call buildPM1D(d,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt)
+		call buildRecord(r,d%nt,1,d%L,d%ng,'debye',20)
 
-		call buildSpecies(debye%p(1),-1.0_mp,1.0_mp)
-		call Debye_initialize(debye,N,Q)
+		call buildSpecies(d%p(1),-1.0_mp,1.0_mp)
+		call Debye_initialize(d,N,Q)
 
-		call forwardsweep(debye,r,Null_input,Null_source)
+		call forwardsweep(d,r,Null_input,Null_source,Debye,J)
 
 		call printPlasma(r)
 
 		call destroyRecord(r)
-		call destroyPM1D(debye)
+		call destroyPM1D(d)
 	end subroutine
 
 	subroutine debye_characterization
@@ -561,11 +561,11 @@ contains
 		type(PM1D) :: pm
 		type(FSens) :: fs
 		type(recordData) :: r, fsr
-		integer :: N=1E5, Ng=128
-		integer :: NInit=5E4, Ngv=64, NInject=5E3, NLimit=3E5
+		integer :: N=1E5, Ng=64
+		integer :: NInit=5E4, Ngv=32, NInject=5E3, NLimit=3E5
 		real(mp) :: L = 20.0_mp, Lv, Q = 2.0_mp
 		real(mp) :: dt=0.05_mp, dx
-		real(mp) :: Time = 150.0_mp, vT = 1.5_mp
+		real(mp) :: Time = 50.0_mp, vT = 1.5_mp
 		real(mp) :: A(2), J, grad
 		character(len=100)::dir
 		A = (/ vT, 0.0_mp /)
@@ -582,7 +582,7 @@ contains
 		call buildFSens(fs,pm,Lv,Ngv,NInject,NLimit)
 		dir = 'Debye_sensitivity/f_A'
 		call buildRecord(fsr,fs%dpm%nt,1,fs%dpm%L,fs%dpm%ng,trim(dir),20)
-		call Debye_sensitivity_init(fs,NInit,vT)
+		call Debye_sensitivity_init(fs,2*N,vT)
 
 		call forwardsweep_sensitivity(pm,r,fs,fsr,Null_input,Null_source,Debye,J,grad)
 
