@@ -32,7 +32,7 @@ contains
 		do i2=1,Nx
 			do i1=1,Nx
 				xp0(i1+Nx*(i2-1)) = (i1-0.5_mp)*fs%dpm%L/Nx
-				vp0(i1+Nx*(i2-1),:) = (i2-0.5_mp)*2.0_mp*fs%Lv/Nx - 1.0_mp*fs%Lv
+				vp0(i1+Nx*(i2-1),:) = (i2-0.5_mp)*2.4_mp*fs%Lv/Nx - 1.2_mp*fs%Lv
 			end do
 		end do
 
@@ -45,7 +45,7 @@ contains
 !		vp0 = (2.0_mp*vp0-1.0_mp)*w
 !		spwt0 = 2.0_mp*w/Np*( vp0(:,1)**2/vT/vT - 1.0_mp )/SQRT(2.0_mp*pi)/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )
 
-		call fs%dpm%p(1)%setSpecies(Np,xp0,vp0,spwt0)
+		call fs%dpm%p(1)%setSpecies(newN,xp0,vp0,spwt0)
 
 		rho_back = 0.0_mp
 		call fs%dpm%m%setMesh(rho_back)
