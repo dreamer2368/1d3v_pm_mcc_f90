@@ -17,6 +17,7 @@ contains
 		type(recordData), intent(inout) :: r
 		integer :: i,k
 		real(mp), intent(out), optional :: J
+		real(mp) :: J_hist(this%nt)
 		interface
 			subroutine target_input(pm,k,str)
 				use modPM1D
@@ -44,6 +45,7 @@ contains
 			J = 0.0_mp
 		end if
 		k=0
+		J_hist = 0.0_mp
 
 		!Time stepping
 !		call halfStep(this,target_input)
@@ -57,7 +59,12 @@ contains
 				call QoI(this,k,J)
 			end if
 			call r%recordPlasma(this, k)									!record for n=1~Nt
+			J_hist(k) = J
 		end do
+		open(unit=305,file='data/'//r%dir//'/J_hist.bin',	&
+					status='replace',form='unformatted',access='stream')
+		write(305) J_hist
+		close(305)
 	end subroutine
 
 	subroutine halfStep(this,target_input)
@@ -427,6 +434,15 @@ contains
 
 		call halfStep_Sensitivity(fs%dpm,this,target_input)
 		call fsr%recordPlasma(fs%dpm, k)
+		call fs%FSensDistribution
+		if( (fsr%mod.eq.1) .or. (mod(k,fsr%mod).eq.0) ) then
+			kr = merge(k,k/fsr%mod,fsr%mod.eq.1)
+			write(kstr,*) kr
+			open(unit=305,file='data/'//fsr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
+					status='replace',form='unformatted',access='stream')
+			write(305) fs%f_A
+			close(305)
+		end if
 		do k=1,this%nt
 			call updatePlasma(this,target_input,source,k,r)
 			call QoI(this,k,J)
@@ -434,9 +450,10 @@ contains
 
 			call updateSensitivity(fs%dpm,this,target_input,source,k,fsr)
 			call fs%FSensDistribution
-			call fs%Redistribute
+!			call fs%Redistribute
 			call fs%FSensSourceTerm(this)
-			call fs%InjectSource(fs%j,fs%NInject)
+			call fs%updateWeight(fs%j)
+!			call fs%InjectSource(fs%j,fs%NInject)
 			call QoI(fs%dpm,k,grad)
 			grad_hist(k) = grad
 			call fsr%recordPlasma(fs%dpm, k)
@@ -446,7 +463,13 @@ contains
 				write(kstr,*) kr
 				open(unit=305,file='data/'//fsr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
 						status='replace',form='unformatted',access='stream')
+				call fs%FSensDistribution
 				write(305) fs%f_A
+				close(305)
+				open(unit=305,file='data/'//fsr%dir//'/j_'//trim(adjustl(kstr))//'.bin',	&
+						status='replace',form='unformatted',access='stream')
+				write(305) fs%j
+				close(305)
 			end if
 		end do
 		open(unit=305,file='data/'//fsr%dir//'/grad_hist.bin',	&
