@@ -59,30 +59,56 @@ contains
 		type(PM1D), intent(inout) :: pm
 		integer, intent(in) :: Np
 		real(mp), intent(in) :: Q
-		real(mp) :: xp0(Np), vp0(Np,3), spwt0(Np), rho_back(pm%ng), xg(pm%ng)
+		real(mp) :: rho_back(pm%ng), xg(pm%ng)
+		real(mp), allocatable :: xp0(:), vp0(:,:), spwt0(:)
 		real(mp) :: L,w
-		integer :: i,j,N
+		real(mp) :: vT, Lv
+		integer :: i,i1,i2,j,N,Nx,newN
 		L=pm%L
 		N=pm%n
 		w=L/10.0_mp
 		xg=(/ ((i-0.5_mp)*pm%m%dx,i=1,pm%ng) /)
 
-!		call init_random_seed
-		vp0 = randn(Np,3)
-		vp0 = pm%A0(1)*vp0
-		call RANDOM_NUMBER(xp0)
-		xp0 = L*(xp0 - 0.5_mp) + 0.5_mp*L
-		spwt0 = L/Np
-
+		!Background charge + External charge
 		rho_back = 1.0_mp - Q/L + Q/sqrt(2.0_mp*pi)/w*exp( -(xg-0.5_mp*L)**2/2.0_mp/w/w )
-!		rho_back = 1.0_mp
-!		rho_back = rho_back - Q/L
-!		pm%p(1)%qs = pm%p(1)%qs - Q/L
-!		rho_back(pm%ng/2) = rho_back(pm%ng/2) + Q/pm%m%dx
-!		rho_back(pm%ng) = 0.0_mp
 
-		call pm%p(1)%setSpecies(Np,xp0,vp0,spwt0)
+		!Uniform grid distribution
+		vT = pm%A0(1)
+		Lv = 6.0_mp*vT
+		Nx = INT(SQRT(Np*1.0_mp))
+		newN = Nx*Nx
+		allocate(xp0(newN))
+		allocate(vp0(newN,3))
+		allocate(spwt0(newN))
+		xp0 = 0.0_mp
+		vp0 = 0.0_mp
+		spwt0 = 0.0_mp
+
+		do i2=1,Nx
+			do i1=1,Nx
+				xp0(i1+Nx*(i2-1)) = (i1-0.5_mp)*pm%L/Nx
+				vp0(i1+Nx*(i2-1),:) = (i2-0.5_mp)*2.0_mp*Lv/Nx - 1.0_mp*Lv
+			end do
+		end do
+
+		spwt0 = 1/SQRT(2.0_mp*pi)/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
+					*pm%L*2.0_mp*Lv/newN
+
+		!Gaussian Random distribution
+!		call init_random_seed
+!		vp0 = randn(Np,3)
+!		vp0 = pm%A0(1)*vp0
+!		call RANDOM_NUMBER(xp0)
+!		xp0 = L*(xp0 - 0.5_mp) + 0.5_mp*L
+!		spwt0 = L/Np
+
+!		call pm%p(1)%setSpecies(Np,xp0,vp0,spwt0)
+		call pm%p(1)%setSpecies(newN,xp0,vp0,spwt0)
 		call pm%m%setMesh(rho_back)
+
+		deallocate(xp0)
+		deallocate(vp0)
+		deallocate(spwt0)
 	end subroutine
 
 	subroutine Landau_initialize(pm,Np,vT)
