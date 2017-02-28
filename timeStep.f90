@@ -399,7 +399,7 @@ contains
 		integer :: i,k,kr
 		character(len=100) :: kstr
 		real(mp), intent(out) :: J,grad
-		real(mp) :: grad_hist(this%nt)
+		real(mp), dimension(this%nt) :: J_hist, grad_hist
 		interface
 			subroutine target_input(pm,k,str)
 				use modPM1D
@@ -424,6 +424,7 @@ contains
 		end interface
 		J = 0.0_mp
 		grad = 0.0_mp
+		J_hist = 0.0_mp
 		grad_hist = 0.0_mp
 		k=0
 
@@ -446,6 +447,7 @@ contains
 		do k=1,this%nt
 			call updatePlasma(this,target_input,source,k,r)
 			call QoI(this,k,J)
+			J_hist(k) = J
 			call r%recordPlasma(this, k)									!record for n=1~Nt
 
 			call updateSensitivity(fs%dpm,this,target_input,source,k,fsr)
@@ -458,23 +460,27 @@ contains
 			grad_hist(k) = grad
 			call fsr%recordPlasma(fs%dpm, k)
 
-			if( (fsr%mod.eq.1) .or. (mod(k,fsr%mod).eq.0) ) then
-				kr = merge(k,k/fsr%mod,fsr%mod.eq.1)
-				write(kstr,*) kr
-				open(unit=305,file='data/'//fsr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
-						status='replace',form='unformatted',access='stream')
-				call fs%FSensDistribution
-				write(305) fs%f_A
-				close(305)
-				open(unit=305,file='data/'//fsr%dir//'/j_'//trim(adjustl(kstr))//'.bin',	&
-						status='replace',form='unformatted',access='stream')
-				write(305) fs%j
-				close(305)
-			end if
+!			if( (fsr%mod.eq.1) .or. (mod(k,fsr%mod).eq.0) ) then
+!				kr = merge(k,k/fsr%mod,fsr%mod.eq.1)
+!				write(kstr,*) kr
+!				open(unit=305,file='data/'//fsr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
+!						status='replace',form='unformatted',access='stream')
+!				call fs%FSensDistribution
+!				write(305) fs%f_A
+!				close(305)
+!				open(unit=305,file='data/'//fsr%dir//'/j_'//trim(adjustl(kstr))//'.bin',	&
+!						status='replace',form='unformatted',access='stream')
+!				write(305) fs%j
+!				close(305)
+!			end if
 		end do
 		open(unit=305,file='data/'//fsr%dir//'/grad_hist.bin',	&
 					status='replace',form='unformatted',access='stream')
 		write(305) grad_hist
+		close(305)
+		open(unit=305,file='data/'//fsr%dir//'/J_hist.bin',	&
+					status='replace',form='unformatted',access='stream')
+		write(305) J_hist
 		close(305)
 	end subroutine
 
