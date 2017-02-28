@@ -36,7 +36,7 @@ contains
 			end do
 		end do
 
-		spwt0 = ( vp0(:,1)**2/vT/vT - 1.0_mp )/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
+		spwt0 = ( vp0(:,1)**2/vT/vT - 1.0_mp )/SQRT(2.0_mp*pi)/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
 !					*fs%dpm%L*w/EXP( -vp0(:,1)**2/2.0_mp/w/w )/newN
 					*fs%dpm%L*2.0_mp*fs%Lv/newN
 
