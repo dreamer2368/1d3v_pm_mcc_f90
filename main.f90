@@ -30,11 +30,11 @@ program main
 !	call InjectionTest
 !	call MPITest
 !	call SensitivityInitializeTest
-!	call Debye_sensitivity
+	call Debye_sensitivity
 !	call forYeoh
 !	call RedistributionTest
 !	call updateWeightTest
-	call debye_sensitivity_curve
+!	call debye_sensitivity_curve
 
 	! print to screen
 	print *, 'program main...done.'
@@ -562,18 +562,18 @@ contains
 		type(PM1D) :: pm
 		type(FSens) :: fs
 		type(recordData) :: r, fsr
-		integer :: N=1E5, Ng=64
+		integer :: N=1E5, Ng=512
 		integer :: NInit=5E4, Ngv=32, NInject=5E3, NLimit=3E5
 		real(mp) :: L = 20.0_mp, Lv, Q = 2.0_mp
 		real(mp) :: dt=0.05_mp, dx
-		real(mp) :: Time = 150.0_mp, vT = 1.5_mp
+		real(mp) :: Time = 5.0_mp, vT = 1.0_mp
 		real(mp) :: A(2), J, grad
 		character(len=100)::dir
 		A = (/ vT, 0.0_mp /)
 
 		call buildPM1D(pm,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt)
-		dir = 'Debye_sensitivity4'
-		call buildRecord(r,pm%nt,1,pm%L,pm%ng,trim(dir),20)
+		dir = 'Debye_sensitivity'
+		call buildRecord(r,pm%nt,1,pm%L,pm%ng,trim(dir),1)
 
 		call buildSpecies(pm%p(1),-1.0_mp,1.0_mp)
 		call Debye_initialize(pm,N,Q)
@@ -581,8 +581,8 @@ contains
 		Lv = vT*6.0_mp
 !		NInject = 5*N/pm%nt
 		call buildFSens(fs,pm,Lv,Ngv,NInject,NLimit)
-		dir = 'Debye_sensitivity4/f_A'
-		call buildRecord(fsr,fs%dpm%nt,1,fs%dpm%L,fs%dpm%ng,trim(dir),20)
+		dir = 'Debye_sensitivity/f_A'
+		call buildRecord(fsr,fs%dpm%nt,1,fs%dpm%L,fs%dpm%ng,trim(dir),1)
 		call Debye_sensitivity_init(fs,2*N,vT)
 
 		call forwardsweep_sensitivity(pm,r,fs,fsr,Null_input,Null_source,Debye,J,grad)
@@ -606,7 +606,7 @@ contains
 		type(mpiHandler) :: mpih
 		integer, parameter  :: Nsample=101
 		real(mp) :: vT(Nsample)
-		integer :: N = 100000, Ng = 512
+		integer :: N = 100000, Ng = 64
 		integer :: NInit=5E4, Ngv=32, NInject=5E3, NLimit=3E5
 		real(mp) :: L = 20.0_mp, Lv, Q = 2.0_mp
 		real(mp) :: dt=0.05_mp, dx
@@ -622,6 +622,7 @@ contains
 		call init_random_seed
 		do i=1,mpih%sendcnt
 			A = (/ vT(mpih%displc(mpih%my_rank)+i), 0.0_mp /)
+			print *, 'vT(',mpih%my_rank,')=',A(1)
 			call buildPM1D(d,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt)
 			dir = 'Debye_sensitivity_curve/'//trim(adjustl(mpih%rank_str))
 			call buildRecord(r,d%nt,1,d%L,d%ng,trim(dir),20)
