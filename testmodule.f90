@@ -8,6 +8,63 @@ module testmodule
 
 contains
 
+	subroutine debye_adj(fk,Time,str,k,output)
+		real(mp), intent(in) :: fk, Time
+		character(len=*), intent(in) ::str
+		integer, intent(in) :: k
+		real(mp), intent(out) :: output(:)
+		type(PM1D) :: d
+		type(adjoint) :: adj
+		type(recordData) :: r
+		real(mp) :: vT = 1.5_mp
+		integer :: N = 1E5, Ng=64
+		real(mp) :: L = 20.0_mp, Wp, Q = 2.0_mp
+		real(mp) :: dt = 0.05_mp
+		real(mp) :: A(2),J0,J1,grad(1)
+
+		SELECT CASE(k)
+			CASE(0)
+				A = (/ vT, 0.0_mp /)
+				call buildPM1D(d,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt)
+				call buildRecord(r,d%nt,1,d%L,d%ng,trim(str)//'/before',20)
+
+				call buildSpecies(d%p(1),-1.0_mp,1.0_mp)
+				call Debye_initialize(d,N,Q)
+
+				call forwardsweep(d,r,Null_input,Null_source,Debye,J0)
+
+				call printPlasma(r)
+				print *, 'J0=',J0
+
+				call buildAdjoint(adj,d)
+				call adj%m%setMesh(d%m%rho_back)
+				call backward_sweep(adj,d,r,grad,dDebye,Null_dinput,dDebye_dvT,Null_input,Null_source)
+
+				print *, 'dJdA=',grad
+
+				call destroyPM1D(d)
+				call destroyRecord(r)
+				call destroyAdjoint(adj)
+
+				output = (/ J0, grad(1) /)
+			CASE(1)
+				A = (/ vT+fk, 0.0_mp /)
+				call buildPM1D(d,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt)
+				call buildRecord(r,d%nt,1,d%L,d%ng,trim(str)//'/after',20)
+
+				call buildSpecies(d%p(1),-1.0_mp,1.0_mp)
+				call Debye_initialize(d,N,Q)
+
+				call forwardsweep(d,r,Null_input,Null_source,Debye,J1)
+				print *, 'J1=',J1
+
+				call destroyRecord(r)
+				call destroyPM1D(d)
+				
+				output(1) = J1
+		END SELECT
+	end subroutine
+
 	subroutine updateWeightTest
 		type(PM1D) :: pm
 		type(FSens) :: fs

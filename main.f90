@@ -4,7 +4,7 @@ program main
 
 	implicit none
 
-	real(mp) :: output(2) = (/(0.1_mp)**6,0.0_mp/)
+	real(mp) :: output(2) = (/(0.1_mp)**5,0.0_mp/)
 
 	! print to screen
 	print *, 'calling program main'
@@ -30,11 +30,12 @@ program main
 !	call InjectionTest
 !	call MPITest
 !	call SensitivityInitializeTest
-	call Debye_sensitivity
+!	call Debye_sensitivity
 !	call forYeoh
 !	call RedistributionTest
 !	call updateWeightTest
 !	call debye_sensitivity_curve
+	call adjoint_convergence_in_time(debye_adj)
 
 	! print to screen
 	print *, 'program main...done.'
@@ -293,8 +294,8 @@ contains
 		end if
 	end subroutine
 
-	subroutine adjoint_convergence(problem)
-		integer, parameter :: N=20, Nt=5
+	subroutine adjoint_convergence_in_time(problem)
+		integer, parameter :: N=23, Nt=4
 		real(mp) :: fk(N)
 		real(mp) :: Tk(Nt)
 		real(mp) :: ek(N,Nt)
@@ -316,14 +317,13 @@ contains
 			end subroutine
 		end interface
 
-		fk = (/ ( 0.1_mp**i,i=-1,N-2 ) /)
-		Tk = (/ 0.2_mp, 0.5_mp, 5.0_mp, 20.0_mp, 30.0_mp /)
-!		Tk = (/ 0.2_mp, 120.0_mp /)
+		fk = (/ (EXP(-1.0_mp*(i-1)),i=1,N) /)
+		Tk = (/ 0.1_mp, 30.0_mp, 150.0_mp, 750.0_mp /)
 		ek = 0.0_mp
 
-		dir = 'Landau'
+		dir = 'debye_adj_test'
 
-		do j=1,size(Tk)
+		do j=1,Nt
 			call problem(fk(i),Tk(j),trim(dir),0,temp)
 			J0 = temp(1)
 			grad(j) = temp(2)
@@ -334,17 +334,55 @@ contains
 			end do
 		end do
 
-		open(unit=301,file='data/'//trim(dir)//'/fk.bin',status='replace',form='unformatted',access='stream')
-		write(301) fk
+		open(unit=301,file='data/'//trim(dir)//'/grad_convergence.dat',status='replace')
+		do i=1,N
+			write(301) fk(i), ek(i,:)
+		end do
 		close(301)
-		open(unit=301,file='data/'//trim(dir)//'/ek.bin',status='replace',form='unformatted',access='stream')
-		write(301) ek
+		open(unit=301,file='data/'//trim(dir)//'/grad_in_time.bin',status='replace')
+		do i=1,Nt
+			write(301) Tk(i),grad(i)
+		end do
 		close(301)
-		open(unit=301,file='data/'//trim(dir)//'/grad.bin',status='replace',form='unformatted',access='stream')
-		write(301) grad
-		close(301)
-		open(unit=301,file='data/'//trim(dir)//'/output.bin',status='replace',form='unformatted',access='stream')
-		write(301) N,Nt
+	end subroutine
+
+	subroutine adj_convergence(problem)
+		interface
+			subroutine problem(fk,Time,str,k,output)
+				use modPM1D
+				use modAdj
+				use modRecord
+				real(mp), intent(in) :: fk
+				real(mp), intent(in) :: Time
+				character(len=*), intent(in) :: str
+				integer, intent(in) :: k
+				real(mp), intent(out) :: output(:)
+			end subroutine
+		end interface
+		character(len=100) :: dir
+		integer, parameter :: N=20
+		real(mp) :: temp(2), J0, J1, grad
+		real(mp), dimension(N) :: fk,ek
+		real(mp) :: Time=0.1_mp
+		integer :: i
+		dir = 'debye_adj_test'
+
+		fk = (/ (EXP(-1.0_mp*(i-1)),i=1,N) /)
+		ek = 0.0_mp
+
+		call problem(fk(i),Time,trim(dir),0,temp)
+		J0 = temp(1)
+		grad = temp(2)
+		do i=1,N
+			call problem(fk(i),Time,trim(dir),1,temp)
+			J1 = temp(1)
+			ek(i) = ABS( ((J1-J0)/fk(i) - grad)/grad )
+		end do
+
+		open(unit=301,file='data/'//trim(dir)//'/adj_convergence.dat',status='replace')
+		do i=1,N
+			write(301,*) fk(i), ek(i)
+		end do
 		close(301)
 	end subroutine
 

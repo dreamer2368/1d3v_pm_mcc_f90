@@ -82,4 +82,24 @@ contains
 		J = J + 1.0_mp/pm%nt*SUM( pm%p(1)%spwt*(pm%p(1)%xp-0.5_mp*pm%L)**2 )
 	end subroutine
 
+	subroutine dDebye(adj,pm,nk)
+		type(adjoint), intent(inout) :: adj
+		type(PM1D), intent(in) :: pm
+		integer, intent(in) :: nk
+
+		adj%dp(1)%xp = adj%dp(1)%xp + 2.0_mp/pm%nt*pm%p(1)%spwt*(pm%p(1)%xp-0.5_mp*pm%L)
+	end subroutine
+
+	subroutine dDebye_dvT(adj,pm,k,str,grad)
+		type(adjoint), intent(in) :: adj
+		type(PM1D), intent(in) :: pm
+		integer, intent(in) :: k
+		character(len=*), intent(in) :: str
+		real(mp), intent(inout) :: grad(:)
+
+		if( str.eq.'after' .and. k.eq.0 ) then
+			grad(1) = -sum( adj%p(1)%vp(:,1)*pm%p(1)%vp(:,1) )/pm%A0(1)/pm%dt
+		end if
+	end subroutine
+
 end module

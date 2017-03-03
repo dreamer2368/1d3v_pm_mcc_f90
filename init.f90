@@ -71,40 +71,43 @@ contains
 
 		!Background charge + External charge
 		rho_back = 1.0_mp - Q/L + Q/sqrt(2.0_mp*pi)/w*exp( -(xg-0.5_mp*L)**2/2.0_mp/w/w )
+		call pm%m%setMesh(rho_back)
 
 		!Uniform grid distribution
-		vT = pm%A0(1)
-		Lv = 6.0_mp*vT
-		Nx = INT(SQRT(Np*1.0_mp))
-		newN = Nx*Nx
-		allocate(xp0(newN))
-		allocate(vp0(newN,3))
-		allocate(spwt0(newN))
-		xp0 = 0.0_mp
-		vp0 = 0.0_mp
-		spwt0 = 0.0_mp
-
-		do i2=1,Nx
-			do i1=1,Nx
-				xp0(i1+Nx*(i2-1)) = (i1-0.5_mp)*pm%L/Nx
-				vp0(i1+Nx*(i2-1),:) = (i2-0.5_mp)*2.0_mp*Lv/Nx - 1.0_mp*Lv
-			end do
-		end do
-
-		spwt0 = 1/SQRT(2.0_mp*pi)/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
-					*pm%L*2.0_mp*Lv/newN
+!		vT = pm%A0(1)
+!		Lv = 6.0_mp*vT
+!		Nx = INT(SQRT(Np*1.0_mp))
+!		newN = Nx*Nx
+!		allocate(xp0(newN))
+!		allocate(vp0(newN,3))
+!		allocate(spwt0(newN))
+!		xp0 = 0.0_mp
+!		vp0 = 0.0_mp
+!		spwt0 = 0.0_mp
+!
+!		do i2=1,Nx
+!			do i1=1,Nx
+!				xp0(i1+Nx*(i2-1)) = (i1-0.5_mp)*pm%L/Nx
+!				vp0(i1+Nx*(i2-1),:) = (i2-0.5_mp)*2.0_mp*Lv/Nx - 1.0_mp*Lv
+!			end do
+!		end do
+!
+!		spwt0 = 1/SQRT(2.0_mp*pi)/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
+!					*pm%L*2.0_mp*Lv/newN
 
 		!Gaussian Random distribution
-!		call init_random_seed
-!		vp0 = randn(Np,3)
-!		vp0 = pm%A0(1)*vp0
-!		call RANDOM_NUMBER(xp0)
-!		xp0 = L*(xp0 - 0.5_mp) + 0.5_mp*L
-!		spwt0 = L/Np
+		allocate(xp0(Np))
+		allocate(vp0(Np,3))
+		allocate(spwt0(Np))
+		call init_random_seed
+		vp0 = randn(Np,3)
+		vp0 = pm%A0(1)*vp0
+		call RANDOM_NUMBER(xp0)
+		xp0 = L*xp0
+		spwt0 = L/Np
 
-!		call pm%p(1)%setSpecies(Np,xp0,vp0,spwt0)
-		call pm%p(1)%setSpecies(newN,xp0,vp0,spwt0)
-		call pm%m%setMesh(rho_back)
+		call pm%p(1)%setSpecies(Np,xp0,vp0,spwt0)
+!		call pm%p(1)%setSpecies(newN,xp0,vp0,spwt0)
 
 		deallocate(xp0)
 		deallocate(vp0)
