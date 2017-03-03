@@ -336,12 +336,12 @@ contains
 
 		open(unit=301,file='data/'//trim(dir)//'/grad_convergence.dat',status='replace')
 		do i=1,N
-			write(301) fk(i), ek(i,:)
+			write(301,*) fk(i), ek(i,:)
 		end do
 		close(301)
 		open(unit=301,file='data/'//trim(dir)//'/grad_in_time.bin',status='replace')
 		do i=1,Nt
-			write(301) Tk(i),grad(i)
+			write(301,*) Tk(i),grad(i)
 		end do
 		close(301)
 	end subroutine
