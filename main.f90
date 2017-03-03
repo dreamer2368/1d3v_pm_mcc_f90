@@ -708,7 +708,7 @@ contains
 		type(FSens) :: fs
 		type(recordData) :: r,fsr
 		type(mpiHandler) :: mpih
-		integer, parameter  :: Nsample=1
+		integer, parameter  :: Nsample=5
 		real(mp), parameter :: vT=1.5_mp
 		integer, parameter :: N = 100000, Ng = 64
 		integer, parameter :: NInit=5E4, Ngv=32, NInject=5E3, NLimit=3E5
@@ -718,7 +718,7 @@ contains
 		real(mp) :: J,grad,adj_grad(1)
 		integer :: i,k
 		character(len=100)::dir,Time_str
-		Time = (/ 0.1_mp, 30.0_mp, 150.0_mp, 750.0_mp /)
+		Time = (/ 0.1_mp, 0.2_mp, 0.3_mp, 0.4_mp /)
 		A = (/ vT, 0.0_mp /)
 
 		call buildMPIHandler(mpih)
@@ -761,7 +761,7 @@ contains
 			call gatherData(mpih)
 
 			if( mpih%my_rank.eq.mpih%size-1 ) then
-				write(Time_str,*) Time(k)
+				write(Time_str,'(F5.2)') Time(k)
 				open(unit=301,file='data/Debye_sampling/Jk_'//trim(Time_str)//'.bin',	&
 						status='replace',form='unformatted',access='stream')
 				open(unit=302,file='data/Debye_sampling/gradk_'//trim(Time_str)//'.bin',	&
