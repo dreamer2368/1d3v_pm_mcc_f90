@@ -120,6 +120,7 @@ contains
 		real(mp) :: rhs(this%ng-1), phi1(this%ng-1)
 		real(mp) :: dt, L
 		integer :: N, Ng, i
+		real(mp) :: time1, time2
 		interface
 			subroutine target_input(pm,k,str)
 				use modPM1D
@@ -143,33 +144,48 @@ contains
 
 		call source(this)
 
+		call CPU_TIME(time1)
 		do i=1,this%n
 			call this%p(i)%moveSpecies(dt)
 		end do
+		call CPU_TIME(time2)
+		r%cpt_temp(1) = r%cpt_temp(1) + (time2-time1)/r%mod
 
 		call applyBC(this)
 		do i=1, this%n
 			call this%a(i)%assignMatrix(this%m,this%p(i)%xp)
 		end do
 		call adjustGrid(this)
+		call CPU_TIME(time1)
+		r%cpt_temp(2) = r%cpt_temp(2) + (time1-time2)/r%mod
 
 		!charge assignment
 		call chargeAssign(this%a,this%p,this%m)
+		call CPU_TIME(time2)
+		r%cpt_temp(3) = r%cpt_temp(3) + (time2-time1)/r%mod
 
 		call target_input(this,k,'rho_back')
 		call this%m%solveMesh(this%eps0)
+		call CPU_TIME(time1)
+		r%cpt_temp(4) = r%cpt_temp(4) + (time1-time2)/r%mod
 
 		!Electric field : -D*phi
 		this%m%E = - multiplyD(this%m%phi,this%m%dx,this%m%BCindex)
+		call CPU_TIME(time2)
+		r%cpt_temp(5) = r%cpt_temp(5) + (time2-time1)/r%mod
 
 		!Force assignment : mat'*E
 		do i=1, this%n
 			call this%a(i)%forceAssign(this%p(i), this%m)
 		end do
+		call CPU_TIME(time1)
+		r%cpt_temp(6) = r%cpt_temp(6) + (time1-time2)/r%mod
 
 		do i=1, this%n
 			call this%p(i)%accelSpecies(dt)
 		end do
+		call CPU_TIME(time2)
+		r%cpt_temp(7) = r%cpt_temp(7) + (time2-time1)/r%mod
 
 		if( present(r) ) then
 			call mcc_collision(this,r%n_coll(:,k))
@@ -400,6 +416,7 @@ contains
 		character(len=100) :: kstr
 		real(mp), intent(out) :: J,grad
 		real(mp), dimension(this%nt) :: J_hist, grad_hist
+		real(mp) :: time1, time2
 		interface
 			subroutine target_input(pm,k,str)
 				use modPM1D
@@ -451,10 +468,18 @@ contains
 			call r%recordPlasma(this, k)									!record for n=1~Nt
 
 			call updateSensitivity(fs%dpm,this,target_input,source,k,fsr)
-			call fs%FSensDistribution
+!			call fs%FSensDistribution
 !			call fs%Redistribute
+
+			call CPU_TIME(time1)
 			call fs%FSensSourceTerm(this)
+			call CPU_TIME(time2)
+			fsr%cpt_temp(8) = fsr%cpt_temp(8) + (time2-time1)/fsr%mod
+
 			call fs%updateWeight(fs%j)
+			call CPU_TIME(time1)
+			fsr%cpt_temp(9) = fsr%cpt_temp(9) + (time1-time2)/fsr%mod
+
 !			call fs%InjectSource(fs%j,fs%NInject)
 			call QoI(fs%dpm,k,grad)
 			grad_hist(k) = grad
@@ -539,6 +564,7 @@ contains
 		real(mp) :: rhs(dpm%ng-1), phi1(dpm%ng-1)
 		real(mp) :: dt, L
 		integer :: N, Ng, i
+		real(mp) :: time1, time2
 		interface
 			subroutine Dtarget_input(pm,k,str)
 				use modPM1D
@@ -562,33 +588,48 @@ contains
 
 		call Dsource(dpm)
 
+		call CPU_TIME(time1)
 		do i=1,dpm%n
 			call dpm%p(i)%moveSpecies(dt)
 		end do
+		call CPU_TIME(time2)
+		r%cpt_temp(1) = r%cpt_temp(1) + (time2-time1)/r%mod
 
 		call applyBC(dpm)
 		do i=1, dpm%n
 			call dpm%a(i)%assignMatrix(dpm%m,dpm%p(i)%xp)
 		end do
 		call adjustGrid(dpm)
+		call CPU_TIME(time1)
+		r%cpt_temp(2) = r%cpt_temp(2) + (time1-time2)/r%mod
 
 		!charge assignment: rho_A
 		call chargeAssign(dpm%a,dpm%p,dpm%m)
+		call CPU_TIME(time2)
+		r%cpt_temp(3) = r%cpt_temp(3) + (time2-time1)/r%mod
 
 		call Dtarget_input(dpm,k,'rho_back')
 		call dpm%m%solveMesh(dpm%eps0)
+		call CPU_TIME(time1)
+		r%cpt_temp(4) = r%cpt_temp(4) + (time1-time2)/r%mod
 
 		!Electric field : E_A = -D*phi_A
 		dpm%m%E = - multiplyD(dpm%m%phi,dpm%m%dx,dpm%m%BCindex)
+		call CPU_TIME(time2)
+		r%cpt_temp(5) = r%cpt_temp(5) + (time2-time1)/r%mod
 
 		!Force assignment : mat'*E  (NOT E_A !!)
 		do i=1, dpm%n
 			call dpm%a(i)%forceAssign(dpm%p(i), pm%m)
 		end do
+		call CPU_TIME(time1)
+		r%cpt_temp(6) = r%cpt_temp(6) + (time1-time2)/r%mod
 
 		do i=1, dpm%n
 			call dpm%p(i)%accelSpecies(dt)
 		end do
+		call CPU_TIME(time2)
+		r%cpt_temp(7) = r%cpt_temp(7) + (time2-time1)/r%mod
 
 !		if( present(r) ) then
 !			call mcc_collision(this,r%n_coll(:,k))

@@ -15,6 +15,9 @@ module modRecord
 		real(mp), allocatable :: rhodata(:,:)
 		real(mp), allocatable :: PE(:), KE(:,:)
 		integer, allocatable :: n_coll(:,:)               !(species*collision type, time)
+
+		real(mp) :: cpt_temp(9)
+		real(mp), allocatable :: cpt_time(:,:)
 	contains
 		procedure, pass(this) :: buildRecord
 		procedure, pass(this) :: destroyRecord
@@ -44,6 +47,7 @@ contains
 		allocate(this%rhodata(ng,nr))
 		allocate(this%PE(nr))
 		allocate(this%KE(n,nr))
+		allocate(this%cpt_time(9,nr))
 
 		this%np = 0
 		this%phidata = 0.0_mp
@@ -51,6 +55,7 @@ contains
 		this%rhodata = 0.0_mp
 		this%PE = 0.0_mp
 		this%KE = 0.0_mp
+		this%cpt_time = 0.0_mp
 
 		if( present(input_dir) ) then
 			allocate(character(len=len(input_dir)) :: this%dir)
@@ -122,6 +127,7 @@ contains
 			this%Edata(:,kr+1) = pm%m%E
 			this%rhodata(:,kr+1) = pm%m%rho
 			this%PE(kr+1) = 0.5_mp*SUM(pm%m%E**2)*pm%m%dx
+			this%cpt_time(:,kr+1) = this%cpt_temp
 
 			print *, '============= ',k,'-th Time Step ================='
 			do n=1,pm%n
@@ -135,6 +141,7 @@ contains
 		class(recordData), intent(in) :: this
 		character(len=100) :: s
 		integer :: i,j
+		real(mp) :: total, mean, pct
 
 		open(unit=300,file='data/'//this%dir//'/record',status='replace')
 		open(unit=301,file='data/'//this%dir//'/E.bin',status='replace',form='unformatted',access='stream')
@@ -173,6 +180,81 @@ contains
 		do i=1,this%n
 			close(307+i)
 		end do
+
+701	FORMAT	(A, F10.3,'	',E10.3,'	', F10.2,'%')
+		if( SUM(this%cpt_time(8,:)).eq.0.0_mp ) then
+			print *, "================ Computation Time Summary ==================================="
+			print *, "Original simulation	   	     Total            Mean	 Percentage	"
+			total = SUM(this%cpt_time(1,:))*this%mod
+			mean = total/this%nt
+			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			print 701, "Particle Move			", total, mean, pct
+			total = SUM(this%cpt_time(2,:))*this%mod
+			mean = total/this%nt
+			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			print 701, "AssignMatrix			", total, mean, pct
+			total = SUM(this%cpt_time(3,:))*this%mod
+			mean = total/this%nt
+			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			print 701, "ChargeAssign			", total, mean, pct
+			total = SUM(this%cpt_time(4,:))*this%mod
+			mean = total/this%nt
+			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			print 701, "Poisson Solver			", total, mean, pct
+			total = SUM(this%cpt_time(5,:))*this%mod
+			mean = total/this%nt
+			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			print 701, "Efield Gradient			", total, mean, pct
+			total = SUM(this%cpt_time(6,:))*this%mod
+			mean = total/this%nt
+			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			print 701, "Force Assign			", total, mean, pct
+			total = SUM(this%cpt_time(7,:))*this%mod
+			mean = total/this%nt
+			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			print 701, "Particle Accel			", total, mean, pct
+			print *, "============================================================================="
+		else
+			print *, "================ Computation Time Summary ==================================="
+			print *, "Sensitivity simulation	  	     Total            Mean   	 Percentage	"
+			total = SUM(this%cpt_time(1,:))*this%mod
+			mean = total/this%nt
+			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			print 701, "Particle Move			", total, mean, pct
+			total = SUM(this%cpt_time(2,:))*this%mod
+			mean = total/this%nt
+			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			print 701, "AssignMatrix			", total, mean, pct
+			total = SUM(this%cpt_time(3,:))*this%mod
+			mean = total/this%nt
+			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			print 701, "ChargeAssign			", total, mean, pct
+			total = SUM(this%cpt_time(4,:))*this%mod
+			mean = total/this%nt
+			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			print 701, "Poisson Solver			", total, mean, pct
+			total = SUM(this%cpt_time(5,:))*this%mod
+			mean = total/this%nt
+			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			print 701, "Efield Gradient			", total, mean, pct
+			total = SUM(this%cpt_time(6,:))*this%mod
+			mean = total/this%nt
+			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			print 701, "Force Assign			", total, mean, pct
+			total = SUM(this%cpt_time(7,:))*this%mod
+			mean = total/this%nt
+			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			print 701, "Particle Accel			", total, mean, pct
+			total = SUM(this%cpt_time(8,:))*this%mod
+			mean = total/this%nt
+			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			print 701, "Sensitivity Source		", total, mean, pct
+			total = SUM(this%cpt_time(9,:))*this%mod
+			mean = total/this%nt
+			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			print 701, "Weight Update			", total, mean, pct
+			print *, "============================================================================="
+		end if
 	end subroutine
 
 end module
