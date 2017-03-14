@@ -6,12 +6,13 @@ module init
 
 contains
 
-	subroutine Debye_sensitivity_init(fs,Np,vT)
+	subroutine Debye_sensitivity_init(fs,Np,vT,input_str)
 		type(FSens), intent(inout) :: fs
 		integer, intent(in) :: Np
 		real(mp), intent(in) :: vT
+		character(len=*), intent(in), optional :: input_str
 		real(mp), allocatable :: xp0(:), vp0(:,:), spwt0(:)
-		real(mp) :: w, rho_back(fs%dpm%ng)
+		real(mp) :: w, rho_back(fs%dpm%ng), xg(fs%dpm%ng)
 		integer :: newN,Nx,i1, i2
 		Nx = INT(SQRT(Np*1.0_mp))
 		newN = Nx*Nx
@@ -36,9 +37,25 @@ contains
 			end do
 		end do
 
-		spwt0 = ( vp0(:,1)**2/vT/vT - 1.0_mp )/SQRT(2.0_mp*pi)/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
+		if( PRESENT(input_str) ) then
+			SELECT CASE(input_str)
+				CASE('vT')
+					spwt0 = ( vp0(:,1)**2/vT/vT - 1.0_mp )/SQRT(2.0_mp*pi)/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
+			!					*fs%dpm%L*w/EXP( -vp0(:,1)**2/2.0_mp/w/w )/newN
+								*fs%dpm%L*2.0_mp*fs%Lv/newN
+					rho_back = 0.0_mp
+				CASE('Q')
+					spwt0 = 0.0_mp
+					w = fs%dpm%L/10.0_mp
+					xg = (/ ((i1-0.5_mp)*fs%dpm%m%dx, i1=1,fs%dpm%ng) /)
+					rho_back = -1.0_mp/fs%dpm%L + 1.0_mp/SQRT(2.0_mp*pi)/w*EXP( -(xg-0.5_mp*fs%dpm%L)**2/2.0_mp/w/w  )
+			END SELECT
+		else		!Default case: vT
+			spwt0 = ( vp0(:,1)**2/vT/vT - 1.0_mp )/SQRT(2.0_mp*pi)/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
 !					*fs%dpm%L*w/EXP( -vp0(:,1)**2/2.0_mp/w/w )/newN
-					*fs%dpm%L*2.0_mp*fs%Lv/newN
+						*fs%dpm%L*2.0_mp*fs%Lv/newN
+			rho_back = 0.0_mp
+		end if
 
 !		call RANDOM_NUMBER(vp0)
 !		w = vT*5.0_mp
@@ -46,8 +63,6 @@ contains
 !		spwt0 = 2.0_mp*w/Np*( vp0(:,1)**2/vT/vT - 1.0_mp )/SQRT(2.0_mp*pi)/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )
 
 		call fs%dpm%p(1)%setSpecies(newN,xp0,vp0,spwt0)
-
-		rho_back = 0.0_mp
 		call fs%dpm%m%setMesh(rho_back)
 
 		deallocate(xp0)
@@ -104,6 +119,7 @@ contains
 		vp0 = pm%A0(1)*vp0
 		call RANDOM_NUMBER(xp0)
 		xp0 = L*xp0
+		xp0 = xp0 + randn(Np)*1.0E-10
 		spwt0 = L/Np
 
 		call pm%p(1)%setSpecies(Np,xp0,vp0,spwt0)
