@@ -25,7 +25,7 @@ program main
 !	call random_test
 !   call Landau_adjoint_sampling
 !   call twostream_adjoint_sampling
-!	call debye_shielding
+	call debye_shielding
 !	call debye_characterization
 !	call InjectionTest
 !	call MPITest
@@ -36,7 +36,7 @@ program main
 !	call updateWeightTest
 !	call debye_sensitivity_curve
 !	call adjoint_convergence_in_time(debye_adj)
-	call debye_sampling
+!	call debye_sampling
 
 	! print to screen
 	print *, 'program main...done.'
@@ -526,18 +526,18 @@ contains
 	subroutine debye_shielding
 		type(PM1D) :: d
 		type(recordData) :: r
-		real(mp) :: n0 = 1.0e10, lambda0 = 1.0e-2, vT = 1.5_mp
-		integer :: N = 100000, Ng = 64
+		real(mp) :: n0 = 1.0e10, lambda0 = 1.0e-2, vT = 1.0_mp
+		integer :: N = 100000, Ng = 128
 		real(mp) :: L = 20.0_mp, Wp, Q = 2.0_mp
 		real(mp) :: dt = 0.05_mp
-		real(mp) :: Time = 1500.0_mp
+		real(mp) :: Time = 30.0_mp
 		real(mp) :: A(2),J
 
 		A = (/ vT, lambda0 /)
 		call buildPM1D(d,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt)
-		call buildRecord(r,d%nt,1,d%L,d%ng,'debye',20)
+		call buildRecord(r,d%nt,1,d%L,d%ng,'debye3',20)
 
-		call buildSpecies(d%p(1),-1.0_mp,1.0_mp)
+		call buildSpecies(d%p(1),-3.0_mp,1.0_mp)
 		call Debye_initialize(d,N,Q)
 
 		call forwardsweep(d,r,Null_input,Null_source,Debye,J)
@@ -601,18 +601,18 @@ contains
 		type(PM1D) :: pm
 		type(FSens) :: fs
 		type(recordData) :: r, fsr
-		integer :: N=1E5, Ng=512
+		integer :: N=1E5, Ng=128
 		integer :: NInit=5E4, Ngv=32, NInject=5E3, NLimit=3E5
 		real(mp) :: L = 20.0_mp, Lv, Q = 2.0_mp
 		real(mp) :: dt=0.05_mp, dx
-		real(mp) :: Time = 5.0_mp, vT = 1.0_mp
+		real(mp) :: Time = 1.0_mp, vT = 1.0_mp
 		real(mp) :: A(2), J, grad
 		character(len=100)::dir
 		A = (/ vT, 0.0_mp /)
 
 		call buildPM1D(pm,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt)
 		dir = 'Debye_sensitivity'
-		call buildRecord(r,pm%nt,1,pm%L,pm%ng,trim(dir),1)
+		call buildRecord(r,pm%nt,1,pm%L,pm%ng,trim(dir),20)
 
 		call buildSpecies(pm%p(1),-1.0_mp,1.0_mp)
 		call Debye_initialize(pm,N,Q)
@@ -621,8 +621,8 @@ contains
 !		NInject = 5*N/pm%nt
 		call buildFSens(fs,pm,Lv,Ngv,NInject,NLimit)
 		dir = 'Debye_sensitivity/f_A'
-		call buildRecord(fsr,fs%dpm%nt,1,fs%dpm%L,fs%dpm%ng,trim(dir),1)
-		call Debye_sensitivity_init(fs,2*N,vT)
+		call buildRecord(fsr,fs%dpm%nt,1,fs%dpm%L,fs%dpm%ng,trim(dir),20)
+		call Debye_sensitivity_init(fs,2*N,vT,'Q')
 
 		call forwardsweep_sensitivity(pm,r,fs,fsr,Null_input,Null_source,Debye,J,grad)
 

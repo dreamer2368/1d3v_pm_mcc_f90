@@ -85,7 +85,7 @@ contains
 		xg=(/ ((i-0.5_mp)*pm%m%dx,i=1,pm%ng) /)
 
 		!Background charge + External charge
-		rho_back = 1.0_mp - Q/L + Q/sqrt(2.0_mp*pi)/w*exp( -(xg-0.5_mp*L)**2/2.0_mp/w/w )
+		rho_back = -pm%p(1)%qs - Q/L + Q/sqrt(2.0_mp*pi)/w*exp( -(xg-0.5_mp*L)**2/2.0_mp/w/w )
 		call pm%m%setMesh(rho_back)
 
 		!Uniform grid distribution
@@ -119,7 +119,6 @@ contains
 		vp0 = pm%A0(1)*vp0
 		call RANDOM_NUMBER(xp0)
 		xp0 = L*xp0
-		xp0 = xp0 + randn(Np)*1.0E-10
 		spwt0 = L/Np
 
 		call pm%p(1)%setSpecies(Np,xp0,vp0,spwt0)

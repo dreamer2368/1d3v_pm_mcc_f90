@@ -485,19 +485,19 @@ contains
 			grad_hist(k) = grad
 			call fsr%recordPlasma(fs%dpm, k)
 
-!			if( (fsr%mod.eq.1) .or. (mod(k,fsr%mod).eq.0) ) then
-!				kr = merge(k,k/fsr%mod,fsr%mod.eq.1)
-!				write(kstr,*) kr
-!				open(unit=305,file='data/'//fsr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
-!						status='replace',form='unformatted',access='stream')
-!				call fs%FSensDistribution
-!				write(305) fs%f_A
-!				close(305)
+			if( (fsr%mod.eq.1) .or. (mod(k,fsr%mod).eq.0) ) then
+				kr = merge(k,k/fsr%mod,fsr%mod.eq.1)
+				write(kstr,*) kr
+				open(unit=305,file='data/'//fsr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
+						status='replace',form='unformatted',access='stream')
+				call fs%FSensDistribution
+				write(305) fs%f_A
+				close(305)
 !				open(unit=305,file='data/'//fsr%dir//'/j_'//trim(adjustl(kstr))//'.bin',	&
 !						status='replace',form='unformatted',access='stream')
 !				write(305) fs%j
 !				close(305)
-!			end if
+			end if
 		end do
 		open(unit=305,file='data/'//fsr%dir//'/grad_hist.bin',	&
 					status='replace',form='unformatted',access='stream')
