@@ -183,77 +183,99 @@ contains
 
 701	FORMAT	(A, F10.3,'	',E10.3,'	', F10.2,'%')
 		if( SUM(this%cpt_time(8,:)).eq.0.0_mp ) then
+			open(unit=301,file='data/'//this%dir//'/original_cpt_summary.dat',status='replace')
+			write(301,*) 'Step	Total	Mean	Percentage'
 			print *, "================ Computation Time Summary ==================================="
 			print *, "Original simulation	   	     Total            Mean	 Percentage	"
 			total = SUM(this%cpt_time(1,:))*this%mod
 			mean = total/this%nt
 			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
 			print 701, "Particle Move			", total, mean, pct
+			write(301,701) 'Particle-Move	', total, mean, pct
 			total = SUM(this%cpt_time(2,:))*this%mod
 			mean = total/this%nt
 			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
 			print 701, "AssignMatrix			", total, mean, pct
+			write(301,701) 'Assign-Matrix	', total, mean, pct
 			total = SUM(this%cpt_time(3,:))*this%mod
 			mean = total/this%nt
 			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
 			print 701, "ChargeAssign			", total, mean, pct
+			write(301,701) 'Charge-Assign	', total, mean, pct
 			total = SUM(this%cpt_time(4,:))*this%mod
 			mean = total/this%nt
 			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
 			print 701, "Poisson Solver			", total, mean, pct
+			write(301,701) 'Poisson-Solver	', total, mean, pct
 			total = SUM(this%cpt_time(5,:))*this%mod
 			mean = total/this%nt
 			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
 			print 701, "Efield Gradient			", total, mean, pct
+			write(301,701) 'Efield-Gradient	', total, mean, pct
 			total = SUM(this%cpt_time(6,:))*this%mod
 			mean = total/this%nt
 			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
 			print 701, "Force Assign			", total, mean, pct
+			write(301,701) 'Force-Assign	', total, mean, pct
 			total = SUM(this%cpt_time(7,:))*this%mod
 			mean = total/this%nt
 			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
 			print 701, "Particle Accel			", total, mean, pct
+			write(301,701) 'Particle-Accel	', total, mean, pct
 			print *, "============================================================================="
+			close(301)
 		else
+			open(unit=301,file='data/'//this%dir//'/sensitivity_cpt_summary.dat',status='replace')
+			write(301,*) 'Step	Total	Mean	Percentage'
 			print *, "================ Computation Time Summary ==================================="
 			print *, "Sensitivity simulation	  	     Total            Mean   	 Percentage	"
 			total = SUM(this%cpt_time(1,:))*this%mod
 			mean = total/this%nt
 			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
 			print 701, "Particle Move			", total, mean, pct
+			write(301,701) 'Particle-Move	', total, mean, pct
 			total = SUM(this%cpt_time(2,:))*this%mod
 			mean = total/this%nt
 			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
 			print 701, "AssignMatrix			", total, mean, pct
+			write(301,701) 'Assign-Matrix	', total, mean, pct
 			total = SUM(this%cpt_time(3,:))*this%mod
 			mean = total/this%nt
 			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
 			print 701, "ChargeAssign			", total, mean, pct
+			write(301,701) 'Charge-Assign	', total, mean, pct
 			total = SUM(this%cpt_time(4,:))*this%mod
 			mean = total/this%nt
 			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
 			print 701, "Poisson Solver			", total, mean, pct
+			write(301,701) 'Poisson-Solver	', total, mean, pct
 			total = SUM(this%cpt_time(5,:))*this%mod
 			mean = total/this%nt
 			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
 			print 701, "Efield Gradient			", total, mean, pct
+			write(301,701) 'Efield-Gradient	', total, mean, pct
 			total = SUM(this%cpt_time(6,:))*this%mod
 			mean = total/this%nt
 			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
 			print 701, "Force Assign			", total, mean, pct
+			write(301,701) 'Force-Assign	', total, mean, pct
 			total = SUM(this%cpt_time(7,:))*this%mod
 			mean = total/this%nt
 			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
 			print 701, "Particle Accel			", total, mean, pct
+			write(301,701) 'Particle-Accel	', total, mean, pct
 			total = SUM(this%cpt_time(8,:))*this%mod
 			mean = total/this%nt
 			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
 			print 701, "Sensitivity Source		", total, mean, pct
+			write(301,701) 'Sensitivity-Source	', total, mean, pct
 			total = SUM(this%cpt_time(9,:))*this%mod
 			mean = total/this%nt
 			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
 			print 701, "Weight Update			", total, mean, pct
+			write(301,701) 'Weight-update	', total, mean, pct
 			print *, "============================================================================="
+			close(301)
 		end if
 	end subroutine
 
