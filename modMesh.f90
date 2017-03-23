@@ -9,6 +9,7 @@ module modMesh
 		real(mp) :: L, dx
 
 		real(mp), allocatable :: E(:)
+!		real(mp), dimension(:), pointer :: rho=>NULL()	!For future devolopment of pointer-use
 		real(mp), allocatable :: rho(:)
 		real(mp), allocatable :: rho_back(:)				!1D sheath: surface charge
 		real(mp), allocatable :: phi(:)

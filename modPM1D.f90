@@ -1,7 +1,6 @@
 module modPM1D
 
-	use modSpecies
-	use modMesh
+	use modBC
 	use modAssign
 
 	implicit none
@@ -15,6 +14,8 @@ module modPM1D
 		type(species), allocatable :: p(:)
 		type(mesh) :: m
 		type(pmAssign), allocatable :: a(:)
+
+		procedure(applyBC), nopass, pointer :: applyBC
 	contains
 		procedure, pass(this) :: buildPM1D
 		procedure, pass(this) :: destroyPM1D
@@ -71,8 +72,19 @@ contains
 		call buildMesh(this%m,this%L,Ng,this%mBCindex)
 		allocate(this%a(N))
 		do i=1,N
-			call buildAssign(this%a(i),Ng,order)
+			call buildAssign(this%a(i),Ng,order,this%mBCindex)
 		end do
+
+		select case(pBC)
+			case(0)	!periodic
+				this%applyBC=>applyBC_periodic
+			case(1) !absorbing-absorbing
+				this%applyBC=>applyBC_absorbing
+			case(2) !refluxing-absorbing
+				this%applyBC=>applyBC_refluxing_absorbing
+			case(3) !refluxing-refluxing
+				this%applyBC=>applyBC_refluxing_refluxing
+		end select
 	end subroutine
 
 	subroutine destroyPM1D(this)

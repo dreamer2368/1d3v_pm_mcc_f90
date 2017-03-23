@@ -6,6 +6,43 @@ module init
 
 contains
 
+	subroutine Debye_sensitivity_init_sync(fs,pm,vT,input_str)
+		type(FSens), intent(inout) :: fs
+		type(PM1D), intent(in) :: pm
+		real(mp), intent(in) :: vT
+		character(len=*), intent(in), optional :: input_str
+		real(mp) :: xp0(pm%p(1)%np), vp0(pm%p(1)%np,3), spwt0(pm%p(1)%np)
+		real(mp) :: w, rho_back(fs%dpm%ng), xg(fs%dpm%ng)
+		integer :: N,i1, i2
+		N = pm%p(1)%np
+		xp0 = pm%p(1)%xp
+		vp0 = pm%p(1)%vp
+
+		if( PRESENT(input_str) ) then
+			SELECT CASE(input_str)
+				CASE('vT')
+					spwt0 = ( vp0(:,1)**2/vT/vT - 1.0_mp )/SQRT(2.0_mp*pi)/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
+								*fs%dpm%L*2.0_mp*fs%Lv/N
+					rho_back = 0.0_mp
+				CASE('Q')
+					spwt0 = 0.0_mp
+					w = fs%dpm%L/10.0_mp
+					xg = (/ ((i1-0.5_mp)*fs%dpm%m%dx, i1=1,fs%dpm%ng) /)
+					rho_back = -1.0_mp/fs%dpm%L + 1.0_mp/SQRT(2.0_mp*pi)/w*EXP( -(xg-0.5_mp*fs%dpm%L)**2/2.0_mp/w/w  )
+				CASE('qp')
+					spwt0 = 0.0_mp
+					rho_back = -1.0_mp
+			END SELECT
+		else		!Default case: vT
+			spwt0 = ( vp0(:,1)**2/vT/vT - 1.0_mp )/SQRT(2.0_mp*pi)/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
+						*fs%dpm%L*2.0_mp*fs%Lv/N
+			rho_back = 0.0_mp
+		end if
+
+		call fs%dpm%p(1)%setSpecies(N,xp0,vp0,spwt0)
+		call fs%dpm%m%setMesh(rho_back)
+	end subroutine
+
 	subroutine Debye_sensitivity_init(fs,Np,vT,input_str)
 		type(FSens), intent(inout) :: fs
 		integer, intent(in) :: Np
@@ -49,6 +86,9 @@ contains
 					w = fs%dpm%L/10.0_mp
 					xg = (/ ((i1-0.5_mp)*fs%dpm%m%dx, i1=1,fs%dpm%ng) /)
 					rho_back = -1.0_mp/fs%dpm%L + 1.0_mp/SQRT(2.0_mp*pi)/w*EXP( -(xg-0.5_mp*fs%dpm%L)**2/2.0_mp/w/w  )
+				CASE('qp')
+					spwt0 = 0.0_mp
+					rho_back = -1.0_mp
 			END SELECT
 		else		!Default case: vT
 			spwt0 = ( vp0(:,1)**2/vT/vT - 1.0_mp )/SQRT(2.0_mp*pi)/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
@@ -99,14 +139,14 @@ contains
 !		xp0 = 0.0_mp
 !		vp0 = 0.0_mp
 !		spwt0 = 0.0_mp
-!
+
 !		do i2=1,Nx
 !			do i1=1,Nx
 !				xp0(i1+Nx*(i2-1)) = (i1-0.5_mp)*pm%L/Nx
 !				vp0(i1+Nx*(i2-1),:) = (i2-0.5_mp)*2.0_mp*Lv/Nx - 1.0_mp*Lv
 !			end do
 !		end do
-!
+
 !		spwt0 = 1/SQRT(2.0_mp*pi)/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
 !					*pm%L*2.0_mp*Lv/newN
 

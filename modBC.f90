@@ -1,41 +1,29 @@
 module modBC
 
-	use modPM1D
+	use modSpecies
+	use modMesh
 	use random
 
 	implicit none
+
+	abstract interface
+		subroutine applyBC(p,m,dt,A0)
+			use modSpecies
+			use modMesh
+			type(species), intent(inout) :: p
+			type(mesh), intent(inout) :: m
+			real(mp), intent(in) :: dt, A0
+		end subroutine
+	end interface
 
 contains
 
 !==============================particle BC=====================================
 
-	subroutine applyBC(pm)
-		type(PM1D), intent(inout) :: pm
-		integer :: i
-
-		select case(pm%pBCindex)
-			case(0)	!periodic
-				do i=1,pm%n
-					call applyBC_periodic(pm%p(i),pm%m)
-				end do
-			case(1) !absorbing-absorbing
-				do i=1,pm%n
-					call applyBC_absorbing(pm%p(i),pm%m)
-				end do
-			case(2) !refluxing-absorbing
-				do i=1,pm%n
-					call applyBC_refluxing_absorbing(pm%p(i),pm%m,pm%dt,pm%A0(i))
-				end do
-			case(3) !refluxing-refluxing
-				do i=1,pm%n
-					call applyBC_refluxing_refluxing(pm%p(i),pm%m,pm%dt,pm%A0(i))
-				end do
-		end select
-	end subroutine
-
-	subroutine applyBC_periodic(p,m)
+	subroutine applyBC_periodic(p,m,dt,A0)
 		type(species), intent(inout) :: p
 		type(mesh), intent(inout) :: m
+		real(mp), intent(in) :: dt, A0
 		integer :: i
 
 		!apply BC
@@ -48,9 +36,10 @@ contains
 		end do
 	end subroutine
 
-	subroutine applyBC_absorbing(p,m)
+	subroutine applyBC_absorbing(p,m,dt,A0)
 		type(species), intent(inout) :: p
 		type(mesh), intent(inout) :: m
+		real(mp), intent(in) :: dt, A0
 		integer :: i, np1
 		real(mp), allocatable :: vec(:), vec2(:,:)
 
@@ -180,74 +169,6 @@ contains
 				call RANDOM_NUMBER(temp)
 				p%xp(i) = m%L + temp(1)*dt*p%vp(i,1)
 			end if			
-		end do
-	end subroutine
-
-!===========================grid adjustment for BC=============================
-
-	subroutine adjustGrid(pm)
-		type(PM1D), intent(inout) :: pm
-		integer :: i
-
-		select case(pm%mBCindex)
-			case(0)	!periodic
-				do i=1,pm%n
-					call adjustGrid_periodic(pm%a(i))
-				end do
-			case(1)	!Dirichlet-Dirichlet
-				do i=1,pm%n
-					call adjustGrid_absorbing(pm%a(i),pm%p(i))
-				end do
-			case(2)	!Dirichlet-Neumann
-				do i=1,pm%n
-					call adjustGrid_absorbing(pm%a(i),pm%p(i))
-				end do
-		end select
-	end subroutine
-
-	subroutine adjustGrid_periodic(a)
-		type(pmassign), intent(inout) :: a
-		integer :: i
-
-		do i=1,a%np
-			if( a%g(i,1)<1 ) then
-				a%g(i,1) = a%g(i,1) + a%ng
-			elseif( a%g(i,1)>a%ng ) then
-				a%g(i,1) = a%g(i,1) - a%ng
-			end if
-			if( a%g(i,2)<1 ) then
-				a%g(i,2) = a%g(i,2) + a%ng
-			elseif( a%g(i,2)>a%ng ) then
-				a%g(i,2) = a%g(i,2) - a%ng
-			end if
-		end do
-
-		if( MINVAL(a%g(:,1))<1 .or. MAXVAL(a%g(:,2))>a%ng ) then
-			print *, MINLOC(a%g(:,1)),MINVAL(a%g(:,1)),MAXLOC(a%g(:,2)), MAXVAL(a%g(:,2))
-			print *, 'Boundary handling is failed. particle is way outside BC. stopped time stepping.'
-			stop
-		end if
-	end subroutine
-
-	subroutine adjustGrid_absorbing(a,p)
-		type(pmassign), intent(inout) :: a
-		type(species), intent(in) :: p
-		integer :: i
-
-		if( MINVAL(a%g(:,1))<1 .or. MAXVAL(a%g(:,2))>a%ng ) then
-			print *, MINVAL(a%g(:,1)), p%xp(minloc(a%g(:,1))), MAXVAL(a%g(:,2)), p%xp(maxloc(a%g(:,2)))
-			print *, 'Boundary handling is failed. particle is way outside BC. stopped time stepping.'
-			stop
-		end if
-
-		!adjustment for boundary : charge/(dx/2)
-		do i=1,a%np
-			if( a%g(i,1).eq.1 ) then
-				a%frac(i,1) = a%frac(i,1)*2.0_mp
-			end if
-			if( a%g(i,2).eq.a%ng ) then
-				a%frac(i,2) = a%frac(i,2)*2.0_mp
-			end if
 		end do
 	end subroutine
 

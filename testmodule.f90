@@ -73,6 +73,8 @@ contains
 		real(mp), parameter :: L = 1.0_mp, Lv=0.5_mp, w = 0.1_mp
 		integer, parameter :: Ng=64, N=2E6, NInject=1E6
 		integer :: i,k
+		integer :: g(2)
+		real(mp) :: frac(2)
 		real(mp) :: xp0(N), vp0(N,3), spwt0(N)
 		real(mp), dimension(Ng,Ng+1) :: j
 
@@ -91,9 +93,14 @@ contains
 		spwt0 = 1.0_mp/N
 		call fs%dpm%p(1)%setSpecies(N,xp0,vp0,spwt0)
 
-		call applyBC(fs%dpm)
-		call fs%dpm%a(1)%assignMatrix(fs%dpm%m,fs%dpm%p(1)%xp)
-		call adjustGrid(fs%dpm)
+		call fs%dpm%applyBC(fs%dpm%p(1),fs%dpm%m,fs%dpm%dt,fs%dpm%A0(1))
+		!X-direction Interpolation
+		do k=1,N
+			CALL fs%dpm%a(1)%assignMatrix(xp0(k),pm%m%dx,g,frac)
+			CALL fs%dpm%a(1)%adjustGrid(fs%dpm%m%ng,g,frac)
+			fs%dpm%a(1)%g(:,k) = g
+			fs%dpm%a(1)%frac(:,k) = frac
+		end do
 
 		call fs%FSensDistribution
 
@@ -138,6 +145,8 @@ contains
 		real(mp), parameter :: L = 1.0_mp, Lv=0.5_mp, w = 0.1_mp
 		integer, parameter :: Ng=64, N=2E6, NInject=1E6
 		integer :: i,k
+		integer :: g(2)
+		real(mp) :: frac(2)
 		real(mp) :: xp0(N), vp0(N,3), spwt0(N)
 
 		call pm%buildPM1D(Tf,Ti,Ng,N=1,pBC=0,mBC=0,order=1,L=L,dt=dt)
@@ -153,9 +162,14 @@ contains
 		spwt0 = pm%L*SIN(2.0_mp*pi*xp0/pm%L)/N
 		call fs%dpm%p(1)%setSpecies(N,xp0,vp0,spwt0)
 
-		call applyBC(fs%dpm)
-		call fs%dpm%a(1)%assignMatrix(fs%dpm%m,fs%dpm%p(1)%xp)
-		call adjustGrid(fs%dpm)
+		call fs%dpm%applyBC(fs%dpm%p(1),fs%dpm%m,fs%dpm%dt,fs%dpm%A0(1))
+		!X-direction Interpolation
+		do k=1,N
+			CALL fs%dpm%a(1)%assignMatrix(xp0(k),pm%m%dx,g,frac)
+			CALL fs%dpm%a(1)%adjustGrid(fs%dpm%m%ng,g,frac)
+			fs%dpm%a(1)%g(:,k) = g
+			fs%dpm%a(1)%frac(:,k) = frac
+		end do
 
 		call fs%FSensDistribution
 
@@ -204,6 +218,8 @@ contains
 		real(mp), parameter :: L = 20.0_mp, Lv=5.0_mp, w = 1.0_mp
 		integer, parameter :: Ng=256, N=1000000, NInit=1000000
 		integer :: i,k
+		integer :: g(2)
+		real(mp) :: frac(2)
 		real(mp) :: xp0(N), vp0(N,3), spwt0(N)
 
 		call pm%buildPM1D(Tf,Ti,Ng,N=1,pBC=0,mBC=0,order=1,L=L,dt=dt,A=(/vT/))
@@ -216,9 +232,14 @@ contains
 		close(300)
 
 		call Debye_sensitivity_init(fs,NInit,fs%dpm%A0(1))
-		call applyBC(fs%dpm)
-		call fs%dpm%a(1)%assignMatrix(fs%dpm%m,fs%dpm%p(1)%xp)
-		call adjustGrid(fs%dpm)
+		call fs%dpm%applyBC(fs%dpm%p(1),fs%dpm%m,fs%dpm%dt,fs%dpm%A0(1))
+		!X-direction Interpolation
+		do k=1,N
+			CALL fs%dpm%a(1)%assignMatrix(fs%dpm%p(1)%xp(k),pm%m%dx,g,frac)
+			CALL fs%dpm%a(1)%adjustGrid(fs%dpm%m%ng,g,frac)
+			fs%dpm%a(1)%g(:,k) = g
+			fs%dpm%a(1)%frac(:,k) = frac
+		end do
 		fs%dpm%m%E = 1.0_mp
 		call fs%FSensSourceTerm(fs%dpm)
 
@@ -265,6 +286,8 @@ contains
 		real(mp), parameter :: L = 1.0_mp, Lv=0.5_mp, w = 0.1_mp
 		integer, parameter :: Ng=64, N=1000000, NInject=1000000
 		integer :: i,k
+		integer :: g(2)
+		real(mp) :: frac(2)
 		real(mp) :: xp0(N), vp0(N,3), spwt0(N)
 
 		call pm%buildPM1D(Tf,Ti,Ng,N=1,pBC=0,mBC=0,order=1,L=L,dt=dt)
@@ -283,9 +306,14 @@ contains
 !		fs%dpm%m%E = 1.0_mp
 		fs%dpm%m%E = (/ (SIN( 2.0_mp*pi*i/Ng ),i=1,Ng) /)
 
-		call applyBC(pm)
-		call pm%a(1)%assignMatrix(pm%m,pm%p(1)%xp)
-		call adjustGrid(pm)
+		call pm%applyBC(pm%p(1),pm%m,pm%dt,pm%A0(1))
+		!X-direction Interpolation
+		do k=1,N
+			CALL pm%a(1)%assignMatrix(pm%p(1)%xp(k),pm%m%dx,g,frac)
+			CALL pm%a(1)%adjustGrid(pm%m%ng,g,frac)
+			pm%a(1)%g(:,k) = g
+			pm%a(1)%frac(:,k) = frac
+		end do
 
 		call fs%FSensSourceTerm(pm)
 
@@ -315,9 +343,14 @@ contains
 		close(304)
 		call fs%InjectSource(fs%j,fs%NInject)
 
-		call applyBC(fs%dpm)
-		call fs%dpm%a(1)%assignMatrix(fs%dpm%m,fs%dpm%p(1)%xp)
-		call adjustGrid(fs%dpm)
+		call fs%dpm%applyBC(fs%dpm%p(1),fs%dpm%m,fs%dpm%dt,fs%dpm%A0(1))
+		!X-direction Interpolation
+		do k=1,N
+			CALL fs%dpm%a(1)%assignMatrix(fs%dpm%p(1)%xp(k),pm%m%dx,g,frac)
+			CALL fs%dpm%a(1)%adjustGrid(fs%dpm%m%ng,g,frac)
+			fs%dpm%a(1)%g(:,k) = g
+			fs%dpm%a(1)%frac(:,k) = frac
+		end do
 		call fs%FSensDistribution
 
 		open(unit=301,file='data/InjectionTest/xp_inject.bin',status='replace',form='unformatted',access='stream')
@@ -601,13 +634,12 @@ contains
 		call setMesh(pm%m,rho_back)
 		!one time-step
 		call moveSpecies(pm%p(1),pm%dt)
-		call applyBC(pm)
-		call assignMatrix(pm%a(1),pm%m,pm%p(1)%xp)
-		call adjustGrid(pm)
-		call chargeAssign(pm%a,pm%p,pm%m)
+		call pm%applyBC(pm%p(1),pm%m,pm%dt,pm%A0(1))
+		pm%m%rho = 0.0_mp
+		call pm%a(1)%chargeAssign(pm%p(i),pm%m)
 		call solveMesh(pm%m,pm%eps0)
 		pm%m%E = - multiplyD(pm%m%phi,pm%m%dx,pm%m%BCindex)
-		call forceAssign(pm%a(1), pm%p(1), pm%m)
+		call pm%a(1)%forceAssign(pm%p(1), pm%m)
 		call accelSpecies(pm%p(1),pm%dt)
 		!QoI
 		J0 = sum( pm%p(1)%vp(:,1)**2 )
@@ -645,10 +677,9 @@ contains
 		call setSpecies(pm%p(1),Np,xp,vp,spwt)
 
 		call moveSpecies(pm%p(1),pm%dt)
-		call applyBC(pm)
-		call assignMatrix(pm%a(1),pm%m,pm%p(1)%xp)
-		call adjustGrid(pm)
-		call chargeAssign(pm%a,pm%p,pm%m)
+		call pm%applyBC(pm%p(1),pm%m,pm%dt,pm%A0(1))
+		pm%m%rho = 0.0_mp
+		call pm%a(1)%chargeAssign(pm%p(i),pm%m)
 		call solveMesh(pm%m,pm%eps0)
 		pm%m%E = - multiplyD(pm%m%phi,pm%m%dx,pm%m%BCindex)
 		call forceAssign(pm%a(1), pm%p(1), pm%m)
@@ -683,7 +714,7 @@ contains
 		call setSpecies(reflux%p(1),N,xp0,vp0,spwt0)
 		call setMesh(reflux%m,rho_back)
 
-		call applyBC(reflux)
+		call reflux%applyBC(reflux%p(1),reflux%m,reflux%dt,reflux%A0(1))
 		call recordPlasma(r,reflux,1)
 		call printPlasma(r)
 

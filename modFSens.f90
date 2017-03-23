@@ -67,6 +67,7 @@ contains
 		integer :: i,k, g(pm%a(1)%order+1)
 		integer :: vgl, vgr
 		real(mp) :: vp, g0, h
+		real(mp) :: E_temp(pm%m%ng)
 
 		!F to phase space
 		this%j = 0.0_mp
@@ -77,10 +78,10 @@ contains
 				vgl = g0 + this%ngv+1
 				vgr = vgl+1
 				if( vgl<1 .or. vgr>2*this%ngv+1 )	cycle
-				g = pm%a(i)%g(k,:)
+				g = pm%a(i)%g(:,k)
 				h = vp/this%dv - g0
-				this%j(g,vgl) = this%j(g,vgl) + (1.0_mp-h)*pm%p(i)%spwt(k)/pm%m%dx/this%dv*pm%a(i)%frac(k,:)
-				this%j(g,vgr) = this%j(g,vgr) + h*pm%p(i)%spwt(k)/pm%m%dx/this%dv*pm%a(i)%frac(k,:)
+				this%j(g,vgl) = this%j(g,vgl) + (1.0_mp-h)*pm%p(i)%spwt(k)/pm%m%dx/this%dv*pm%a(i)%frac(:,k)
+				this%j(g,vgr) = this%j(g,vgr) + h*pm%p(i)%spwt(k)/pm%m%dx/this%dv*pm%a(i)%frac(:,k)
 			end do
 			this%j(:,1) = this%j(:,1)*2.0_mp
 			this%j(:,2*this%ngv+1) = this%j(:,2*this%ngv+1)*2.0_mp
@@ -103,13 +104,17 @@ contains
 			end if
 		end if
 
-		!Multiply E_A
+		!Multiply E_A, E
+		!v_T,Q
+		E_temp = pm%p(1)%qs/pm%p(1)%ms*this%dpm%m%E
+		!qp
+!		E_temp = pm%p(1)%qs/pm%p(1)%ms*this%dpm%m%E + 1.0_mp/pm%p(1)%ms*pm%m%E
 		do i=1,2*this%ngv+1
-			this%j(:,i) = this%j(:,i)*this%dpm%m%E
+			this%j(:,i) = this%j(:,i)*E_temp
 		end do
 
 		!Multiply dt
-		this%j = this%j*pm%dt
+		this%j = -this%j*pm%dt
 	end subroutine
 
 	subroutine InjectSource(this,f,N)
@@ -130,8 +135,12 @@ contains
 		integer :: Nx, newN
 		integer :: i,i1,i2,k,Np,nk
 		integer :: vgl, vgr
-		real(mp) :: w, h
+		real(mp) :: w, h, dx,dv
+		integer :: g(this%dpm%a(1)%order+1)
+		real(mp) :: fx(this%dpm%a(1)%order+1)
 		real(mp), allocatable :: frac(:,:)
+		dx = this%dpm%m%dx
+		dv = this%dv
 		Nx = INT(SQRT(N*1.0_mp))
 		newN = Nx*Nx
 !		newN = N
@@ -173,19 +182,11 @@ contains
 			end do
 
 			!X-direction Interpolation
-			call this%dpm%a(i)%assignMatrix(this%dpm%m,xp0)
-			!Adjust grid for periodic BC
 			do k=1,newN
-				if( this%dpm%a(i)%g(k,1)<1 ) then
-					this%dpm%a(i)%g(k,1) = this%dpm%a(i)%g(k,1) + this%dpm%m%ng
-				elseif( this%dpm%a(i)%g(k,1)>this%dpm%m%ng ) then
-					this%dpm%a(i)%g(k,1) = this%dpm%a(i)%g(k,1) - this%dpm%m%ng
-				end if
-				if( this%dpm%a(i)%g(k,2)<1 ) then
-					this%dpm%a(i)%g(k,2) = this%dpm%a(i)%g(k,2) + this%dpm%m%ng
-				elseif( this%dpm%a(i)%g(k,2)>this%dpm%m%ng ) then
-					this%dpm%a(i)%g(k,2) = this%dpm%a(i)%g(k,2) - this%dpm%m%ng
-				end if
+				CALL this%dpm%a(i)%assignMatrix(xp0(k),dx,g,fx)
+				CALL this%dpm%a(i)%adjustGrid(this%dpm%m%ng,g,fx)
+				this%dpm%a(i)%g(:,k) = g
+				this%dpm%a(i)%frac(:,k) = fx
 			end do
 
 			!V-direction Interpolation and determine spwt
@@ -201,9 +202,9 @@ contains
 				end if
 
 				h = vp0(k,1)/this%dv - FLOOR(vp0(k,1)/this%dv)
-				frac(:,1) = this%dpm%a(i)%frac(k,:)*(1.0_mp-h)
-				frac(:,2) = this%dpm%a(i)%frac(k,:)*h
-				spwt0(k) = SUM( f(this%dpm%a(i)%g(k,:),(/vgl,vgr/))*frac )	&
+				frac(:,1) = this%dpm%a(i)%frac(:,k)*(1.0_mp-h)
+				frac(:,2) = this%dpm%a(i)%frac(:,k)*h
+				spwt0(k) = SUM( f(this%dpm%a(i)%g(:,k),(/vgl,vgr/))*frac )	&
 !								*this%dpm%L*sqrt(2.0_mp*pi)*w/EXP( -vp0(k,1)**2/2.0_mp/w/w )
 								*this%dpm%L*2.0_mp*this%Lv
 			end do
@@ -225,10 +226,10 @@ contains
 				vgl = FLOOR(vp/this%dv) + this%ngv+1
 				vgr = vgl+1
 				if( vgl<1 .or. vgr>2*this%ngv+1 )	cycle
-				g = this%dpm%a(i)%g(k,:)
+				g = this%dpm%a(i)%g(:,k)
 				h = vp/this%dv - FLOOR(vp/this%dv)
-				this%f_A(g,vgl) = this%f_A(g,vgl) + (1.0_mp-h)*this%dpm%p(i)%spwt(k)/this%dpm%m%dx/this%dv*this%dpm%a(i)%frac(k,:)
-				this%f_A(g,vgr) = this%f_A(g,vgr) + h*this%dpm%p(i)%spwt(k)/this%dpm%m%dx/this%dv*this%dpm%a(i)%frac(k,:)
+				this%f_A(g,vgl) = this%f_A(g,vgl) + (1.0_mp-h)*this%dpm%p(i)%spwt(k)/this%dpm%m%dx/this%dv*this%dpm%a(i)%frac(:,k)
+				this%f_A(g,vgr) = this%f_A(g,vgr) + h*this%dpm%p(i)%spwt(k)/this%dpm%m%dx/this%dv*this%dpm%a(i)%frac(:,k)
 			end do
 			this%f_A(:,1) = this%f_A(:,1)*2.0_mp
 			this%f_A(:,2*this%ngv+1) = this%f_A(:,2*this%ngv+1)*2.0_mp
@@ -273,11 +274,11 @@ contains
 					frac_xv(:,:,k) = 0.0_mp
 					cycle
 				end if
-				g = this%dpm%a(i)%g(k,:)
+				g = this%dpm%a(i)%g(:,k)
 				g_v(:,k) = (/ vgl, vgr /)
 				h = vp/this%dv - FLOOR(vp/this%dv)
-				frac_xv(:,1,k) = (1.0_mp-h)*this%dpm%a(i)%frac(k,:)
-				frac_xv(:,2,k) = h*this%dpm%a(i)%frac(k,:)
+				frac_xv(:,1,k) = (1.0_mp-h)*this%dpm%a(i)%frac(:,k)
+				frac_xv(:,2,k) = h*this%dpm%a(i)%frac(:,k)
 !				this%f_A(g,g_v(:,k)) = this%f_A(g,g_v(:,k)) + frac_xv(:,:,k)/this%dpm%m%dx/this%dv
 				n_temp(g,g_v(:,k)) = n_temp(g,g_v(:,k)) + frac_xv(:,:,k)/this%dpm%m%dx/this%dv
 			end do
@@ -300,7 +301,7 @@ contains
 
 			!Update weight
 			do k = 1, this%dpm%p(i)%np
-				g = this%dpm%a(i)%g(k,:)
+				g = this%dpm%a(i)%g(:,k)
 				this%dpm%p(i)%spwt(k) = this%dpm%p(i)%spwt(k)	&
 													+ SUM( j(g,g_v(:,k))*frac_xv(:,:,k)/this%f_A(g,g_v(:,k)) )
 			end do

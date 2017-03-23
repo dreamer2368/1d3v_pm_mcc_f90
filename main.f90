@@ -4,7 +4,7 @@ program main
 
 	implicit none
 
-	real(mp) :: output(2) = (/(0.1_mp)**5,0.0_mp/)
+	real(mp) :: output(2) = (/(0.1_mp)**3,0.0_mp/)
 
 	! print to screen
 	print *, 'calling program main'
@@ -20,21 +20,21 @@ program main
 !	call test_particle_adj(64,2)
 !	call test_backward_sweep
 !	call twostream_adj(output(1),output(2))
-!	call Landau(0.0_mp, 60.0_mp, ,'Landau', 1,output )
-!	call adjoint_convergence(Landau)
+!	call Landau(0.0_mp, 6.0_mp ,'Landau', 1,output )
 !	call random_test
 !   call Landau_adjoint_sampling
 !   call twostream_adjoint_sampling
-	call debye_shielding
+!	call debye_shielding
 !	call debye_characterization
 !	call InjectionTest
 !	call MPITest
 !	call SensitivityInitializeTest
-!	call Debye_sensitivity
+	call Debye_sensitivity
 !	call forYeoh
 !	call RedistributionTest
 !	call updateWeightTest
 !	call debye_sensitivity_curve
+!	call adj_convergence(twostream_grad)
 !	call adjoint_convergence_in_time(debye_adj)
 !	call debye_sampling
 
@@ -296,7 +296,7 @@ contains
 	end subroutine
 
 	subroutine adjoint_convergence_in_time(problem)
-		integer, parameter :: N=23, Nt=4
+		integer, parameter :: N=23, Nt=1
 		real(mp) :: fk(N)
 		real(mp) :: Tk(Nt)
 		real(mp) :: ek(N,Nt)
@@ -319,7 +319,7 @@ contains
 		end interface
 
 		fk = (/ (EXP(-1.0_mp*(i-1)),i=1,N) /)
-		Tk = (/ 0.1_mp, 30.0_mp, 150.0_mp, 750.0_mp /)
+		Tk = (/ 3.0_mp /)
 		ek = 0.0_mp
 
 		dir = 'debye_adj_test'
@@ -366,7 +366,7 @@ contains
 		real(mp), dimension(N) :: fk,ek
 		real(mp) :: Time=0.1_mp
 		integer :: i
-		dir = 'debye_adj_test'
+		dir = 'adj_test'
 
 		fk = (/ (EXP(-1.0_mp*(i-1)),i=1,N) /)
 		ek = 0.0_mp
@@ -535,9 +535,9 @@ contains
 
 		A = (/ vT, lambda0 /)
 		call buildPM1D(d,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt)
-		call buildRecord(r,d%nt,1,d%L,d%ng,'debye3',20)
+		call buildRecord(r,d%nt,1,d%L,d%ng,'debye',20)
 
-		call buildSpecies(d%p(1),-3.0_mp,1.0_mp)
+		call buildSpecies(d%p(1),-1.0_mp,1.0_mp)
 		call Debye_initialize(d,N,Q)
 
 		call forwardsweep(d,r,Null_input,Null_source,Debye,J)
@@ -601,11 +601,11 @@ contains
 		type(PM1D) :: pm
 		type(FSens) :: fs
 		type(recordData) :: r, fsr
-		integer :: N=1E5, Ng=128
+		integer :: N=1E5, Ng=64
 		integer :: NInit=5E4, Ngv=32, NInject=5E3, NLimit=3E5
 		real(mp) :: L = 20.0_mp, Lv, Q = 2.0_mp
 		real(mp) :: dt=0.05_mp, dx
-		real(mp) :: Time = 1.0_mp, vT = 1.0_mp
+		real(mp) :: Time = 150.0_mp, vT = 1.0_mp
 		real(mp) :: A(2), J, grad
 		character(len=100)::dir
 		A = (/ vT, 0.0_mp /)
@@ -622,7 +622,8 @@ contains
 		call buildFSens(fs,pm,Lv,Ngv,NInject,NLimit)
 		dir = 'Debye_sensitivity/f_A'
 		call buildRecord(fsr,fs%dpm%nt,1,fs%dpm%L,fs%dpm%ng,trim(dir),20)
-		call Debye_sensitivity_init(fs,2*N,vT,'Q')
+		call Debye_sensitivity_init(fs,2*N,vT,'vT')
+!		call Debye_sensitivity_init_sync(fs,pm,vT,'vT')
 
 		call forwardsweep_sensitivity(pm,r,fs,fsr,Null_input,Null_source,Debye,J,grad)
 

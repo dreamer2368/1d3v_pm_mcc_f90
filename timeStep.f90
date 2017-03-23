@@ -74,6 +74,8 @@ contains
 		real(mp) :: phi1(this%ng-1)
 		real(mp) :: dt, L
 		integer :: N,Ng
+		integer :: g(this%p(1)%np,2)
+		real(mp) :: frac(this%p(1)%np,2)
 		interface
 			subroutine target_input(pm,k,str)
 				use modPM1D
@@ -87,14 +89,15 @@ contains
 		N = this%N
 		Ng = this%ng
 
-		call applyBC(this)
 		do i=1,this%n
-			call this%a(i)%assignMatrix(this%m,this%p(i)%xp)
+			call this%applyBC(this%p(i),this%m,this%dt,this%A0(i))
 		end do
-		call adjustGrid(this)
 
 		!charge assignment
-		call chargeAssign(this%a,this%p,this%m)
+		this%m%rho = 0.0_mp
+		do i=1, this%n
+			call this%a(i)%chargeAssign(this%p(i),this%m)
+		end do
 
 		call target_input(this,0,'rho_back')
 		call this%m%solveMesh(this%eps0)
@@ -120,7 +123,7 @@ contains
 		real(mp) :: rhs(this%ng-1), phi1(this%ng-1)
 		real(mp) :: dt, L
 		integer :: N, Ng, i
-		real(mp) :: time1, time2
+		real(mp) :: time1, time2, cpt_temp(7)
 		interface
 			subroutine target_input(pm,k,str)
 				use modPM1D
@@ -139,6 +142,7 @@ contains
 		L = this%L
 		N = this%n
 		Ng = this%ng
+		cpt_temp = 0.0_mp
 
 		call target_input(this,k,'xp')
 
@@ -149,64 +153,54 @@ contains
 			call this%p(i)%moveSpecies(dt)
 		end do
 		call CPU_TIME(time2)
-		r%cpt_temp(1) = r%cpt_temp(1) + (time2-time1)/r%mod
+		cpt_temp(1) = (time2-time1)
 
-		call applyBC(this)
-		do i=1, this%n
-			call this%a(i)%assignMatrix(this%m,this%p(i)%xp)
+		do i=1,this%n
+			call this%applyBC(this%p(i),this%m,this%dt,this%A0(i))
 		end do
-		call adjustGrid(this)
 		call CPU_TIME(time1)
-		r%cpt_temp(2) = r%cpt_temp(2) + (time1-time2)/r%mod
+		cpt_temp(2) = (time1-time2)
 
 		!charge assignment
-		call chargeAssign(this%a,this%p,this%m)
+		this%m%rho = 0.0_mp
+		do i=1, this%n
+			call this%a(i)%chargeAssign(this%p(i),this%m)
+		end do
+
 		call CPU_TIME(time2)
-		r%cpt_temp(3) = r%cpt_temp(3) + (time2-time1)/r%mod
+		cpt_temp(3) = (time2-time1)
 
 		call target_input(this,k,'rho_back')
 		call this%m%solveMesh(this%eps0)
 		call CPU_TIME(time1)
-		r%cpt_temp(4) = r%cpt_temp(4) + (time1-time2)/r%mod
+		cpt_temp(4) = (time1-time2)
 
 		!Electric field : -D*phi
 		this%m%E = - multiplyD(this%m%phi,this%m%dx,this%m%BCindex)
 		call CPU_TIME(time2)
-		r%cpt_temp(5) = r%cpt_temp(5) + (time2-time1)/r%mod
+		cpt_temp(5) = (time2-time1)
 
 		!Force assignment : mat'*E
 		do i=1, this%n
 			call this%a(i)%forceAssign(this%p(i), this%m)
 		end do
 		call CPU_TIME(time1)
-		r%cpt_temp(6) = r%cpt_temp(6) + (time1-time2)/r%mod
+		cpt_temp(6) = (time1-time2)
 
 		do i=1, this%n
 			call this%p(i)%accelSpecies(dt)
 		end do
 		call CPU_TIME(time2)
-		r%cpt_temp(7) = r%cpt_temp(7) + (time2-time1)/r%mod
+		cpt_temp(7) = (time2-time1)
 
 		if( present(r) ) then
 			call mcc_collision(this,r%n_coll(:,k))
+			r%cpt_temp(1:7) = r%cpt_temp(1:7) + cpt_temp/r%mod
 		else
 			call mcc_collision(this)
 		end if
 	end subroutine
-!
-!	subroutine QOI(this,J)
-!		type(plasma), intent(in) :: this
-!		real(mp), intent(out) :: J
-!		J = 1.0_mp/Ng/(Nt-Ni)*SUM(this%Edata(:,Ni+1:Nt)**2)
-!	end subroutine
-!
-!	subroutine QOItwo(this,A,B,J)
-!	type(plasma), intent(in) :: this
-!	integer, intent(in) :: A, B
-!	real(mp), intent(out) :: J
-!	J = 1.0_mp/Ng/(B-A)*SUM(this%Edata(:,A+1:B)**2)		!omitted 1/N/T for the sake of machine precision
-!	end subroutine
-!
+
 !===================Adjoint time stepping==========================
 
 	subroutine backward_sweep(adj,pm,r, grad, dJ, Dtarget_input,dJdA,target_input,source)
@@ -263,7 +257,6 @@ contains
 
 		do k=1,pm%nt
 			nk = pm%nt+1-k
-
 			call adj%reset_Dadj
 
 			!=====  Checkpointing  =====
@@ -354,7 +347,6 @@ contains
 				type(PM1D), intent(inout) :: pm
 			end subroutine
 		end interface
-
 		kr = merge(nk,nk/r%mod,r%mod.eq.1)
 		write(kstr,*) kr
 		do i=1,pm%n
@@ -381,13 +373,11 @@ contains
 			deallocate(spwt0)
 		end do
 		if( nk-kr*r%mod.eq.0 ) then
-			do i=1, pm%n
-				call pm%a(i)%assignMatrix(pm%m,pm%p(i)%xp)
-			end do
-			call adjustGrid(pm)
-
 			!charge assignment
-			call chargeAssign(pm%a,pm%p,pm%m)
+			pm%m%rho = 0.0_mp
+			do i=1, pm%n
+				call pm%a(i)%chargeAssign(pm%p(i),pm%m)
+			end do
 
 			call target_input(pm,nk,'rho_back')
 			call pm%m%solveMesh(pm%eps0)
@@ -453,6 +443,7 @@ contains
 		call halfStep_Sensitivity(fs%dpm,this,target_input)
 		call fsr%recordPlasma(fs%dpm, k)
 		call fs%FSensDistribution
+
 		if( (fsr%mod.eq.1) .or. (mod(k,fsr%mod).eq.0) ) then
 			kr = merge(k,k/fsr%mod,fsr%mod.eq.1)
 			write(kstr,*) kr
@@ -493,10 +484,10 @@ contains
 				call fs%FSensDistribution
 				write(305) fs%f_A
 				close(305)
-!				open(unit=305,file='data/'//fsr%dir//'/j_'//trim(adjustl(kstr))//'.bin',	&
-!						status='replace',form='unformatted',access='stream')
-!				write(305) fs%j
-!				close(305)
+				open(unit=305,file='data/'//fsr%dir//'/j_'//trim(adjustl(kstr))//'.bin',	&
+						status='replace',form='unformatted',access='stream')
+				write(305) fs%j
+				close(305)
 			end if
 		end do
 		open(unit=305,file='data/'//fsr%dir//'/grad_hist.bin',	&
@@ -530,16 +521,28 @@ contains
 		N = dpm%N
 		Ng = dpm%ng
 
-		call applyBC(dpm)
+!		do i=1, dpm%n
+!			dpm%p(i)%xp = pm%p(i)%xp
+!			dpm%p(i)%vp = pm%p(i)%vp
+!			dpm%a(i)%g = pm%a(i)%g
+!			dpm%a(i)%frac = pm%a(i)%frac
+!		end do
+
 		do i=1,dpm%n
-			call dpm%a(i)%assignMatrix(dpm%m,dpm%p(i)%xp)
+			call dpm%applyBC(dpm%p(i),dpm%m,dt,dpm%A0(i))
 		end do
-		call adjustGrid(dpm)
 
 		!charge assignment
-		call chargeAssign(dpm%a,dpm%p,dpm%m)
+		dpm%m%rho = 0.0_mp
+		do i=1, dpm%n
+			call dpm%a(i)%chargeAssign(dpm%p(i),dpm%m)
+		end do
 
 		call Dtarget_input(dpm,0,'rho_back')
+
+		!for control parameter qp
+!		dpm%m%rho = dpm%m%rho + pm%m%rho/pm%p(1)%qs
+
 		call dpm%m%solveMesh(dpm%eps0)
 
 		!Electric field : -D*phi
@@ -592,23 +595,36 @@ contains
 		do i=1,dpm%n
 			call dpm%p(i)%moveSpecies(dt)
 		end do
+
+!		do i=1, dpm%n
+!			dpm%p(i)%xp = pm%p(i)%xp
+!			dpm%p(i)%vp = pm%p(i)%vp
+!			dpm%a(i)%g = pm%a(i)%g
+!			dpm%a(i)%frac = pm%a(i)%frac
+!		end do
+
 		call CPU_TIME(time2)
 		r%cpt_temp(1) = r%cpt_temp(1) + (time2-time1)/r%mod
 
-		call applyBC(dpm)
-		do i=1, dpm%n
-			call dpm%a(i)%assignMatrix(dpm%m,dpm%p(i)%xp)
+		do i=1,dpm%n
+			call dpm%applyBC(dpm%p(i),dpm%m,dt,dpm%A0(i))
 		end do
-		call adjustGrid(dpm)
 		call CPU_TIME(time1)
 		r%cpt_temp(2) = r%cpt_temp(2) + (time1-time2)/r%mod
 
-		!charge assignment: rho_A
-		call chargeAssign(dpm%a,dpm%p,dpm%m)
+		!charge assignment
+		dpm%m%rho = 0.0_mp
+		do i=1, dpm%n
+			call dpm%a(i)%chargeAssign(dpm%p(i),dpm%m)
+		end do
 		call CPU_TIME(time2)
 		r%cpt_temp(3) = r%cpt_temp(3) + (time2-time1)/r%mod
 
 		call Dtarget_input(dpm,k,'rho_back')
+
+		!for control parameter qp
+!		dpm%m%rho = dpm%m%rho + pm%m%rho/pm%p(1)%qs
+
 		call dpm%m%solveMesh(dpm%eps0)
 		call CPU_TIME(time1)
 		r%cpt_temp(4) = r%cpt_temp(4) + (time1-time2)/r%mod

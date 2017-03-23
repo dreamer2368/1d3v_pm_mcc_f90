@@ -6,32 +6,66 @@ module modAssign
 	implicit none
 
 	type pmAssign
-		integer :: np
-		integer :: ng
-		integer :: order
+		integer :: np,ng,order,mBCidx
 
 		integer, allocatable :: g(:,:)
 		real(mp), allocatable :: frac(:,:)
 		real(mp), allocatable :: h(:)
+		procedure(assignMatrix), nopass, pointer :: assignMatrix
+		procedure(adjustGrid), nopass, pointer :: adjustGrid
 	contains
 		procedure, pass(this) :: buildAssign
 		procedure, pass(this) :: destroyAssign
-		procedure, pass(this) :: assignMatrix
-!		procedure, pass(this) :: chargeAssign				!We handle chargeAssign subroutine globally, since it handles multiple species
+		procedure, pass(this) :: chargeAssign				!We handle chargeAssign subroutine globally, since it handles multiple species
 		procedure, pass(this) :: forceAssign
 		procedure, pass(this) :: Adj_chargeAssign
 		procedure, pass(this) :: Adj_forceAssign_E
 		procedure, pass(this) :: Adj_forceAssign_xp
 	end type
 
+	abstract interface
+		subroutine assignMatrix(xp,dx,g,frac)
+			use constants
+			real(mp), intent(in) :: xp, dx
+			integer, intent(out) :: g(:)
+			real(mp), intent(out) :: frac(:)
+		end subroutine
+	end interface
+
+	abstract interface
+		subroutine adjustGrid(ng,g,frac)
+			use constants
+			integer, intent(in) :: ng
+			integer, intent(inout) :: g(:)
+			real(mp), intent(inout) :: frac(:)
+		end subroutine
+	end interface
+
 contains
 
-	subroutine buildAssign(this,ng,order)
+	subroutine buildAssign(this,ng,order,mBCidx)
 		class(pmAssign), intent(out) :: this
-		integer, intent(in) :: ng, order
+		integer, intent(in) :: ng, order, mBCidx
 
 		this%ng = ng
 		this%order = order
+		this%mBCidx = mBCidx
+
+		SELECT CASE(order)
+			CASE(1)
+				this%assignMatrix=>assign_CIC
+			CASE(2)
+				this%assignMatrix=>assign_TSC
+		END SELECT
+
+		select case(mBCidx)
+			case(0)	!periodic
+				this%adjustGrid=>adjustGrid_periodic
+			case(1)	!Dirichlet-Dirichlet
+				this%adjustGrid=>adjustGrid_absorbing
+			case(2)	!Dirichlet-Neumann
+				this%adjustGrid=>adjustGrid_absorbing
+		end select
 
 		allocate(this%g(1,1))
 		allocate(this%frac(1,1))
@@ -49,59 +83,34 @@ contains
 		deallocate(this%h)
 	end subroutine
 
-	subroutine assignMatrix(this,m,xp)
-		class(pmAssign), intent(inout) :: this
-		type(mesh), intent(inout) :: m
-		real(mp), intent(inout) :: xp(:)
-
-		SELECT CASE(this%order)
-			CASE(1)
-				call assign_CIC(this,m,xp)
-			CASE(2)
-				call assign_TSC(this,m,xp)
-		END SELECT
-	end subroutine
-
-	subroutine assign_CIC(this,m,xp)	!apply BC and create assignment matrix
-		type(pmAssign), intent(inout) :: this
-		type(mesh), intent(inout) :: m
-		real(mp), intent(inout) :: xp(:)
+	subroutine assign_CIC(xp,dx,g,frac)	!apply BC and create assignment matrix
+		real(mp), intent(in) :: xp, dx
+		integer, intent(out) :: g(:)
+		real(mp), intent(out) :: frac(:)
 		integer :: i, np
 		integer :: g1, gl, gr
 		real(mp) :: fracl, fracr		!fraction for left grid point
 		real(mp) :: h
 
-		np = size(xp)
-		this%np = np
-		deallocate(this%g)
-		deallocate(this%frac)
-		deallocate(this%h)
-		allocate(this%g(np,this%order+1))
-		allocate(this%frac(np,this%order+1))
-		allocate(this%h(np))
-
 		!assignment matrix
-		do i=1,this%np
-			g1 = FLOOR(xp(i)/m%dx - 0.5_mp)+1
-			gl = g1
-			gr = gl+1
+		g1 = FLOOR(xp/dx - 0.5_mp)+1
+		gl = g1
+		gr = gl+1
 
-			h = xp(i)/m%dx - g1 + 0.5_mp
-			fracl = 1.0_mp - ABS(h)
-			fracr = 1.0_mp - fracl
+		h = xp/dx - g1 + 0.5_mp
+		fracl = 1.0_mp - ABS(h)
+		fracr = 1.0_mp - fracl
 
-			this%h(i) = h
-			this%g(i,:) = (/ gl, gr /)
-			this%frac(i,:) = (/ fracl, fracr /)
-		end do
+		g = (/ gl, gr /)
+		frac = (/ fracl, fracr /)
 	end subroutine
 
-	subroutine assign_TSC(this,m,xp)	!apply BC and create assignment matrix
-		type(pmAssign), intent(inout) :: this
-		type(mesh), intent(inout) :: m
-		real(mp), intent(inout) :: xp(:)
+	subroutine assign_TSC(xp,dx,g,frac)	!apply BC and create assignment matrix
+		real(mp), intent(in) :: xp, dx
+		integer, intent(out) :: g(:)
+		real(mp), intent(out) :: frac(:)
 		integer :: i, np
-		integer :: g		!nearest grid point
+		integer :: g0		!nearest grid point
 		integer :: gl		!left grid point
 		integer :: gr		!right grid point
 		real(mp) :: fracl		!fraction for left grid point
@@ -109,42 +118,39 @@ contains
 		real(mp) :: fracr		!fraction for right grid point
 		real(mp) :: h			!distance from nearest grid point
 
-		np = size(xp)
-		this%np = np
-		deallocate(this%g)
-		deallocate(this%frac)
-		deallocate(this%h)
-		allocate(this%g(np,this%order+1))
-		allocate(this%frac(np,this%order+1))
-		allocate(this%h(np))
 		!assignment matrix
-		do i=1,this%np
-			g = FLOOR(xp(i)/m%dx + 0.5_mp)+1
-			gl = g-1
-			gr = g+1
-			h = xp(i)/m%dx - g + 1.0_mp
+		g0 = FLOOR(xp/dx + 0.5_mp)+1
+		gl = g0-1
+		gr = g0+1
+		h = xp/dx - g0 + 1.0_mp
 
-			frac0 = 0.75_mp - h*h
-			fracl = 0.5_mp*(0.5_mp-h)*(0.5_mp-h)
-			fracr = 0.5_mp*(0.5_mp+h)*(0.5_mp+h)
+		frac0 = 0.75_mp - h*h
+		fracl = 0.5_mp*(0.5_mp-h)*(0.5_mp-h)
+		fracr = 0.5_mp*(0.5_mp+h)*(0.5_mp+h)
 
-			this%g(i,:) = (/gl,g,gr/)
-			this%h(i) = h
-			this%frac(i,:) = (/ fracl, frac0, fracr /)
-		end do
+		g = (/gl,g0,gr/)
+		frac = (/ fracl, frac0, fracr /)
 	end subroutine
 
 	subroutine chargeAssign(this,p,m)
-		type(pmAssign), intent(inout) :: this(:)
-		type(species), intent(inout) :: p(:)
+		class(pmAssign), intent(inout) :: this
+		type(species), intent(inout) :: p
 		type(mesh), intent(inout) :: m
+		integer :: g(this%order+1)
+		real(mp) :: frac(this%order+1)
 		integer :: i,ip
 
-		m%rho = 0.0_mp
-		do ip = 1, size(p)
-			do i=1,p(ip)%np
-				m%rho( this(ip)%g(i,:) ) = m%rho( this(ip)%g(i,:) ) + p(ip)%spwt(i)*p(ip)%qs/m%dx*this(ip)%frac(i,:)
-			end do
+		DEALLOCATE(this%g)
+		DEALLOCATE(this%frac)
+		this%np = p%np
+		ALLOCATE(this%g(this%order+1,p%np))
+		ALLOCATE(this%frac(this%order+1,p%np))
+		do i=1,p%np
+			CALL this%assignMatrix(p%xp(i),m%dx,g,frac)
+			CALL this%adjustGrid(m%ng,g,frac)
+			this%g(:,i) = g
+			this%frac(:,i) = frac
+			m%rho( g ) = m%rho( g ) + p%spwt(i)*p%qs/m%dx*frac
 		end do
 	end subroutine
 
@@ -156,7 +162,7 @@ contains
 
 		p%Ep = 0.0_mp
 		do i=1,this%np
-			p%Ep(i) = sum( this%frac(i,:)*m%E(this%g(i,:)) )
+			p%Ep(i) = sum( this%frac(:,i)*m%E(this%g(:,i)) )
 		end do
 	end subroutine
 
@@ -174,7 +180,7 @@ contains
 
 		dV = m%dx
 		dxps = 0.0_mp
-		dxps = 1.0_mp/m%dx*( rhos( this%g(:,2) ) - rhos( this%g(:,1) ) )
+		dxps = 1.0_mp/m%dx*( rhos( this%g(2,:) ) - rhos( this%g(1,:) ) )
 		dxps = - p%qs*p%spwt/dV*dxps
 		xps = xps + dxps
 	end subroutine
@@ -187,8 +193,8 @@ contains
 
 !		Es = 0.0_mp
 		do i=1,this%np
-			g = this%g(i,:)
-			Es( g ) = Es( g ) + Eps(i)*this%frac(i,:)
+			g = this%g(:,i)
+			Es( g ) = Es( g ) + Eps(i)*this%frac(:,i)
 		end do
 	end subroutine
 
@@ -204,14 +210,56 @@ contains
 		dxps = 0.0_mp
 		!sum : sum in each direction --- this rank will be added by the gradient of assignment
 		do i=1,this%np
-			dxps(i) = dxps(i) + Eps(i)/m%dx*( E(this%g(i,2)) - E(this%g(i,1)) )			!gradient of fraction = +/- 1/dx
+			dxps(i) = dxps(i) + Eps(i)/m%dx*( E(this%g(2,i)) - E(this%g(1,i)) )			!gradient of fraction = +/- 1/dx
 		end do
 		dxps = - dxps
 
 		xps = xps + dxps
 	end subroutine
 
-!======================= Forward sensitivity calculation =============================================
+!======================= AdjustGrid for BC =============================================
 
+	subroutine adjustGrid_periodic(ng,g,frac)
+		integer, intent(in) :: ng
+		integer, intent(inout) :: g(:)
+		real(mp), intent(inout) :: frac(:)
+
+			if( g(1)<1 ) then
+				g(1) = g(1) + ng
+			elseif( g(1)>ng ) then
+				g(1) = g(1) - ng
+			end if
+			if( g(2)<1 ) then
+				g(2) = g(2) + ng
+			elseif( g(2)>ng ) then
+				g(2) = g(2) - ng
+			end if
+
+		if( MINVAL(g)<1 .or. MAXVAL(g)>ng ) then
+			print *, MINVAL(g), MAXVAL(g)
+			print *, 'Boundary handling is failed. particle is way outside BC. stopped time stepping.'
+			stop
+		end if
+	end subroutine
+
+	subroutine adjustGrid_absorbing(ng,g,frac)
+		integer, intent(in) :: ng
+		integer, intent(inout) :: g(:)
+		real(mp), intent(inout) :: frac(:)
+
+		if( MINVAL(g)<1 .or. MAXVAL(g)>ng ) then
+			print *, MINVAL(g), MAXVAL(g)
+			print *, 'Boundary handling is failed. particle is way outside BC. stopped time stepping.'
+			stop
+		end if
+
+		!adjustment for boundary : charge/(dx/2)
+		if( g(1).eq.1 ) then
+			frac(1) = frac(1)*2.0_mp
+		end if
+		if( g(2).eq.ng ) then
+			frac(2) = frac(2)*2.0_mp
+		end if
+	end subroutine
 
 end module
