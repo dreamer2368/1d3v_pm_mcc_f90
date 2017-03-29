@@ -467,7 +467,14 @@ contains
 			call CPU_TIME(time2)
 			fsr%cpt_temp(8) = fsr%cpt_temp(8) + (time2-time1)/fsr%mod
 
-			call fs%updateWeight(fs%j)
+			fs%f_A = 0.0_mp
+			do i=1,fs%dpm%n
+				call numberDensity(fs,fs%dpm%p(i),fs%dpm%a(i),fs%f_A)
+			end do
+			do i=1,fs%dpm%n
+				call updateWeight_temp(fs,fs%dpm%p(i),fs%dpm%a(i),fs%f_A,fs%j)
+			end do
+!			call fs%updateWeight(fs%j)
 			call CPU_TIME(time1)
 			fsr%cpt_temp(9) = fsr%cpt_temp(9) + (time1-time2)/fsr%mod
 

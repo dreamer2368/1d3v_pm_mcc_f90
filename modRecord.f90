@@ -237,8 +237,8 @@ contains
 			total = SUM(this%cpt_time(2,:))*this%mod
 			mean = total/this%nt
 			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
-			print 701, "AssignMatrix			", total, mean, pct
-			write(301,701) 'Assign-Matrix	', total, mean, pct
+			print 701, "ApplyBC				", total, mean, pct
+			write(301,701) 'ApplyBC	', total, mean, pct
 			total = SUM(this%cpt_time(3,:))*this%mod
 			mean = total/this%nt
 			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp

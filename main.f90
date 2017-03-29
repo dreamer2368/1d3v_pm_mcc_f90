@@ -530,12 +530,12 @@ contains
 		integer :: N = 100000, Ng = 128
 		real(mp) :: L = 20.0_mp, Wp, Q = 2.0_mp
 		real(mp) :: dt = 0.05_mp
-		real(mp) :: Time = 30.0_mp
+		real(mp) :: Time = 150.0_mp
 		real(mp) :: A(2),J
 
 		A = (/ vT, lambda0 /)
 		call buildPM1D(d,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt)
-		call buildRecord(r,d%nt,1,d%L,d%ng,'debye',20)
+		call buildRecord(r,d%nt,1,d%L,d%ng,'debye',10)
 
 		call buildSpecies(d%p(1),-1.0_mp,1.0_mp)
 		call Debye_initialize(d,N,Q)
@@ -605,7 +605,7 @@ contains
 		integer :: NInit=5E4, Ngv=32, NInject=5E3, NLimit=3E5
 		real(mp) :: L = 20.0_mp, Lv, Q = 2.0_mp
 		real(mp) :: dt=0.05_mp, dx
-		real(mp) :: Time = 150.0_mp, vT = 1.0_mp
+		real(mp) :: Time = 30.0_mp, vT = 1.0_mp
 		real(mp) :: A(2), J, grad
 		character(len=100)::dir
 		A = (/ vT, 0.0_mp /)
@@ -622,7 +622,7 @@ contains
 		call buildFSens(fs,pm,Lv,Ngv,NInject,NLimit)
 		dir = 'Debye_sensitivity/f_A'
 		call buildRecord(fsr,fs%dpm%nt,1,fs%dpm%L,fs%dpm%ng,trim(dir),20)
-		call Debye_sensitivity_init(fs,2*N,vT,'vT')
+		call Debye_sensitivity_init(fs,N,vT,'vT')
 !		call Debye_sensitivity_init_sync(fs,pm,vT,'vT')
 
 		call forwardsweep_sensitivity(pm,r,fs,fsr,Null_input,Null_source,Debye,J,grad)

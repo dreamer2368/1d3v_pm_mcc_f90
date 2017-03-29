@@ -8,8 +8,8 @@ module modAssign
 	type pmAssign
 		integer :: np,ng,order,mBCidx
 
-		integer, allocatable :: g(:,:)
-		real(mp), allocatable :: frac(:,:)
+		integer, dimension(:,:), pointer :: g
+		real(mp), dimension(:,:), pointer :: frac
 		real(mp), allocatable :: h(:)
 		procedure(assignMatrix), nopass, pointer :: assignMatrix
 		procedure(adjustGrid), nopass, pointer :: adjustGrid

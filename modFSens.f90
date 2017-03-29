@@ -9,7 +9,8 @@ module modFSens
 		type(PM1D) :: dpm
 		real(mp) :: Lv, dv
 		integer :: ngv
-		real(mp), allocatable :: j(:,:), f_A(:,:)
+		real(mp), allocatable :: j(:,:), f_A(:,:), frac(:,:,:)
+		integer, allocatable :: gv(:,:)
 		integer :: NInject										!Number of injecting particle per direction
 		integer :: NLimit											!Number limit of particle for redistribution
 	contains
@@ -68,20 +69,24 @@ contains
 		integer :: vgl, vgr
 		real(mp) :: vp, g0, h
 		real(mp) :: E_temp(pm%m%ng)
+		integer, dimension(:,:), pointer :: g_x
+		real(mp), dimension(:,:), pointer :: frac_x
 
 		!F to phase space
 		this%j = 0.0_mp
 		do i=1,pm%n
+			g_x=>pm%a(i)%g
+			frac_x=>pm%a(i)%frac
 			do k = 1, pm%p(i)%np
 				vp = pm%p(i)%vp(k,1)
 				g0 = FLOOR(vp/this%dv)
 				vgl = g0 + this%ngv+1
 				vgr = vgl+1
 				if( vgl<1 .or. vgr>2*this%ngv+1 )	cycle
-				g = pm%a(i)%g(:,k)
+				g = g_x(:,k)
 				h = vp/this%dv - g0
-				this%j(g,vgl) = this%j(g,vgl) + (1.0_mp-h)*pm%p(i)%spwt(k)/pm%m%dx/this%dv*pm%a(i)%frac(:,k)
-				this%j(g,vgr) = this%j(g,vgr) + h*pm%p(i)%spwt(k)/pm%m%dx/this%dv*pm%a(i)%frac(:,k)
+				this%j(g,vgl) = this%j(g,vgl) + (1.0_mp-h)*pm%p(i)%spwt(k)/pm%m%dx/this%dv*frac_x(:,k)
+				this%j(g,vgr) = this%j(g,vgr) + h*pm%p(i)%spwt(k)/pm%m%dx/this%dv*frac_x(:,k)
 			end do
 			this%j(:,1) = this%j(:,1)*2.0_mp
 			this%j(:,2*this%ngv+1) = this%j(:,2*this%ngv+1)*2.0_mp
@@ -93,16 +98,16 @@ contains
 		end do
 		this%j(:,1) = 0.0_mp
 		this%j(:,pm%m%ng) = 0.0_mp
-		if( present(nk) ) then
-			if( (fsr%mod.eq.1) .or. (mod(nk,fsr%mod).eq.0) ) then
-				kr = merge(nk,nk/fsr%mod,fsr%mod.eq.1)
-				write(kstr,*) kr
-				open(unit=305,file='data/'//fsr%dir//'/Dvf_'//trim(adjustl(kstr))//'.bin',	&
-						status='replace',form='unformatted',access='stream')
-				write(305) this%j
-				close(305)
-			end if
-		end if
+!		if( present(nk) ) then
+!			if( (fsr%mod.eq.1) .or. (mod(nk,fsr%mod).eq.0) ) then
+!				kr = merge(nk,nk/fsr%mod,fsr%mod.eq.1)
+!				write(kstr,*) kr
+!				open(unit=305,file='data/'//fsr%dir//'/Dvf_'//trim(adjustl(kstr))//'.bin',	&
+!						status='replace',form='unformatted',access='stream')
+!				write(305) this%j
+!				close(305)
+!			end if
+!		end if
 
 		!Multiply E_A, E
 		!v_T,Q
@@ -247,6 +252,90 @@ contains
 		end if
 	end subroutine
 
+	subroutine numberDensity(this,p,a,N_A)
+		class(FSens), intent(inout) :: this
+		type(species), intent(in) :: p
+		type(pmAssign), intent(in) :: a
+		real(mp), dimension(this%dpm%m%ng, 2*this%ngv+1), intent(inout) :: N_A
+		real(mp), dimension(this%dpm%m%ng,2*this%ngv+3) :: n_temp
+		integer :: i,k, g(a%order+1), g_v(2)
+		real(mp) :: frac(2,2)
+		integer :: vgl, vgr, k_temp
+		real(mp) :: vp, h
+		integer, dimension(:,:), pointer :: g_x
+		real(mp), dimension(:,:), pointer :: frac_x
+		if( ALLOCATED(this%gv) ) DEALLOCATE(this%gv)
+		if( ALLOCATED(this%frac) ) DEALLOCATE(this%frac)
+		ALLOCATE(this%gv(2,p%np))
+		ALLOCATE(this%frac(a%order+1,2,p%np))
+
+		!F_A to phase space
+		n_temp = 0.0_mp
+		g_x=>a%g
+		frac_x=>a%frac
+		do k = 1, p%np
+			vp = p%vp(k,1)
+			vgl = FLOOR(vp/this%dv) + this%ngv+2
+			vgr = vgl+1
+			if( vgl<1 .or. vgr>2*this%ngv+3 )	then
+				this%gv(:,k) = this%ngv
+				this%frac(:,:,k) = 0.0_mp
+				cycle
+			end if
+			g = g_x(:,k)
+			g_v = (/ vgl, vgr /)
+			h = vp/this%dv - FLOOR(vp/this%dv)
+			frac(:,1) = (1.0_mp-h)*frac_x(:,k)
+			frac(:,2) = h*frac_x(:,k)
+			n_temp(g,g_v) = n_temp(g,g_v) + frac/this%dpm%m%dx/this%dv
+
+			this%gv(:,k) = g_v-1
+			this%frac(:,:,k) = frac
+			if( vgl.eq.1 ) then
+				this%frac(:,1,k) = 0.0_mp
+				this%gv(1,k) = this%ngv+2
+			end if
+			if( vgr.eq.2*this%ngv+3 ) then
+				this%frac(:,2,k) = 0.0_mp
+				this%gv(2,k) = this%ngv+2
+			end if
+		end do
+		N_A = N_A + n_temp(:,2:2*this%ngv+2)
+	end subroutine
+
+	subroutine updateWeight_temp(this,p,a,n_A,j)
+		class(FSens), intent(inout) :: this
+		type(species), intent(inout) :: p
+		type(pmAssign), intent(in) :: a
+		real(mp), dimension(this%dpm%m%ng,2*this%ngv+1), intent(in) :: n_A, j
+		integer :: i,k, g(a%order+1), g_v(2)
+		real(mp) :: frac(2,2)
+		integer :: vgl, vgr, k_temp
+		real(mp) :: vp, h
+		integer, dimension(:,:), pointer :: g_x
+		real(mp), dimension(:,:), pointer :: frac_x
+
+		!Update weight
+		g_x=>a%g
+		frac_x=>a%frac
+		do k = 1, p%np
+!			vp = p%vp(k,1)
+!			vgl = FLOOR(vp/this%dv) + this%ngv+1
+!			vgr = vgl+1
+!			if( vgl<1 .or. vgr>2*this%ngv+1 )	then
+!				cycle
+!			end if
+!			g = g_x(:,k)
+!			g_v = (/ vgl, vgr /)
+!			h = vp/this%dv - FLOOR(vp/this%dv)
+!			frac(:,1) = (1.0_mp-h)*frac_x(:,k)
+!			frac(:,2) = h*frac_x(:,k)
+!			p%spwt(k) = p%spwt(k) + SUM( j(g,g_v)*frac/n_A(g,g_v) )
+			g=g_x(:,k)
+			p%spwt(k) = p%spwt(k) + SUM( j(g,this%gv(:,k))*this%frac(:,:,k)/n_A(g,this%gv(:,k)) )
+		end do
+	end subroutine
+
 	subroutine updateWeight(this,j)
 		class(FSens), intent(inout) :: this
 		real(mp), intent(in), dimension(this%dpm%m%ng,2*this%ngv+1) :: j
@@ -256,38 +345,33 @@ contains
 		real(mp), allocatable :: frac_xv(:,:,:)
 		integer :: vgl, vgr, k_temp
 		real(mp) :: vp, h
+		integer, dimension(:,:), pointer :: g_x
+		real(mp), dimension(:,:), pointer :: frac_x
 
 		do i = 1, this%dpm%n
 			!F_A to phase space
 			n_temp = 0.0_mp
-!			this%f_A = 0.0_mp
 			allocate(g_v(2,this%dpm%p(i)%np))
 			allocate(frac_xv(2,2,this%dpm%p(i)%np))
+			g_x=>this%dpm%a(i)%g
+			frac_x=>this%dpm%a(i)%frac
 			do k = 1, this%dpm%p(i)%np
 				vp = this%dpm%p(i)%vp(k,1)
-!				vgl = FLOOR(vp/this%dv) + this%ngv+1
 				vgl = FLOOR(vp/this%dv) + this%ngv+2
 				vgr = vgl+1
-!				if( vgl<1 .or. vgr>2*this%ngv+1 )	then
 				if( vgl<1 .or. vgr>2*this%ngv+3 )	then
 					g_v(:,k) = this%ngv+2
 					frac_xv(:,:,k) = 0.0_mp
 					cycle
 				end if
-				g = this%dpm%a(i)%g(:,k)
+				g = g_x(:,k)
 				g_v(:,k) = (/ vgl, vgr /)
 				h = vp/this%dv - FLOOR(vp/this%dv)
-				frac_xv(:,1,k) = (1.0_mp-h)*this%dpm%a(i)%frac(:,k)
-				frac_xv(:,2,k) = h*this%dpm%a(i)%frac(:,k)
-!				this%f_A(g,g_v(:,k)) = this%f_A(g,g_v(:,k)) + frac_xv(:,:,k)/this%dpm%m%dx/this%dv
+				frac_xv(:,1,k) = (1.0_mp-h)*frac_x(:,k)
+				frac_xv(:,2,k) = h*frac_x(:,k)
 				n_temp(g,g_v(:,k)) = n_temp(g,g_v(:,k)) + frac_xv(:,:,k)/this%dpm%m%dx/this%dv
-			end do
-			this%f_A = n_temp(:,2:2*this%ngv+2)
-!			this%f_A(:,1) = this%f_A(:,1)*2.0_mp
-!			this%f_A(:,2*this%ngv+1) = this%f_A(:,2*this%ngv+1)*2.0_mp
 
-			!Adjust grid
-			do k = 1, this%dpm%p(1)%np
+				!Adjust grid
 				if( g_v(1,k).eq.1 ) then
 					frac_xv(:,1,k) = 0.0_mp
 					g_v(1,k) = this%ngv+2
@@ -297,11 +381,12 @@ contains
 					g_v(2,k) = this%ngv+2
 				end if
 			end do
+			this%f_A = n_temp(:,2:2*this%ngv+2)
 			g_v = g_v-1
 
 			!Update weight
 			do k = 1, this%dpm%p(i)%np
-				g = this%dpm%a(i)%g(:,k)
+				g = g_x(:,k)
 				this%dpm%p(i)%spwt(k) = this%dpm%p(i)%spwt(k)	&
 													+ SUM( j(g,g_v(:,k))*frac_xv(:,:,k)/this%f_A(g,g_v(:,k)) )
 			end do
