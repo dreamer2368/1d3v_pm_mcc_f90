@@ -398,10 +398,10 @@ contains
 
 !===============Forward, continuum Sensitivity
 
-	subroutine forwardsweep_sensitivity(this,r,fs,fsr,target_input,source,QoI,J,grad)
-		type(PM1D), intent(inout) :: this
-		type(FSens), intent(inout) :: fs
+	subroutine forwardsweep_sensitivity(this,r,dpm,fsr,Ninject,Nlimit,target_input,source,QoI,J,grad)
+		type(PM1D), intent(inout) :: this,dpm
 		type(recordData), intent(inout) :: r, fsr
+		integer, intent(in) :: Ninject, Nlimit
 		integer :: i,k,kr
 		character(len=100) :: kstr
 		real(mp), intent(out) :: J,grad
@@ -440,16 +440,16 @@ contains
 		call QoI(this,k,J)
 		call r%recordPlasma(this, k)										!record for n=1~Nt
 
-		call halfStep_Sensitivity(fs%dpm,this,target_input)
-		call fsr%recordPlasma(fs%dpm, k)
-		call fs%FSensDistribution
+		call halfStep_Sensitivity(dpm,this,target_input)
+		call fsr%recordPlasma(dpm, k)
+		call dpm%a(1)%PhaseSpaceDensity(dpm%p(1),dpm%m)
 
 		if( (fsr%mod.eq.1) .or. (mod(k,fsr%mod).eq.0) ) then
 			kr = merge(k,k/fsr%mod,fsr%mod.eq.1)
 			write(kstr,*) kr
 			open(unit=305,file='data/'//fsr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
 					status='replace',form='unformatted',access='stream')
-			write(305) fs%f_A
+			write(305) dpm%m%f
 			close(305)
 		end if
 		do k=1,this%nt
@@ -458,42 +458,38 @@ contains
 			J_hist(k) = J
 			call r%recordPlasma(this, k)									!record for n=1~Nt
 
-			call updateSensitivity(fs%dpm,this,target_input,source,k,fsr)
+			call updateSensitivity(dpm,this,target_input,source,k,fsr)
 !			call fs%FSensDistribution
 !			call fs%Redistribute
 
 			call CPU_TIME(time1)
-			call fs%FSensSourceTerm(this)
+			call FSensSourceTerm(dpm,this,k,fsr)
 			call CPU_TIME(time2)
 			fsr%cpt_temp(8) = fsr%cpt_temp(8) + (time2-time1)/fsr%mod
 
-			fs%f_A = 0.0_mp
-			do i=1,fs%dpm%n
-				call numberDensity(fs,fs%dpm%p(i),fs%dpm%a(i),fs%f_A)
+			do i=1,dpm%n
+				call updateWeight(dpm%p(i),dpm%a(i),dpm%m,dpm%m%j)
 			end do
-			do i=1,fs%dpm%n
-				call updateWeight_temp(fs,fs%dpm%p(i),fs%dpm%a(i),fs%f_A,fs%j)
-			end do
-!			call fs%updateWeight(fs%j)
 			call CPU_TIME(time1)
 			fsr%cpt_temp(9) = fsr%cpt_temp(9) + (time1-time2)/fsr%mod
 
 !			call fs%InjectSource(fs%j,fs%NInject)
-			call QoI(fs%dpm,k,grad)
+			call QoI(dpm,k,grad)
 			grad_hist(k) = grad
-			call fsr%recordPlasma(fs%dpm, k)
+			call fsr%recordPlasma(dpm, k)
 
 			if( (fsr%mod.eq.1) .or. (mod(k,fsr%mod).eq.0) ) then
 				kr = merge(k,k/fsr%mod,fsr%mod.eq.1)
 				write(kstr,*) kr
 				open(unit=305,file='data/'//fsr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
 						status='replace',form='unformatted',access='stream')
-				call fs%FSensDistribution
-				write(305) fs%f_A
+				dpm%m%f = 0.0_mp
+				call dpm%a(1)%PhaseSpaceDensity(dpm%p(1),dpm%m)
+				write(305) dpm%m%f
 				close(305)
 				open(unit=305,file='data/'//fsr%dir//'/j_'//trim(adjustl(kstr))//'.bin',	&
 						status='replace',form='unformatted',access='stream')
-				write(305) fs%j
+				write(305) dpm%m%j
 				close(305)
 			end if
 		end do

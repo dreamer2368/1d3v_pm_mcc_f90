@@ -1,7 +1,6 @@
 module modAssign
 
-	use modSpecies
-	use modMesh
+	use modGridBC
 
 	implicit none
 
@@ -21,6 +20,9 @@ module modAssign
 		procedure, pass(this) :: Adj_chargeAssign
 		procedure, pass(this) :: Adj_forceAssign_E
 		procedure, pass(this) :: Adj_forceAssign_xp
+		procedure, pass(this) :: AssignPhaseSpace
+		procedure, pass(this) :: NumberDensity
+		procedure, pass(this) :: PhaseSpaceDensity
 	end type
 
 	abstract interface
@@ -32,14 +34,14 @@ module modAssign
 		end subroutine
 	end interface
 
-	abstract interface
-		subroutine adjustGrid(ng,g,frac)
-			use constants
-			integer, intent(in) :: ng
-			integer, intent(inout) :: g(:)
-			real(mp), intent(inout) :: frac(:)
-		end subroutine
-	end interface
+!	abstract interface
+!		subroutine assignV(vp,dv,gv,fracv)
+!			use constants
+!			real(mp), intent(in) :: vp, dv
+!			integer, intent(out) :: gv(:)
+!			real(mp), intent(out) :: fracv(:)
+!		end subroutine
+!	end interface
 
 contains
 
@@ -138,18 +140,12 @@ contains
 		type(mesh), intent(inout) :: m
 		integer :: g(this%order+1)
 		real(mp) :: frac(this%order+1)
-		integer :: i,ip
+		integer :: i
 
-		DEALLOCATE(this%g)
-		DEALLOCATE(this%frac)
 		this%np = p%np
-		ALLOCATE(this%g(this%order+1,p%np))
-		ALLOCATE(this%frac(this%order+1,p%np))
 		do i=1,p%np
 			CALL this%assignMatrix(p%xp(i),m%dx,g,frac)
 			CALL this%adjustGrid(m%ng,g,frac)
-			this%g(:,i) = g
-			this%frac(:,i) = frac
 			m%rho( g ) = m%rho( g ) + p%spwt(i)*p%qs/m%dx*frac
 		end do
 	end subroutine
@@ -158,11 +154,15 @@ contains
 		class(pmAssign), intent(inout) :: this
 		type(species), intent(inout) :: p
 		type(mesh), intent(in) :: m
+		integer :: g(this%order+1)
+		real(mp) :: frac(this%order+1)
 		integer :: i
 
 		p%Ep = 0.0_mp
 		do i=1,this%np
-			p%Ep(i) = sum( this%frac(:,i)*m%E(this%g(:,i)) )
+			CALL this%assignMatrix(p%xp(i),m%dx,g,frac)
+			CALL this%adjustGrid(m%ng,g,frac)
+			p%Ep(i) = sum( frac*m%E( g ) )
 		end do
 	end subroutine
 
@@ -217,49 +217,139 @@ contains
 		xps = xps + dxps
 	end subroutine
 
-!======================= AdjustGrid for BC =============================================
+!=======================  Phase-Space Assignment  ======================================
 
-	subroutine adjustGrid_periodic(ng,g,frac)
-		integer, intent(in) :: ng
-		integer, intent(inout) :: g(:)
-		real(mp), intent(inout) :: frac(:)
+	subroutine AssignPhaseSpace(this,xp,vp,m,g,gv,frac)
+		class(pmAssign), intent(in) :: this
+		real(mp), intent(in) :: xp, vp
+		type(mesh), intent(in) :: m
+		integer, intent(out) :: g(this%order+1), gv(2)
+		real(mp), dimension(this%order+1,2), intent(out) :: frac
+		integer :: vgl,vgr
+		real(mp) :: f_x(this%order+1), hv
 
-			if( g(1)<1 ) then
-				g(1) = g(1) + ng
-			elseif( g(1)>ng ) then
-				g(1) = g(1) - ng
-			end if
-			if( g(2)<1 ) then
-				g(2) = g(2) + ng
-			elseif( g(2)>ng ) then
-				g(2) = g(2) - ng
-			end if
+		vgl = FLOOR(vp/m%dv) + m%ngv+1
+		vgr = vgl+1
+		if( vgl<0 .or. vgr>2*m%ngv+2 ) then
+			g = 2
+			gv = m%ngv
+			frac = 0.0_mp
+			RETURN
+		end if
+		hv = vp/m%dv - FLOOR(vp/m%dv)
 
-		if( MINVAL(g)<1 .or. MAXVAL(g)>ng ) then
-			print *, MINVAL(g), MAXVAL(g)
-			print *, 'Boundary handling is failed. particle is way outside BC. stopped time stepping.'
-			stop
+		call this%assignMatrix(xp,m%dx,g,f_x)
+		call this%adjustGrid(m%ng,g,f_x)
+
+		if( vgl.eq.0 ) then
+			gv(1) = m%ngv
+			gv(2) = vgr
+			frac(:,1) = 0.0_mp
+			frac(:,2) = hv*f_x
+		elseif( vgr.eq.2*m%ngv+2 ) then
+			gv(1) = vgl
+			gv(2) = m%ngv
+			frac(:,1) = (1.0_mp-hv)*f_x
+			frac(:,2) = 0.0_mp
+		else
+			gv = (/ vgl,vgr /)
+			frac(:,1) = (1.0_mp-hv)*f_x
+			frac(:,2) = hv*f_x
 		end if
 	end subroutine
 
-	subroutine adjustGrid_absorbing(ng,g,frac)
-		integer, intent(in) :: ng
-		integer, intent(inout) :: g(:)
-		real(mp), intent(inout) :: frac(:)
+	subroutine NumberDensity(this,p,m)
+		class(pmAssign), intent(in) :: this
+		type(species), intent(in) :: p
+		type(mesh), intent(inout) :: m
+		integer :: k, g(this%order+1), gv(2)
+		real(mp) :: frac(this%order+1,2)
+		real(mp) :: xp, vp
+		integer :: vgl,vgr
+		real(mp) :: f_x(this%order+1), hv
 
-		if( MINVAL(g)<1 .or. MAXVAL(g)>ng ) then
-			print *, MINVAL(g), MAXVAL(g)
-			print *, 'Boundary handling is failed. particle is way outside BC. stopped time stepping.'
-			stop
-		end if
+		!N_A to phase space
+		do k = 1, p%np
+			xp = p%xp(k)
+			vp = p%vp(k,1)
+			vgl = FLOOR(vp/m%dv) + m%ngv+1
+			vgr = vgl+1
+			if( vgl<0 .or. vgr>2*m%ngv+2 ) then
+!				g = 2
+!				gv = m%ngv
+!				frac = 0.0_mp
+				CYCLE
+			end if
+			hv = vp/m%dv - FLOOR(vp/m%dv)
+	
+			call this%assignMatrix(xp,m%dx,g,f_x)
+			call this%adjustGrid(m%ng,g,f_x)
+	
+			if( vgl.eq.0 ) then
+				gv(1) = m%ngv
+				gv(2) = vgr
+				frac(:,1) = 0.0_mp
+				frac(:,2) = hv*f_x
+			elseif( vgr.eq.2*m%ngv+2 ) then
+				gv(1) = vgl
+				gv(2) = m%ngv
+				frac(:,1) = (1.0_mp-hv)*f_x
+				frac(:,2) = 0.0_mp
+			else
+				gv = (/ vgl,vgr /)
+				frac(:,1) = (1.0_mp-hv)*f_x
+				frac(:,2) = hv*f_x
+			end if
+!			call this%AssignPhaseSpace(p%xp(k),p%vp(k,1),m,g,gv,frac)
+			m%f(g,gv) = m%f(g,gv) + frac/m%dx/m%dv
+		end do
+	end subroutine
 
-		!adjustment for boundary : charge/(dx/2)
-		if( g(1).eq.1 ) then
-			frac(1) = frac(1)*2.0_mp
-		end if
-		if( g(2).eq.ng ) then
-			frac(2) = frac(2)*2.0_mp
-		end if
+	subroutine PhaseSpaceDensity(this,p,m)
+		class(pmAssign), intent(in) :: this
+		type(species), intent(in) :: p
+		type(mesh), intent(inout) :: m
+		integer :: k, g(this%order+1),gv(2)
+		real(mp) :: frac(this%order+1,2)
+		real(mp) :: xp, vp
+		integer :: vgl,vgr
+		real(mp) :: f_x(this%order+1), hv
+
+		!N_A to phase space
+		do k = 1, p%np
+			xp = p%xp(k)
+			vp = p%vp(k,1)
+			vgl = FLOOR(vp/m%dv) + m%ngv+1
+			vgr = vgl+1
+			if( vgl<0 .or. vgr>2*m%ngv+2 ) then
+!				g = 2
+!				gv = m%ngv
+!				frac = 0.0_mp
+				CYCLE
+			end if
+			hv = vp/m%dv - FLOOR(vp/m%dv)
+	
+			call this%assignMatrix(xp,m%dx,g,f_x)
+			call this%adjustGrid(m%ng,g,f_x)
+	
+			if( vgl.eq.0 ) then
+				gv(1) = m%ngv
+				gv(2) = vgr
+				frac(:,1) = 0.0_mp
+				frac(:,2) = hv*f_x
+			elseif( vgr.eq.2*m%ngv+2 ) then
+				gv(1) = vgl
+				gv(2) = m%ngv
+				frac(:,1) = (1.0_mp-hv)*f_x
+				frac(:,2) = 0.0_mp
+			else
+				gv = (/ vgl,vgr /)
+				frac(:,1) = (1.0_mp-hv)*f_x
+				frac(:,2) = hv*f_x
+			end if
+!			call this%AssignPhaseSpace(p%xp(k),p%vp(k,1),m,g,gv,frac)
+			m%f(g,gv) = m%f(g,gv) + frac*p%spwt(k)/m%dx/m%dv
+		end do
 	end subroutine
 
 end module

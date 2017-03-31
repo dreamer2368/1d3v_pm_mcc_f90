@@ -1,14 +1,14 @@
 module modPM1D
 
-	use modBC
+	use modParticleBC
 	use modAssign
 
 	implicit none
 
 	type PM1D
-		integer :: nt, ni, n, ng, pBCindex, mBCindex
+		integer :: nt, ni, n, ng, ngv, pBCindex, mBCindex
 		real(mp) :: eps0, wp
-		real(mp) :: dt, L
+		real(mp) :: dt, L, Lv
 		real(mp), allocatable :: A0(:)
 
 		type(species), allocatable :: p(:)
@@ -23,11 +23,12 @@ module modPM1D
 
 contains
 
-	subroutine buildPM1D(this,Tf,Ti,Ng,N,pBC,mBC,order,dt,L,A,eps)
+	subroutine buildPM1D(this,Tf,Ti,Ng,N,pBC,mBC,order,dt,L,A,eps,Ngv,Lv)
 		class(PM1D), intent(out) :: this
 		real(mp), intent(in) :: Tf,Ti
 		integer, intent(in) :: Ng, N, pBC, mBC, order
-		real(mp), intent(in), optional :: dt, A(:), L, eps
+		real(mp), intent(in), optional :: dt, A(:), L, Lv, eps
+		integer, intent(in), optional :: Ngv
 		real(mp) :: L0
 		integer :: i
 		if( present(dt) ) then
@@ -52,6 +53,10 @@ contains
 		else
 			this%eps0 = 1.0_mp
 		end if
+		if( PRESENT(Ngv) ) then
+			this%ngv = Ngv
+			this%Lv = Lv
+		end if
 		this%n = N
 		this%ng = Ng
 		this%pBCindex = pBC
@@ -61,15 +66,25 @@ contains
 		this%ni = FLOOR(Ti/this%dt)
 		this%wp = 1.0_mp
 		print *, 'Plasma is created'
-		print *, 'L = (',this%L,')'
-		print *, 'Ng = (',this%ng,'), N = ',this%n
+		print *, 'L = (',this%L,')',', Ng_x = (',this%ng,')'
+		if( PRESENT(Ngv) ) print *, 'Lv = (',this%Lv,')',', Ng_v = (',this%ngv,')'
+		print *, 'Number of species = ',this%n
 		print *, 'Particle BC : ', this%pBCindex
 		print *, 'Mesh BC : ', this%mBCindex
 		print *, 'A = ',this%A0
 		print *, 'Ni = ',this%ni,', Nt = ',this%nt,', dt = ',this%dt
 
+		!Allocate array of species
 		allocate(this%p(N))
-		call buildMesh(this%m,this%L,Ng,this%mBCindex)
+
+		!Build Mesh
+		if( PRESENT(Ngv) ) then
+			call buildMesh(this%m,this%L,Ng,this%mBCindex,Lv,Ngv)
+		else
+			call buildMesh(this%m,this%L,Ng,this%mBCindex)
+		end if
+
+		!Build Assignment
 		allocate(this%a(N))
 		do i=1,N
 			call buildAssign(this%a(i),Ng,order,this%mBCindex)

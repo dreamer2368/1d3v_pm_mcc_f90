@@ -6,13 +6,13 @@ module init
 
 contains
 
-	subroutine Debye_sensitivity_init_sync(fs,pm,vT,input_str)
-		type(FSens), intent(inout) :: fs
+	subroutine Debye_sensitivity_init_sync(dpm,pm,vT,input_str)
+		type(PM1D), intent(inout) :: dpm
 		type(PM1D), intent(in) :: pm
 		real(mp), intent(in) :: vT
 		character(len=*), intent(in), optional :: input_str
 		real(mp) :: xp0(pm%p(1)%np), vp0(pm%p(1)%np,3), spwt0(pm%p(1)%np)
-		real(mp) :: w, rho_back(fs%dpm%ng), xg(fs%dpm%ng)
+		real(mp) :: w, rho_back(dpm%ng), xg(dpm%ng)
 		integer :: N,i1, i2
 		N = pm%p(1)%np
 		xp0 = pm%p(1)%xp
@@ -22,34 +22,34 @@ contains
 			SELECT CASE(input_str)
 				CASE('vT')
 					spwt0 = ( vp0(:,1)**2/vT/vT - 1.0_mp )/SQRT(2.0_mp*pi)/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
-								*fs%dpm%L*2.0_mp*fs%Lv/N
+								*dpm%L*2.0_mp*dpm%Lv/N
 					rho_back = 0.0_mp
 				CASE('Q')
 					spwt0 = 0.0_mp
-					w = fs%dpm%L/10.0_mp
-					xg = (/ ((i1-0.5_mp)*fs%dpm%m%dx, i1=1,fs%dpm%ng) /)
-					rho_back = -1.0_mp/fs%dpm%L + 1.0_mp/SQRT(2.0_mp*pi)/w*EXP( -(xg-0.5_mp*fs%dpm%L)**2/2.0_mp/w/w  )
+					w = dpm%L/10.0_mp
+					xg = (/ ((i1-0.5_mp)*dpm%m%dx, i1=1,dpm%ng) /)
+					rho_back = -1.0_mp/dpm%L + 1.0_mp/SQRT(2.0_mp*pi)/w*EXP( -(xg-0.5_mp*dpm%L)**2/2.0_mp/w/w  )
 				CASE('qp')
 					spwt0 = 0.0_mp
 					rho_back = -1.0_mp
 			END SELECT
 		else		!Default case: vT
 			spwt0 = ( vp0(:,1)**2/vT/vT - 1.0_mp )/SQRT(2.0_mp*pi)/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
-						*fs%dpm%L*2.0_mp*fs%Lv/N
+						*dpm%L*2.0_mp*dpm%Lv/N
 			rho_back = 0.0_mp
 		end if
 
-		call fs%dpm%p(1)%setSpecies(N,xp0,vp0,spwt0)
-		call fs%dpm%m%setMesh(rho_back)
+		call dpm%p(1)%setSpecies(N,xp0,vp0,spwt0)
+		call dpm%m%setMesh(rho_back)
 	end subroutine
 
-	subroutine Debye_sensitivity_init(fs,Np,vT,input_str)
-		type(FSens), intent(inout) :: fs
+	subroutine Debye_sensitivity_init(dpm,Np,vT,input_str)
+		type(PM1D), intent(inout) :: dpm
 		integer, intent(in) :: Np
 		real(mp), intent(in) :: vT
 		character(len=*), intent(in), optional :: input_str
 		real(mp), allocatable :: xp0(:), vp0(:,:), spwt0(:)
-		real(mp) :: w, rho_back(fs%dpm%ng), xg(fs%dpm%ng)
+		real(mp) :: w, rho_back(dpm%ng), xg(dpm%ng)
 		integer :: newN,Nx,i1, i2
 		Nx = INT(SQRT(Np*1.0_mp))
 		newN = Nx*Nx
@@ -69,8 +69,8 @@ contains
 
 		do i2=1,Nx
 			do i1=1,Nx
-				xp0(i1+Nx*(i2-1)) = (i1-0.5_mp)*fs%dpm%L/Nx
-				vp0(i1+Nx*(i2-1),:) = (i2-0.5_mp)*2.4_mp*fs%Lv/Nx - 1.2_mp*fs%Lv
+				xp0(i1+Nx*(i2-1)) = (i1-0.5_mp)*dpm%L/Nx
+				vp0(i1+Nx*(i2-1),:) = (i2-0.5_mp)*2.4_mp*dpm%Lv/Nx - 1.2_mp*dpm%Lv
 			end do
 		end do
 
@@ -78,22 +78,22 @@ contains
 			SELECT CASE(input_str)
 				CASE('vT')
 					spwt0 = ( vp0(:,1)**2/vT/vT - 1.0_mp )/SQRT(2.0_mp*pi)/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
-			!					*fs%dpm%L*w/EXP( -vp0(:,1)**2/2.0_mp/w/w )/newN
-								*fs%dpm%L*2.0_mp*fs%Lv/newN
+			!					*dpm%L*w/EXP( -vp0(:,1)**2/2.0_mp/w/w )/newN
+								*dpm%L*2.0_mp*dpm%Lv/newN
 					rho_back = 0.0_mp
 				CASE('Q')
 					spwt0 = 0.0_mp
-					w = fs%dpm%L/10.0_mp
-					xg = (/ ((i1-0.5_mp)*fs%dpm%m%dx, i1=1,fs%dpm%ng) /)
-					rho_back = -1.0_mp/fs%dpm%L + 1.0_mp/SQRT(2.0_mp*pi)/w*EXP( -(xg-0.5_mp*fs%dpm%L)**2/2.0_mp/w/w  )
+					w = dpm%L/10.0_mp
+					xg = (/ ((i1-0.5_mp)*dpm%m%dx, i1=1,dpm%ng) /)
+					rho_back = -1.0_mp/dpm%L + 1.0_mp/SQRT(2.0_mp*pi)/w*EXP( -(xg-0.5_mp*dpm%L)**2/2.0_mp/w/w  )
 				CASE('qp')
 					spwt0 = 0.0_mp
 					rho_back = -1.0_mp
 			END SELECT
 		else		!Default case: vT
 			spwt0 = ( vp0(:,1)**2/vT/vT - 1.0_mp )/SQRT(2.0_mp*pi)/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
-!					*fs%dpm%L*w/EXP( -vp0(:,1)**2/2.0_mp/w/w )/newN
-						*fs%dpm%L*2.0_mp*fs%Lv/newN
+!					*dpm%L*w/EXP( -vp0(:,1)**2/2.0_mp/w/w )/newN
+						*dpm%L*2.0_mp*dpm%Lv/newN
 			rho_back = 0.0_mp
 		end if
 
@@ -102,8 +102,8 @@ contains
 !		vp0 = (2.0_mp*vp0-1.0_mp)*w
 !		spwt0 = 2.0_mp*w/Np*( vp0(:,1)**2/vT/vT - 1.0_mp )/SQRT(2.0_mp*pi)/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )
 
-		call fs%dpm%p(1)%setSpecies(newN,xp0,vp0,spwt0)
-		call fs%dpm%m%setMesh(rho_back)
+		call dpm%p(1)%setSpecies(newN,xp0,vp0,spwt0)
+		call dpm%m%setMesh(rho_back)
 
 		deallocate(xp0)
 		deallocate(vp0)

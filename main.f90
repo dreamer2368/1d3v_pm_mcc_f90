@@ -530,12 +530,12 @@ contains
 		integer :: N = 100000, Ng = 128
 		real(mp) :: L = 20.0_mp, Wp, Q = 2.0_mp
 		real(mp) :: dt = 0.05_mp
-		real(mp) :: Time = 150.0_mp
+		real(mp) :: Time = 30.0_mp
 		real(mp) :: A(2),J
 
 		A = (/ vT, lambda0 /)
 		call buildPM1D(d,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt)
-		call buildRecord(r,d%nt,1,d%L,d%ng,'debye',10)
+		call buildRecord(r,d%nt,1,d%L,d%ng,'debye',20)
 
 		call buildSpecies(d%p(1),-1.0_mp,1.0_mp)
 		call Debye_initialize(d,N,Q)
@@ -598,34 +598,33 @@ contains
 	end subroutine
 
 	subroutine Debye_sensitivity
-		type(PM1D) :: pm
-		type(FSens) :: fs
+		type(PM1D) :: pm, dpm
 		type(recordData) :: r, fsr
 		integer :: N=1E5, Ng=64
 		integer :: NInit=5E4, Ngv=32, NInject=5E3, NLimit=3E5
 		real(mp) :: L = 20.0_mp, Lv, Q = 2.0_mp
 		real(mp) :: dt=0.05_mp, dx
-		real(mp) :: Time = 30.0_mp, vT = 1.0_mp
+		real(mp) :: Time = 3.0_mp, vT = 1.0_mp
 		real(mp) :: A(2), J, grad
 		character(len=100)::dir
 		A = (/ vT, 0.0_mp /)
+		Lv = vT*6.0_mp
 
-		call buildPM1D(pm,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt)
+		call buildPM1D(pm,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt,Ngv=Ngv,Lv=Lv)
 		dir = 'Debye_sensitivity'
-		call buildRecord(r,pm%nt,1,pm%L,pm%ng,trim(dir),20)
+		call buildRecord(r,pm%nt,1,pm%L,pm%ng,trim(dir),1)
 
 		call buildSpecies(pm%p(1),-1.0_mp,1.0_mp)
 		call Debye_initialize(pm,N,Q)
 		
-		Lv = vT*6.0_mp
 !		NInject = 5*N/pm%nt
-		call buildFSens(fs,pm,Lv,Ngv,NInject,NLimit)
+		call buildSensitivity(dpm,pm)
 		dir = 'Debye_sensitivity/f_A'
-		call buildRecord(fsr,fs%dpm%nt,1,fs%dpm%L,fs%dpm%ng,trim(dir),20)
-		call Debye_sensitivity_init(fs,N,vT,'vT')
-!		call Debye_sensitivity_init_sync(fs,pm,vT,'vT')
+		call buildRecord(fsr,dpm%nt,1,dpm%L,dpm%ng,trim(dir),1)
+		call Debye_sensitivity_init(dpm,N,vT,'vT')
+!		call Debye_sensitivity_init_sync(dpm,pm,vT,'vT')
 
-		call forwardsweep_sensitivity(pm,r,fs,fsr,Null_input,Null_source,Debye,J,grad)
+		call forwardsweep_sensitivity(pm,r,dpm,fsr,NInject,NLimit,Null_input,Null_source,Debye,J,grad)
 
 		print *, 'J: ',J
 		print *, 'grad: ',grad
@@ -635,13 +634,12 @@ contains
 
 		call destroyPM1D(pm)
 		call destroyRecord(r)
-		call destroyFSens(fs)
+		call destroyPM1D(dpm)
 		call destroyRecord(fsr)
 	end subroutine
 
 	subroutine debye_sensitivity_curve
-		type(PM1D) :: d
-		type(FSens) :: fs
+		type(PM1D) :: d,dpm
 		type(recordData) :: r,fsr
 		type(mpiHandler) :: mpih
 		integer, parameter  :: Nsample=101
@@ -662,28 +660,29 @@ contains
 		call init_random_seed
 		do i=1,mpih%sendcnt
 			A = (/ vT(mpih%displc(mpih%my_rank)+i), 0.0_mp /)
+			Lv = A(1)*6.0_mp
+
 			print *, 'vT(',mpih%my_rank,')=',A(1)
-			call buildPM1D(d,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt)
+			call buildPM1D(d,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt,Ngv=Ngv,Lv=Lv)
 			dir = 'Debye_sensitivity_curve/'//trim(adjustl(mpih%rank_str))
 			call buildRecord(r,d%nt,1,d%L,d%ng,trim(dir),20)
 
 			call buildSpecies(d%p(1),-1.0_mp,1.0_mp)
 			call Debye_initialize(d,N,Q)
 		
-			Lv = A(1)*6.0_mp
-			call buildFSens(fs,d,Lv,Ngv,NInject,NLimit)
+			call buildSensitivity(dpm,d)
 			dir = 'Debye_sensitivity_curve/'//trim(adjustl(mpih%rank_str))//'/f_A'
-			call buildRecord(fsr,fs%dpm%nt,1,fs%dpm%L,fs%dpm%ng,trim(dir),20)
-			call Debye_sensitivity_init(fs,2*N,A(1))
+			call buildRecord(fsr,dpm%nt,1,dpm%L,dpm%ng,trim(dir),20)
+			call Debye_sensitivity_init(dpm,2*N,A(1))
 	
-			call forwardsweep_sensitivity(d,r,fs,fsr,Null_input,Null_source,Debye,J,grad)
+			call forwardsweep_sensitivity(d,r,dpm,fsr,NInject,NLimit,Null_input,Null_source,Debye,J,grad)
 
 			mpih%sendbuf(i,:) = (/vT(mpih%displc(mpih%my_rank)+i),J,grad/)
 
 			call destroyRecord(r)
 			call destroyPM1D(d)
 			call destroyRecord(fsr)
-			call destroyFSens(fs)
+			call destroyPM1D(dpm)
 		end do
 
 		call gatherData(mpih)
@@ -704,9 +703,8 @@ contains
 	end subroutine
 
 	subroutine debye_sampling
-		type(PM1D) :: d
+		type(PM1D) :: d, dpm
 		type(adjoint) :: adj
-		type(FSens) :: fs
 		type(recordData) :: r,fsr
 		type(mpiHandler) :: mpih
 		integer, parameter  :: Nsample=5
@@ -721,6 +719,7 @@ contains
 		character(len=100)::dir,Time_str
 		Time = (/ 0.1_mp, 0.2_mp, 0.3_mp, 0.4_mp /)
 		A = (/ vT, 0.0_mp /)
+		Lv = A(1)*6.0_mp
 
 		call buildMPIHandler(mpih)
 		call allocateBuffer(Nsample,3,mpih)
@@ -731,20 +730,19 @@ contains
 			grad = 0.0_mp
 			adj_grad = 0.0_mp
 			do i=1,mpih%sendcnt
-				call buildPM1D(d,Time(k),0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt)
+				call buildPM1D(d,Time(k),0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt,Ngv=Ngv,Lv=Lv)
 				dir = 'Debye_sampling/'//trim(adjustl(mpih%rank_str))
 				call buildRecord(r,d%nt,1,d%L,d%ng,trim(dir),20)
 
 				call buildSpecies(d%p(1),-1.0_mp,1.0_mp)
 				call Debye_initialize(d,N,Q)
 		
-				Lv = A(1)*6.0_mp
-				call buildFSens(fs,d,Lv,Ngv,NInject,NLimit)
+				call buildSensitivity(dpm,d)
 				dir = 'Debye_sampling/'//trim(adjustl(mpih%rank_str))//'/f_A'
-				call buildRecord(fsr,fs%dpm%nt,1,fs%dpm%L,fs%dpm%ng,trim(dir),20)
-				call Debye_sensitivity_init(fs,2*N,A(1))
+				call buildRecord(fsr,dpm%nt,1,dpm%L,dpm%ng,trim(dir),20)
+				call Debye_sensitivity_init(dpm,2*N,A(1))
 	
-				call forwardsweep_sensitivity(d,r,fs,fsr,Null_input,Null_source,Debye,J,grad)
+				call forwardsweep_sensitivity(d,r,dpm,fsr,NInject,NLimit,Null_input,Null_source,Debye,J,grad)
 
 				call buildAdjoint(adj,d)
 				call adj%m%setMesh(d%m%rho_back)
@@ -756,7 +754,7 @@ contains
 				call destroyPM1D(d)
 				call destroyAdjoint(adj)
 				call destroyRecord(fsr)
-				call destroyFSens(fs)
+				call destroyPM1D(dpm)
 			end do
 
 			call gatherData(mpih)

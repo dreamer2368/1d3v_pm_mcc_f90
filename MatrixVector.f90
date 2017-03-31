@@ -8,6 +8,23 @@ module MatrixVector
 
 contains
 
+!==================  V-Derivative on Phase-Space  ====================================
+
+	function D_V(f,dv) result(Df)
+		real(mp), intent(in) :: f(:,:), dv
+		real(mp) :: Df(SIZE(f,1),SIZE(f,2))
+		integer :: i
+
+		!Gradient in v direction
+		do i=1,SIZE(f,1)
+			Df(i,2:SIZE(f,2)-1) = ( f(i,3:SIZE(f,2))-f(i,1:SIZE(f,2)-2) )/2.0_mp/dv
+		end do
+		Df(:,1) = 0.0_mp
+		Df(:,SIZE(f,2)) = 0.0_mp
+	end function
+
+!==================  X-Derivative  ===================================================
+
 	function multiplyD(x,dx,idx) result(y)						!Derivative with BC
 		real(mp), intent(in) :: x(:)
 		real(mp), intent(in) :: dx

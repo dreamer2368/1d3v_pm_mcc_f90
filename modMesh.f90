@@ -5,14 +5,15 @@ module modMesh
 	implicit none
 
 	type mesh
-		integer :: ng, BCindex
-		real(mp) :: L, dx
+		integer :: ng, ngv, BCindex
+		real(mp) :: L, Lv, dx, dv
 
 		real(mp), allocatable :: E(:)
 !		real(mp), dimension(:), pointer :: rho=>NULL()	!For future devolopment of pointer-use
 		real(mp), allocatable :: rho(:)
 		real(mp), allocatable :: rho_back(:)				!1D sheath: surface charge
 		real(mp), allocatable :: phi(:)
+		real(mp), allocatable :: f(:,:), j(:,:)
 	contains
 		procedure, pass(this) :: buildMesh
 		procedure, pass(this) :: setMesh
@@ -23,10 +24,12 @@ module modMesh
 
 contains
 
-	subroutine buildMesh(this,L,ng,BC)
+	subroutine buildMesh(this,L,ng,BC,Lv,ngv)
 		class(mesh), intent(out) :: this
 		integer, intent(in) :: ng, BC
 		real(mp), intent(in) :: L
+		real(mp), intent(in), optional :: Lv
+		integer, intent(in), optional :: ngv
 
 		this%L = L
 		this%ng = ng
@@ -51,6 +54,16 @@ contains
 		this%rho_back = 0.0_mp
 
 !		call DSTPoisson_setup(this%ng,this%L,this%W)
+		if( PRESENT(Lv) ) then
+			this%Lv = Lv
+			this%ngv = ngv
+			this%dv = Lv/ngv
+print *, this%Lv, this%ngv, this%dv
+			allocate(this%f(ng,2*ngv+1))
+			allocate(this%j(ng,2*ngv+1))
+			this%f = 0.0_mp
+			this%j = 0.0_mp
+		end if
 	end subroutine
 
 	subroutine setMesh(this,rho_back)
@@ -67,6 +80,9 @@ contains
 		deallocate(this%rho)
 		deallocate(this%rho_back)
 		deallocate(this%phi)
+
+		if( ALLOCATED(this%f) ) deallocate(this%f)
+		if( ALLOCATED(this%j) ) deallocate(this%j)
 	end subroutine
 
 !===========Mesh Solver===============================================
