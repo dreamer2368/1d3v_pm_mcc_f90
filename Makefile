@@ -35,11 +35,11 @@ modSpecies.o : constants.o
 modMesh.o : MatrixVector.o
 modAssign.o : modSpecies.o modMesh.o
 modBC.o : modSpecies.o modMesh.o random.o
-modPM1D.o : modBC.o modAssign.o
+ArMCC.o : modSpecies.o random.o
+modPM1D.o : modBC.o modAssign.o ArMCC.o
 modRecord.o : modPM1D.o
 modAdj.o : modPM1D.o
 modQoI.o : modAdj.o
-ArMCC.o : modPM1D.o modRecord.o random.o
 modFSens.o : modBC.o modRecord.o
 init.o : modFSens.o
 modTarget.o : modAdj.o random.o

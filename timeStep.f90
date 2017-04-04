@@ -57,9 +57,9 @@ contains
 			call updatePlasma(this,target_input,source,k,r)
 			if( present(J) ) then
 				call QoI(this,k,J)
+				J_hist(k) = J
 			end if
 			call r%recordPlasma(this, k)									!record for n=1~Nt
-			J_hist(k) = J
 		end do
 		open(unit=305,file='data/'//r%dir//'/J_hist.bin',	&
 					status='replace',form='unformatted',access='stream')
@@ -166,7 +166,6 @@ contains
 		do i=1, this%n
 			call this%a(i)%chargeAssign(this%p(i),this%m)
 		end do
-
 		call CPU_TIME(time2)
 		cpt_temp(3) = (time2-time1)
 
@@ -194,10 +193,10 @@ contains
 		cpt_temp(7) = (time2-time1)
 
 		if( present(r) ) then
-			call mcc_collision(this,r%n_coll(:,k))
+			call this%mcc_collision(this%p,this%A0,r%n_coll(:,k))
 			r%cpt_temp(1:7) = r%cpt_temp(1:7) + cpt_temp/r%mod
 		else
-			call mcc_collision(this)
+			call this%mcc_collision(this%p,this%A0)
 		end if
 	end subroutine
 

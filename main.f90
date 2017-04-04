@@ -16,7 +16,7 @@ program main
 !	call test_mcc_electron
 !	call test_mcc_Argon
 !	call test_ext_voltage_Poisson
-!   call Ar_discharge
+   call Ar_discharge
 !	call test_particle_adj(64,2)
 !	call test_backward_sweep
 !	call twostream_adj(output(1),output(2))
@@ -29,7 +29,7 @@ program main
 !	call InjectionTest
 !	call MPITest
 !	call SensitivityInitializeTest
-	call Debye_sensitivity
+!	call Debye_sensitivity
 !	call forYeoh
 !	call RedistributionTest
 !	call updateWeightTest
@@ -387,6 +387,34 @@ contains
 		close(301)
 	end subroutine
 
+!===========   MCC collision setting   ==============================
+
+	subroutine set_Ar_discharge(pm, A, r)
+		type(PM1D), intent(inout) :: pm
+      type(recordData), intent(inout), optional :: r
+		real(mp), intent(in) :: A(4)						!A(1): temperature of neutral(eV),	A(2): density of neutral(m-3),
+                                                   !A(3): discharge current density(A/m2), A(4): discharge frequency(Hz)
+		if( pm%n .ne. 2 ) then
+			print *, 'ERROR : the number of species should be two corresponding to electon and Argon+. stopped the simulation.'
+			stop
+		end if
+
+		!Electron species
+		call buildSpecies(pm%p(1),-q_e,m_e)
+		!Argon cation species
+		call buildSpecies(pm%p(2),q_e,m_Ar)
+
+		deallocate(pm%A0)
+		allocate(pm%A0(4))
+		pm%A0 = A
+
+      if( present(r) ) then
+         allocate(r%n_coll(7,r%nt))
+      end if
+
+		pm%mcc_collision=>Argon_Electron
+	end subroutine
+
    subroutine Ar_discharge
       type(PM1D) :: pm
       type(recordData) :: r
@@ -404,7 +432,7 @@ contains
 
 	  spwt = n0*L/Np                      !spwt = nc2p/area
 
-	  print *, 'gden(m-3): ',gden,', n0(m-3): ',n0,', spwt(m-2): ',spwt
+	  print *, 'gden(m-3): ',gden,', n0(m-3): ',n0,', spwt(m-2): ',spwt(1)
 
 !      T0 = 0.5_mp*m_e*v0_e**2/q_e*EV_TO_K
 	  v0_e = sqrt(2.0_mp*T0/EV_TO_K*q_e/m_e)

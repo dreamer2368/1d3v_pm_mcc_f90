@@ -279,4 +279,17 @@ contains
 		end if
 	end subroutine
 
+!=======================================================
+!	For no_collision: don't compute n_coll
+!=======================================================
+
+	subroutine set_null_discharge(r)
+		type(recordData), intent(inout), optional :: r
+
+		if( present(r) ) then
+			allocate(r%n_coll(1,r%nt))
+			r%n_coll = 0
+		end if
+	end subroutine
+
 end module

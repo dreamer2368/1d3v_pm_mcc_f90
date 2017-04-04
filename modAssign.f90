@@ -93,11 +93,13 @@ contains
 		real(mp) :: h
 
 		!assignment matrix
-		g1 = FLOOR(xp/dx - 0.5_mp)+1
+!		g1 = FLOOR(xp/dx - 0.5_mp)+1				!For periodic BC
+		g1 = FLOOR(xp/dx) + 1						!For bounded BC
 		gl = g1
 		gr = gl+1
 
-		h = xp/dx - g1 + 0.5_mp
+!		h = xp/dx - g1 + 0.5_mp						!For periodic BC
+		h = xp/dx - g1 + 1.0_mp						!For bounded BC
 		fracl = 1.0_mp - ABS(h)
 		fracr = 1.0_mp - fracl
 
@@ -248,7 +250,7 @@ contains
 		real(mp), intent(inout) :: frac(:)
 
 		if( MINVAL(g)<1 .or. MAXVAL(g)>ng ) then
-			print *, MINVAL(g), MAXVAL(g)
+			print *, MINVAL(g), MAXVAL(g), frac
 			print *, 'Boundary handling is failed. particle is way outside BC. stopped time stepping.'
 			stop
 		end if

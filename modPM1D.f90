@@ -2,6 +2,7 @@ module modPM1D
 
 	use modBC
 	use modAssign
+	use ArMCC
 
 	implicit none
 
@@ -16,6 +17,7 @@ module modPM1D
 		type(pmAssign), allocatable :: a(:)
 
 		procedure(applyBC), nopass, pointer :: applyBC
+		procedure(mcc_collision), nopass, pointer :: mcc_collision
 	contains
 		procedure, pass(this) :: buildPM1D
 		procedure, pass(this) :: destroyPM1D
@@ -85,6 +87,8 @@ contains
 			case(3) !refluxing-refluxing
 				this%applyBC=>applyBC_refluxing_refluxing
 		end select
+
+		this%mcc_collision=>no_collision
 	end subroutine
 
 	subroutine destroyPM1D(this)
@@ -100,5 +104,6 @@ contains
 		call destroyMesh(this%m)
 		deallocate(this%a)
 	end subroutine
+
 
 end module

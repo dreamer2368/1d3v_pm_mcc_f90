@@ -1,7 +1,6 @@
 module ArMCC
 
-	use modPM1D
-   use modRecord
+	use modSpecies
 	use random
 	implicit none
 
@@ -10,65 +9,44 @@ module ArMCC
 	real(mp), parameter :: extengy0 = 11.55_mp, ionengy0 = 15.76_mp									!eV (excitation, ionization)
 	real(mp) :: col_prob_e = 0.0_mp, col_prob_Ar = 0.0_mp
 
+	abstract interface
+		subroutine mcc_collision(p,A0,n_coll)
+			use modSpecies
+			class(species), intent(inout) :: p(:)
+			real(mp), intent(in) :: A0(:)
+			integer, intent(out), optional :: n_coll(7)
+		end subroutine
+	end interface
+
 contains
 
-	subroutine set_Ar_discharge(pm, A, r)
-		type(PM1D), intent(inout) :: pm
-      type(recordData), intent(inout), optional :: r
-		real(mp), intent(in) :: A(4)						!A(1): temperature of neutral(eV),	A(2): density of neutral(m-3),
-                                                   !A(3): discharge current density(A/m2), A(4): discharge frequency(Hz)
-		if( pm%n .ne. 2 ) then
-			print *, 'ERROR : the number of species should be two corresponding to electon and Argon+. stopped the simulation.'
-			stop
-		end if
-
-		!Electron species
-		call buildSpecies(pm%p(1),-q_e,m_e)
-		!Argon cation species
-		call buildSpecies(pm%p(2),q_e,m_Ar)
-
-		deallocate(pm%A0)
-		allocate(pm%A0(4))
-		pm%A0 = A
-
-      if( present(r) ) then
-         allocate(r%n_coll(7,r%nt))
-      end if
-	end subroutine
-
 !=======================================================
-!	MCC global subroutine
+!	MCC global subroutine interface: mcc_collision
 !=======================================================
 
 	!No collision --- Use for collisionless PIC
-	subroutine mcc_collision(pm,n_coll)
-		type(PM1D), intent(inout) :: pm
+	subroutine no_collision(p,A0,n_coll)
+		class(species), intent(inout) :: p(:)
+		real(mp), intent(in) :: A0(:)
 		integer, intent(out), optional :: n_coll(7)
 
 	end subroutine
 
-	subroutine set_null_discharge(r)
-		type(recordData), intent(inout), optional :: r
+	!Argon-Electron collision
+	subroutine Argon_Electron(p,A0,n_coll)
+		class(species), intent(inout) :: p(:)
+		real(mp), intent(in) :: A0(:)
+      integer, intent(out), optional :: n_coll(7)
 
-		if( present(r) ) then
-			allocate(r%n_coll(1,r%nt))
-			r%n_coll = 0
+		if( present(n_coll) ) then
+			call mcc_Argon(p(2),A0(1),n_coll(5:7))
+			call mcc_electron(p(1),p(2),A0(1),n_coll(1:4))
+		else
+			call mcc_Argon(p(2),A0(1))
+			call mcc_electron(p(1),p(2),A0(1))
 		end if
 	end subroutine
 
-	!Argon-Electron collision
-!	subroutine mcc_collision(pm,n_coll)
-!		type(PM1D), intent(inout) :: pm
-!      integer, intent(out), optional :: n_coll(7)
-!
-!		if( present(n_coll) ) then
-!			call mcc_Argon(pm,n_coll(5:7))
-!			call mcc_electron(pm,n_coll(1:4))
-!		else
-!			call mcc_Argon(pm)
-!			call mcc_electron(pm)
-!		end if
-!	end subroutine
 
 !=======================================================
 !	Compute null collision for each species (e, Ar+)
@@ -83,8 +61,9 @@ contains
 !=======================================================
 !	MCC for each species
 !=======================================================
-	subroutine mcc_electron(pm,n_diag)						!electron species
-		type(PM1D), intent(inout) :: pm
+	subroutine mcc_electron(Electron,Ar,T_eV,n_diag)						!electron species
+		type(species), intent(inout) :: Electron, Ar
+		real(mp), intent(in) :: T_eV									!Temperature in eV
 		integer, intent(out), optional :: n_diag(4)
 		integer :: n_coll, nnp, idx
 		real(mp) :: rnd, rnd_ion, temp_x, temp_v(3)
@@ -102,8 +81,8 @@ contains
       end if
 
 		!Pick particles for collisions
-		n_coll = floor( pm%p(1)%np*col_prob_e )
-		nnp = pm%p(1)%np
+		n_coll = floor( Electron%np*col_prob_e )
+		nnp = Electron%np
 		do i=1,n_coll
 			call RANDOM_NUMBER(rnd)
 			idx = ceiling( nnp*rnd )
@@ -112,18 +91,18 @@ contains
 			end if
 
 			!sort them into the tail of arrays
-			temp_x = pm%p(1)%xp(nnp)
-			temp_v = pm%p(1)%vp(nnp,:)
-			pm%p(1)%xp(nnp) = pm%p(1)%xp(idx)
-			pm%p(1)%vp(nnp,:) = pm%p(1)%vp(idx,:)
-			pm%p(1)%xp(idx) = temp_x
-			pm%p(1)%vp(idx,:) = temp_v
+			temp_x = Electron%xp(nnp)
+			temp_v = Electron%vp(nnp,:)
+			Electron%xp(nnp) = Electron%xp(idx)
+			Electron%vp(nnp,:) = Electron%vp(idx,:)
+			Electron%xp(idx) = temp_x
+			Electron%vp(idx,:) = temp_v
 			nnp = nnp-1
 		end do
 
 		!Pick the type of collision for each particle
 		!Note: we don't consider the velocity of the neutral, assuming that it is much smaller than that of electron species
-		vT = sqrt( pm%A0(1)*q_e/m_Ar )
+		vT = sqrt( T_eV*q_e/m_Ar )
 		new_e = 0
 		new_Ar = 0
 		allocate(vec1_e(n_coll))
@@ -131,8 +110,8 @@ contains
 		allocate(vec1_Ar(n_coll))
 		allocate(vec2_Ar(n_coll,3))
 		do i=nnp+1,nnp+n_coll
-			vel = sqrt( sum( pm%p(1)%vp(i,:)**2 ) )
-			engy = 0.5_mp*pm%p(1)%ms*vel**2/q_e			!scale in eV
+			vel = sqrt( sum( Electron%vp(i,:)**2 ) )
+			engy = 0.5_mp*Electron%ms*vel**2/q_e			!scale in eV
 			nu_total_vel = max_sigmav_e/vel
 
 			call RANDOM_NUMBER(rnd)
@@ -142,7 +121,7 @@ contains
 			!Elastic
 			if( rnd .le. sum_sigma(1)/nu_total_vel ) then
 
-				call anewvel_e(engy,m_e,m_Ar,pm%p(1)%vp(i,:),.true.)
+				call anewvel_e(engy,m_e,m_Ar,Electron%vp(i,:),.true.)
             if( present(n_diag) ) then
    				n_elastic = n_elastic+1
             end if
@@ -151,10 +130,10 @@ contains
 			elseif( (engy.ge.extengy0) .and. (rnd.le.sum_sigma(2)/nu_total_vel) ) then
 
 				engy = engy - extengy0
-				pm%p(1)%vp(i,:) = pm%p(1)%vp(i,:)/vel
-				vel = sqrt( 2.0_mp/pm%p(1)%ms*q_e*engy )
-				pm%p(1)%vp(i,:) = pm%p(1)%vp(i,:)*vel
-				call anewvel_e(engy,m_e,m_Ar,pm%p(1)%vp(i,:),.false.)
+				Electron%vp(i,:) = Electron%vp(i,:)/vel
+				vel = sqrt( 2.0_mp/Electron%ms*q_e*engy )
+				Electron%vp(i,:) = Electron%vp(i,:)*vel
+				call anewvel_e(engy,m_e,m_Ar,Electron%vp(i,:),.false.)
             if( present(n_diag) ) then
    				n_excite = n_excite+1
             end if
@@ -171,18 +150,18 @@ contains
 
 				!scatter the created electron
 				new_e = new_e+1
-				vec1_e(new_e) = pm%p(1)%xp(i)
-				vec2_e(new_e,:) = pm%p(1)%vp(i,:)/vel*sqrt( 2.0_mp/pm%p(1)%ms*q_e*rengy )
+				vec1_e(new_e) = Electron%xp(i)
+				vec2_e(new_e,:) = Electron%vp(i,:)/vel*sqrt( 2.0_mp/Electron%ms*q_e*rengy )
 				call anewvel_e(rengy,m_e,m_Ar,vec2_e(new_e,:),.false.)
 
 				!assign velocity to the created Ar ion
 				new_Ar = new_Ar+1
-				vec1_Ar(new_Ar) = pm%p(1)%xp(i)
+				vec1_Ar(new_Ar) = Electron%xp(i)
 				vec2_Ar(new_Ar,:) = vT*randn(3)
 
 				!scatter the incident electron
-				pm%p(1)%vp(i,:) = pm%p(1)%vp(i,:)/vel*sqrt( 2.0_mp/pm%p(1)%ms*q_e*engy )
-				call anewvel_e(engy,m_e,m_Ar,pm%p(1)%vp(i,:),.false.)
+				Electron%vp(i,:) = Electron%vp(i,:)/vel*sqrt( 2.0_mp/Electron%ms*q_e*engy )
+				call anewvel_e(engy,m_e,m_Ar,Electron%vp(i,:),.false.)
             if( present(n_diag) ) then
    				n_ionize = n_ionize+1
             end if
@@ -194,52 +173,64 @@ contains
 
 		!Add newly created particles
       !Electron species
-		pm%p(1)%np = pm%p(1)%np + new_e
+		Electron%np = Electron%np + new_e
       !xp
-		allocate(temp1(pm%p(1)%np))
-		temp1(1:pm%p(1)%np-new_e) = pm%p(1)%xp
-		temp1(pm%p(1)%np-new_e+1:pm%p(1)%np) = vec1_e(1:new_e)
-		deallocate(pm%p(1)%xp)
-		allocate(pm%p(1)%xp(pm%p(1)%np))
-		pm%p(1)%xp = temp1
+		allocate(temp1(Electron%np))
+		temp1(1:Electron%np-new_e) = Electron%xp
+		temp1(Electron%np-new_e+1:Electron%np) = vec1_e(1:new_e)
+		deallocate(Electron%xp)
+		allocate(Electron%xp(Electron%np))
+		Electron%xp = temp1
+      !spwt
+		temp1(1:Electron%np-new_e) = Electron%spwt
+		temp1(Electron%np-new_e+1:Electron%np) = Electron%spwt(1)				!Assume uniform spwt!!
+		deallocate(Electron%spwt)
+		allocate(Electron%spwt(Electron%np))
+		Electron%spwt = temp1
       !Ep
-		temp1(1:pm%p(1)%np-new_e) = pm%p(1)%Ep
-		temp1(pm%p(1)%np-new_e+1:pm%p(1)%np) = 0.0_mp
-		deallocate(pm%p(1)%Ep)
-		allocate(pm%p(1)%Ep(pm%p(1)%np))
-		pm%p(1)%Ep = temp1
+		temp1(1:Electron%np-new_e) = Electron%Ep
+		temp1(Electron%np-new_e+1:Electron%np) = 0.0_mp
+		deallocate(Electron%Ep)
+		allocate(Electron%Ep(Electron%np))
+		Electron%Ep = temp1
 		deallocate(temp1)
       !vp
-		allocate(temp2(pm%p(1)%np,3))
-		temp2(1:pm%p(1)%np-new_e,:) = pm%p(1)%vp
-		temp2(pm%p(1)%np-new_e+1:pm%p(1)%np,:) = vec2_e(1:new_e,:)
-		deallocate(pm%p(1)%vp)
-		allocate(pm%p(1)%vp(pm%p(1)%np,3))
-		pm%p(1)%vp = temp2
+		allocate(temp2(Electron%np,3))
+		temp2(1:Electron%np-new_e,:) = Electron%vp
+		temp2(Electron%np-new_e+1:Electron%np,:) = vec2_e(1:new_e,:)
+		deallocate(Electron%vp)
+		allocate(Electron%vp(Electron%np,3))
+		Electron%vp = temp2
 		deallocate(temp2)
       !Argon species
-		pm%p(2)%np = pm%p(2)%np + new_Ar
+		Ar%np = Ar%np + new_Ar
       !xp
-		allocate(temp1(pm%p(2)%np))
-		temp1(1:pm%p(2)%np-new_Ar) = pm%p(2)%xp
-		temp1(pm%p(2)%np-new_Ar+1:pm%p(2)%np) = vec1_Ar(1:new_Ar)
-		deallocate(pm%p(2)%xp)
-		allocate(pm%p(2)%xp(pm%p(2)%np))
-		pm%p(2)%xp = temp1
+		allocate(temp1(Ar%np))
+		temp1(1:Ar%np-new_Ar) = Ar%xp
+		temp1(Ar%np-new_Ar+1:Ar%np) = vec1_Ar(1:new_Ar)
+		deallocate(Ar%xp)
+		allocate(Ar%xp(Ar%np))
+		Ar%xp = temp1
+      !spwt
+		temp1(1:Ar%np-new_Ar) = Ar%spwt
+		temp1(Ar%np-new_Ar+1:Ar%np) = Ar%spwt(1)						!Assume uniform spwt!!!
+		deallocate(Ar%spwt)
+		allocate(Ar%spwt(Ar%np))
+		Ar%spwt = temp1
       !Ep
-		temp1(1:pm%p(2)%np-new_Ar) = pm%p(2)%Ep
-		temp1(pm%p(2)%np-new_Ar+1:pm%p(2)%np) = 0.0_mp
-		deallocate(pm%p(2)%Ep)
-		allocate(pm%p(2)%Ep(pm%p(2)%np))
-		pm%p(2)%Ep = temp1
+		temp1(1:Ar%np-new_Ar) = Ar%Ep
+		temp1(Ar%np-new_Ar+1:Ar%np) = 0.0_mp
+		deallocate(Ar%Ep)
+		allocate(Ar%Ep(Ar%np))
+		Ar%Ep = temp1
 		deallocate(temp1)
       !vp
-		allocate(temp2(pm%p(2)%np,3))
-		temp2(1:pm%p(2)%np-new_Ar,:) = pm%p(2)%vp
-		temp2(pm%p(2)%np-new_Ar+1:pm%p(2)%np,:) = vec2_Ar(1:new_Ar,:)
-		deallocate(pm%p(2)%vp)
-		allocate(pm%p(2)%vp(pm%p(2)%np,3))
-		pm%p(2)%vp = temp2
+		allocate(temp2(Ar%np,3))
+		temp2(1:Ar%np-new_Ar,:) = Ar%vp
+		temp2(Ar%np-new_Ar+1:Ar%np,:) = vec2_Ar(1:new_Ar,:)
+		deallocate(Ar%vp)
+		allocate(Ar%vp(Ar%np,3))
+		Ar%vp = temp2
 		deallocate(temp2)
       !deallocate temporary arrays
 		deallocate(vec1_e)
@@ -248,8 +239,9 @@ contains
 		deallocate(vec2_Ar)
 	end subroutine
 
-	subroutine mcc_Argon(pm,N_diag)
-		type(PM1D), intent(inout) :: pm
+	subroutine mcc_Argon(Ar,T_eV,N_diag)
+		type(species), intent(inout) :: Ar
+		real(mp), intent(in) :: T_eV								!Temperature in eV
       integer, intent(out), optional :: N_diag(3)
 		integer :: n_coll, nnp, idx
 		real(mp) :: rnd, temp_x, temp_v(3), vT, vn(3)
@@ -263,8 +255,8 @@ contains
       end if
 
 		!Pick particles for collisions
-		n_coll = floor( pm%p(2)%np*col_prob_Ar )
-		nnp = pm%p(2)%np
+		n_coll = floor( Ar%np*col_prob_Ar )
+		nnp = Ar%np
 		do i=1,n_coll
 			call RANDOM_NUMBER(rnd)
 			idx = ceiling( nnp*rnd )
@@ -272,23 +264,23 @@ contains
 				idx = nnp
 			end if
 
-			temp_x = pm%p(2)%xp(nnp)
-			temp_v = pm%p(2)%vp(nnp,:)
-			pm%p(2)%xp(nnp) = pm%p(2)%xp(idx)
-			pm%p(2)%vp(nnp,:) = pm%p(2)%vp(idx,:)
-			pm%p(2)%xp(idx) = temp_x
-			pm%p(2)%vp(idx,:) = temp_v
+			temp_x = Ar%xp(nnp)
+			temp_v = Ar%vp(nnp,:)
+			Ar%xp(nnp) = Ar%xp(idx)
+			Ar%vp(nnp,:) = Ar%vp(idx,:)
+			Ar%xp(idx) = temp_x
+			Ar%vp(idx,:) = temp_v
 			nnp = nnp-1
 		end do
 
 		!Pick the type of collision for each particle
 		!Note: we consider the velocity of the neutral here
-		vT = sqrt( pm%A0(1)*q_e/m_Ar )
+		vT = sqrt( T_eV*q_e/m_Ar )
 		do i=nnp+1,nnp+n_coll
 			vn = vT*randn(3)
-			pm%p(2)%vp(i,:) = pm%p(2)%vp(i,:) - vn
-			vel = sqrt( sum( pm%p(2)%vp(i,:)**2 ) )
-			engy = 0.5_mp*pm%p(2)%ms*vel**2/q_e			!scale in eV
+			Ar%vp(i,:) = Ar%vp(i,:) - vn
+			vel = sqrt( sum( Ar%vp(i,:)**2 ) )
+			engy = 0.5_mp*Ar%ms*vel**2/q_e			!scale in eV
 			nu_total_vel = max_sigmav_Ar/vel
 
 			call RANDOM_NUMBER(rnd)
@@ -297,7 +289,7 @@ contains
 			!Charge Exchange
 			if( rnd .le. sum_sigma(1)/nu_total_vel ) then
 
-				pm%p(2)%vp(i,:) = 0.0_mp
+				Ar%vp(i,:) = 0.0_mp
             if( present(N_diag) ) then
    				n_exchange = n_exchange+1
             end if
@@ -305,13 +297,13 @@ contains
 			!Elastic scattering
 			elseif( rnd .le. sum_sigma(2)/nu_total_vel ) then
 
-				call anewvel_Ar(pm%p(2)%vp(i,:))
+				call anewvel_Ar(Ar%vp(i,:))
             if( present(N_diag) ) then
    				n_elastic = n_elastic+1
             end if
 
 			end if
-			pm%p(2)%vp(i,:) = pm%p(2)%vp(i,:) + vn
+			Ar%vp(i,:) = Ar%vp(i,:) + vn
 		end do
 
       if( present(N_diag) ) then
