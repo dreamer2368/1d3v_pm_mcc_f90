@@ -15,40 +15,45 @@ contains
 	subroutine forwardsweep(this,r,inputControl,inputSource,inputQoI,J)
 		type(PM1D), intent(inout) :: this
 		type(recordData), intent(inout) :: r
-		procedure(control) :: inputControl
-		procedure(source) :: inputSource
+		procedure(control), optional :: inputControl
+		procedure(source), optional :: inputSource
 		procedure(QoI), optional :: inputQoI
 		real(mp), intent(out), optional :: J
+		procedure(control), pointer :: PtrControl=>Null_input
+		procedure(source), pointer :: PtrSource=>Null_source
+		procedure(QoI), pointer :: PtrQoI=>Null_QoI
 		integer :: i,k
-		real(mp) :: J_hist(this%nt)
+		real(mp) :: Jtemp, J_hist(this%nt)
+		if( PRESENT(inputControl) ) PtrControl=>inputControl
+		if( PRESENT(inputSource) ) PtrSource=>inputSource
+		if( PRESENT(inputQoI) ) PtrQoI=>inputQoI
 		if( present(J) ) then
 			J = 0.0_mp
 		end if
 		k=0
+		Jtemp = 0.0_mp
 		J_hist = 0.0_mp
 
 		!Time stepping
 !		call halfStep(this,target_input)
-		if( present(J) ) then
-			call inputQoI(this,k,J)
-		end if
+		call PtrQoI(this,k,Jtemp)
 		call r%recordPlasma(this, k)									!record for n=1~Nt
 		do k=1,this%nt
-			call updatePlasma(this,inputControl,inputSource,k,r)
-			if( present(J) ) then
-				call inputQoI(this,k,J)
-				J_hist(k) = J
-			end if
+			call updatePlasma(this,PtrControl,PtrSource,k,r)
+			call PtrQoI(this,k,Jtemp)
+			J_hist(k) = Jtemp
 			call r%recordPlasma(this, k)									!record for n=1~Nt
 		end do
+		if( PRESENT(J) ) J=Jtemp
 		open(unit=305,file='data/'//r%dir//'/J_hist.bin',	&
 					status='replace',form='unformatted',access='stream')
 		write(305) J_hist
 		close(305)
 	end subroutine
 
-	subroutine halfStep(this,inputControl)
+	subroutine halfStep(this,PtrControl)
 		type(PM1D), intent(inout) :: this
+		procedure(control), pointer :: PtrControl
 		integer :: i, j
 		real(mp) :: rhs(this%ng-1)
 		real(mp) :: phi1(this%ng-1)
@@ -56,7 +61,6 @@ contains
 		integer :: N,Ng
 		integer :: g(this%p(1)%np,2)
 		real(mp) :: frac(this%p(1)%np,2)
-		procedure(control) :: inputControl
 		dt = this%dt
 		L = this%L
 		N = this%N
@@ -72,7 +76,7 @@ contains
 			call this%a(i)%chargeAssign(this%p(i),this%m)
 		end do
 
-		call inputControl(this,0,'rho_back')
+		call PtrControl(this,0,'rho_back')
 		call this%m%solveMesh(this%eps0)
 
 		!Electric field : -D*phi
@@ -89,25 +93,25 @@ contains
 		end do
 	end subroutine
 
-	subroutine updatePlasma(this,inputControl,inputSource,k,r)
+	subroutine updatePlasma(this,PtrControl,PtrSource,k,r)
 		type(PM1D), intent(inout) :: this
+		procedure(control), pointer :: PtrControl
+		procedure(source), pointer :: PtrSource
 		type(recordData), intent(inout), optional :: r
 		integer, intent(in) :: k
 		real(mp) :: rhs(this%ng-1), phi1(this%ng-1)
 		real(mp) :: dt, L
 		integer :: N, Ng, i
 		real(mp) :: time1, time2, cpt_temp(7)
-		procedure(control) :: inputControl
-		procedure(source) :: inputSource
 		dt = this%dt
 		L = this%L
 		N = this%n
 		Ng = this%ng
 		cpt_temp = 0.0_mp
 
-		call inputControl(this,k,'xp')
+		call PtrControl(this,k,'xp')
 
-		call inputSource(this)
+		call PtrSource(this)
 
 		call CPU_TIME(time1)
 		do i=1,this%n
@@ -130,7 +134,7 @@ contains
 		call CPU_TIME(time2)
 		cpt_temp(3) = (time2-time1)
 
-		call inputControl(this,k,'rho_back')
+		call PtrControl(this,k,'rho_back')
 		call this%m%solveMesh(this%eps0)
 		call CPU_TIME(time1)
 		cpt_temp(4) = (time1-time2)
@@ -163,56 +167,17 @@ contains
 
 !===================Adjoint time stepping==========================
 
-	subroutine backward_sweep(adj,pm,r, grad, dJ, Dtarget_input,dJdA,target_input,source)
+	subroutine backward_sweep(adj,pm,r, grad, inputDJ, inputDControl,inputGrad,inputControl,inputSource)
 		type(adjoint), intent(inout) :: adj
 		type(PM1D), intent(inout) :: pm
 		type(recordData), intent(inout) :: r
 		real(mp), intent(out) :: grad(:)
+		procedure(Adj_DJ) :: inputDJ
+		procedure(Adj_Dcontrol) :: inputDControl
+		procedure(Adj_grad) :: inputGrad
+		procedure(control) :: inputControl
+		procedure(source) :: inputSource
 		integer :: k, nk, i
-		interface
-			subroutine dJ(adj,pm,k)
-				use modPM1D
-				use modAdj
-				type(adjoint), intent(inout) :: adj
-				type(PM1D), intent(in) :: pm
-				integer, intent(in) :: k
-			end subroutine
-		end interface
-		interface
-			subroutine Dtarget_input(adj,pm,k,str)
-				use modPM1D
-				use modAdj
-				type(adjoint), intent(inout) :: adj
-				type(PM1D), intent(in) :: pm
-				integer, intent(in) :: k
-				character(len=*), intent(in) :: str
-			end subroutine
-		end interface
-		interface
-			subroutine dJdA(adj,pm,k,str,grad)
-				use modPM1D
-				use modAdj
-				type(adjoint), intent(in) :: adj
-				type(PM1D), intent(in) :: pm
-				integer, intent(in) :: k
-				character(len=*), intent(in) :: str
-				real(mp), intent(inout) :: grad(:)
-			end subroutine
-		end interface
-		interface
-			subroutine target_input(pm,k,str)
-				use modPM1D
-				type(PM1D), intent(inout) :: pm
-				integer, intent(in) :: k
-				character(len=*), intent(in) :: str
-			end subroutine
-		end interface
-		interface
-			subroutine source(pm)
-				use modPM1D
-				type(PM1D), intent(inout) :: pm
-			end subroutine
-		end interface
 		grad = 0.0_mp
 
 		do k=1,pm%nt
@@ -220,16 +185,16 @@ contains
 			call adj%reset_Dadj
 
 			!=====  Checkpointing  =====
-			call checkpoint(pm,r,nk,target_input,source)
+			call checkpoint(pm,r,nk,inputControl,inputSource)
 
 			!===== dJdA : 1st sensitivity calculation ======
-			call dJdA(adj,pm,nk,'before',grad)
+			call inputGrad(adj,pm,nk,'before',grad)
 
 			!======= dJ : source term ==========
-			call dJ(adj,pm,nk)
+			call inputDJ(adj,pm,nk)
 
 			!======= dv_p =============
-			call Dtarget_input(adj,pm,nk,'vp')
+			call inputDControl(adj,pm,nk,'vp')
 			call adj%Adj_accel
 
 !			!Check when adjoint reach to the initial step
@@ -257,56 +222,49 @@ contains
 				call pm%a(i)%Adj_chargeAssign(pm%p(i),pm%m,adj%m%rho,adj%dp(i)%xp)
 				call pm%a(i)%Adj_forceAssign_xp(pm%m,pm%m%E,adj%p(i)%Ep,adj%dp(i)%xp)
 			end do
-			call Dtarget_input(adj,pm,nk,'xp')
+			call inputDControl(adj,pm,nk,'xp')
 			call adj%Adj_move
 
 			!===== dJdA : 2nd sensitivity calculation ======
-			call dJdA(adj,pm,nk,'after',grad)
+			call inputGrad(adj,pm,nk,'after',grad)
 		end do
 		nk = 0
 		call reset_Dadj(adj)
 		!=====  Checkpointing  =====
-		call checkpoint(pm,r,nk,target_input,source)
+		call checkpoint(pm,r,nk,inputControl,inputSource)
 
 		!===== dJdA : 1st sensitivity calculation ======
-		call dJdA(adj,pm,nk,'before',grad)
+		call inputGrad(adj,pm,nk,'before',grad)
 
 		!======= dJ : source term ==========
-		call dJ(adj,pm,nk)
+		call inputDJ(adj,pm,nk)
 
 		!======= dv_p =============
-		call Dtarget_input(adj,pm,nk,'vp')
+		call inputDControl(adj,pm,nk,'vp')
 		call adj%Adj_accel
 
 		!======= dx_p =============
-		call Dtarget_input(adj,pm,nk,'xp')
+		call inputDControl(adj,pm,nk,'xp')
 		call adj%Adj_move
 
 		!===== dJdA : 2nd sensitivity calculation ======
-		call dJdA(adj,pm,nk,'after',grad)
+		call inputGrad(adj,pm,nk,'after',grad)
 	end subroutine
 
-	subroutine checkpoint(pm,r,nk,target_input,source)
+	subroutine checkpoint(pm,r,nk,inputControl,inputSource)
 		type(PM1D), intent(inout) :: pm
 		type(recordData), intent(inout) :: r
 		integer, intent(in) :: nk
+		procedure(control) :: inputControl
+		procedure(source) :: inputSource
+		procedure(control), pointer :: PtrControl
+		procedure(source), pointer :: PtrSource
 		integer :: kr,i
 		character(len=1000) :: istr, kstr, dir_temp
 		real(mp), allocatable :: xp0(:), vp0(:,:), spwt0(:)
-		interface
-			subroutine target_input(pm,k,str)
-				use modPM1D
-				type(PM1D), intent(inout) :: pm
-				integer, intent(in) :: k
-				character(len=*), intent(in) :: str
-			end subroutine
-		end interface
-		interface
-			subroutine source(pm)
-				use modPM1D
-				type(PM1D), intent(inout) :: pm
-			end subroutine
-		end interface
+		PtrControl=>inputControl
+		PtrSource=>inputSource
+
 		kr = merge(nk,nk/r%mod,r%mod.eq.1)
 		write(kstr,*) kr
 		do i=1,pm%n
@@ -339,7 +297,7 @@ contains
 				call pm%a(i)%chargeAssign(pm%p(i),pm%m)
 			end do
 
-			call target_input(pm,nk,'rho_back')
+			call inputControl(pm,nk,'rho_back')
 			call pm%m%solveMesh(pm%eps0)
 
 			!Electric field : -D*phi
@@ -351,25 +309,29 @@ contains
 			end do
 		else
 			do i=1,nk-kr*r%mod
-				call updatePlasma(pm,target_input,source,i)
+				call updatePlasma(pm,PtrControl,PtrSource,i)
 			end do
 		end if
 	end subroutine
 
 !===============Forward, continuum Sensitivity
 
-	subroutine forwardsweep_sensitivity(this,r,fs,fsr,inputControl,inputSource,inputQoI,J,grad)
+	subroutine forwardsweep_sensitivity(this,r,fs,fsr,inputQoI,J,grad,inputControl,inputSource)
 		type(PM1D), intent(inout) :: this
 		type(FSens), intent(inout) :: fs
 		type(recordData), intent(inout) :: r, fsr
+		procedure(QoI) :: inputQoI
+		real(mp), intent(out) :: J,grad
+		procedure(control), optional :: inputControl
+		procedure(source), optional :: inputSource
 		integer :: i,k,kr
 		character(len=100) :: kstr
-		real(mp), intent(out) :: J,grad
 		real(mp), dimension(this%nt) :: J_hist, grad_hist
 		real(mp) :: time1, time2
-		procedure(control) :: inputControl
-		procedure(source) :: inputSource
-		procedure(QoI) :: inputQoI
+		procedure(control), pointer :: PtrControl=>Null_input
+		procedure(source), pointer :: PtrSource=>Null_source
+		if( PRESENT(inputControl) ) PtrControl=>inputControl
+		if( PRESENT(inputSource) ) PtrSource=>inputSource
 		J = 0.0_mp
 		grad = 0.0_mp
 		J_hist = 0.0_mp
@@ -377,11 +339,11 @@ contains
 		k=0
 
 		!Time stepping
-		call halfStep(this,inputControl)
+		call halfStep(this,PtrControl)
 		call inputQoI(this,k,J)
 		call r%recordPlasma(this, k)										!record for n=1~Nt
 
-		call halfStep_Sensitivity(fs%dpm,this,inputControl)
+		call halfStep_Sensitivity(fs%dpm,this,PtrControl)
 		call fsr%recordPlasma(fs%dpm, k)
 		call fs%FSensDistribution
 
@@ -394,12 +356,12 @@ contains
 			close(305)
 		end if
 		do k=1,this%nt
-			call updatePlasma(this,inputControl,inputSource,k,r)
+			call updatePlasma(this,PtrControl,PtrSource,k,r)
 			call inputQoI(this,k,J)
 			J_hist(k) = J
 			call r%recordPlasma(this, k)									!record for n=1~Nt
 
-			call updateSensitivity(fs%dpm,this,inputControl,inputSource,k,fsr)
+			call updateSensitivity(fs%dpm,this,PtrControl,PtrSource,k,fsr)
 !			call fs%FSensDistribution
 !			call fs%Redistribute
 
@@ -448,22 +410,15 @@ contains
 		close(305)
 	end subroutine
 
-	subroutine halfStep_Sensitivity(dpm,pm,Dtarget_input)
+	subroutine halfStep_Sensitivity(dpm,pm,PtrControl)
 		type(PM1D), intent(inout) :: dpm
 		type(PM1D), intent(in) :: pm
+		procedure(control), pointer :: PtrControl
 		integer :: i, j
 		real(mp) :: rhs(dpm%ng-1)
 		real(mp) :: phi1(dpm%ng-1)
 		real(mp) :: dt, L
 		integer :: N,Ng
-		interface
-			subroutine Dtarget_input(pm,k,str)
-				use modPM1D
-				type(PM1D), intent(inout) :: pm
-				integer, intent(in) :: k
-				character(len=*), intent(in) :: str
-			end subroutine
-		end interface
 		dt = dpm%dt
 		L = dpm%L
 		N = dpm%N
@@ -486,7 +441,7 @@ contains
 			call dpm%a(i)%chargeAssign(dpm%p(i),dpm%m)
 		end do
 
-		call Dtarget_input(dpm,0,'rho_back')
+		call PtrControl(dpm,0,'rho_back')
 
 		!for control parameter qp
 !		dpm%m%rho = dpm%m%rho + pm%m%rho/pm%p(1)%qs
@@ -507,37 +462,25 @@ contains
 		end do
 	end subroutine
 
-	subroutine updateSensitivity(dpm,pm,Dtarget_input,Dsource,k,r)
+	subroutine updateSensitivity(dpm,pm,PtrControl,PtrSource,k,r)
 		type(PM1D), intent(inout) :: dpm
 		type(PM1D), intent(in) :: pm
+		procedure(control), pointer :: PtrControl
+		procedure(source), pointer :: PtrSource
 		type(recordData), intent(inout), optional :: r
 		integer, intent(in) :: k
 		real(mp) :: rhs(dpm%ng-1), phi1(dpm%ng-1)
 		real(mp) :: dt, L
 		integer :: N, Ng, i
 		real(mp) :: time1, time2
-		interface
-			subroutine Dtarget_input(pm,k,str)
-				use modPM1D
-				type(PM1D), intent(inout) :: pm
-				integer, intent(in) :: k
-				character(len=*), intent(in) :: str
-			end subroutine
-		end interface
-		interface
-			subroutine Dsource(pm)
-				use modPM1D
-				type(PM1D), intent(inout) :: pm
-			end subroutine
-		end interface
 		dt = dpm%dt
 		L = dpm%L
 		N = dpm%n
 		Ng = dpm%ng
 
-		call Dtarget_input(dpm,k,'xp')
+		call PtrControl(dpm,k,'xp')
 
-		call Dsource(dpm)
+		call PtrSource(dpm)
 
 		call CPU_TIME(time1)
 		do i=1,dpm%n
@@ -568,7 +511,7 @@ contains
 		call CPU_TIME(time2)
 		r%cpt_temp(3) = r%cpt_temp(3) + (time2-time1)/r%mod
 
-		call Dtarget_input(dpm,k,'rho_back')
+		call PtrControl(dpm,k,'rho_back')
 
 		!for control parameter qp
 !		dpm%m%rho = dpm%m%rho + pm%m%rho/pm%p(1)%qs

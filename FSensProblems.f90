@@ -85,7 +85,7 @@ contains
 		call Debye_sensitivity_init(fs,N,vT,'vT')
 !		call Debye_sensitivity_init_sync(fs,pm,vT,'vT')
 
-		call forwardsweep_sensitivity(pm,r,fs,fsr,Null_input,Null_source,Debye,J,grad)
+		call forwardsweep_sensitivity(pm,r,fs,fsr,Debye,J,grad)
 
 		print *, 'J: ',J
 		print *, 'grad: ',grad
@@ -136,7 +136,7 @@ contains
 			call buildRecord(fsr,fs%dpm%nt,1,fs%dpm%L,fs%dpm%ng,trim(dir),20)
 			call Debye_sensitivity_init(fs,2*N,A(1))
 	
-			call forwardsweep_sensitivity(d,r,fs,fsr,Null_input,Null_source,Debye,J,grad)
+			call forwardsweep_sensitivity(d,r,fs,fsr,Debye,J,grad)
 
 			mpih%sendbuf(i,:) = (/vT(mpih%displc(mpih%my_rank)+i),J,grad/)
 
@@ -204,7 +204,7 @@ contains
 				call buildRecord(fsr,fs%dpm%nt,1,fs%dpm%L,fs%dpm%ng,trim(dir),20)
 				call Debye_sensitivity_init(fs,2*N,A(1))
 	
-				call forwardsweep_sensitivity(d,r,fs,fsr,Null_input,Null_source,Debye,J,grad)
+				call forwardsweep_sensitivity(d,r,fs,fsr,Debye,J,grad)
 
 				call buildAdjoint(adj,d)
 				call adj%m%setMesh(d%m%rho_back)

@@ -14,7 +14,7 @@ module modQoI
 	end interface
 
 	abstract interface
-		subroutine Adj_dJ(adj,pm,nk)
+		subroutine Adj_DJ(adj,pm,nk)
 			use modAdj
 			type(adjoint), intent(inout) :: adj
 			type(PM1D), intent(in) :: pm
@@ -23,6 +23,12 @@ module modQoI
 	end interface
 
 contains
+
+	subroutine Null_QoI(pm,k,J)
+		type(PM1D), intent(in) :: pm
+		integer, intent(in) :: k
+		real(mp), intent(inout) :: J
+	end subroutine
 
 !=============Mean Kinetic Energy====================
 
