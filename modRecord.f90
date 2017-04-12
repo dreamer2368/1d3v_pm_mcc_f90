@@ -95,7 +95,7 @@ contains
 
 	subroutine recordPlasma(this,pm,k)
 		class(recordData), intent(inout) :: this
-		type(PM1D), intent(in) :: pm
+		class(PM1D), intent(in) :: pm
 		integer, intent(in) :: k					!k : time step
 		integer :: n,j, kr								!n : species
 		character(len=100) :: nstr, kstr

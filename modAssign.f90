@@ -16,7 +16,7 @@ module modAssign
 	contains
 		procedure, pass(this) :: buildAssign
 		procedure, pass(this) :: destroyAssign
-		procedure, pass(this) :: chargeAssign				!We handle chargeAssign subroutine globally, since it handles multiple species
+		procedure, pass(this) :: chargeAssign
 		procedure, pass(this) :: forceAssign
 		procedure, pass(this) :: Adj_chargeAssign
 		procedure, pass(this) :: Adj_forceAssign_E

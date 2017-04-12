@@ -7,10 +7,10 @@ module timeStepFSens
 contains
 !===============Forward, continuum Sensitivity
 
-	subroutine forwardsweep_sensitivity(this,r,fs,fsr,inputQoI,J,grad,inputControl,inputSource)
+	subroutine forwardsweep_sensitivity(this,r,dpm,dr,inputQoI,J,grad,inputControl,inputSource)
 		type(PM1D), intent(inout) :: this
-		type(FSens), intent(inout) :: fs
-		type(recordData), intent(inout) :: r, fsr
+		type(FSens), intent(inout) :: dpm
+		type(recordData), intent(inout) :: r, dr
 		procedure(QoI) :: inputQoI
 		real(mp), intent(out) :: J,grad
 		procedure(control), optional :: inputControl
@@ -34,75 +34,71 @@ contains
 		call inputQoI(this,k,J)
 		call r%recordPlasma(this, k)										!record for n=1~Nt
 
-		call halfStep_Sensitivity(fs%dpm,this,PtrControl)
-		call fsr%recordPlasma(fs%dpm, k)
-		call fs%FSensDistribution
+		call halfStep_Sensitivity(dpm,this,PtrControl)
+		call dr%recordPlasma(dpm, k)
 
-		if( (fsr%mod.eq.1) .or. (mod(k,fsr%mod).eq.0) ) then
-			kr = merge(k,k/fsr%mod,fsr%mod.eq.1)
-			write(kstr,*) kr
-			open(unit=305,file='data/'//fsr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
-					status='replace',form='unformatted',access='stream')
-			write(305) fs%f_A
-			close(305)
-		end if
+!		call dpm%FSensDistribution
+!		kr = merge(k,k/fsr%mod,fsr%mod.eq.1)
+!		write(kstr,*) kr
+!		open(unit=305,file='data/'//fsr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
+!				status='replace',form='unformatted',access='stream')
+!		write(305) fs%f_A
+!		close(305)
 		do k=1,this%nt
 			call updatePlasma(this,PtrControl,PtrSource,k,r)
 			call inputQoI(this,k,J)
 			J_hist(k) = J
 			call r%recordPlasma(this, k)									!record for n=1~Nt
 
-			call updateSensitivity(fs%dpm,this,PtrControl,PtrSource,k,fsr)
+			call updateSensitivity(dpm,this,PtrControl,PtrSource,k,dr)
 !			call fs%FSensDistribution
 !			call fs%Redistribute
 
-			call CPU_TIME(time1)
-			call fs%FSensSourceTerm(this)
-			call CPU_TIME(time2)
-			fsr%cpt_temp(8) = fsr%cpt_temp(8) + (time2-time1)/fsr%mod
+			do i=1,dpm%n
+				call CPU_TIME(time1)
+				call dpm%FSensDistribution(this%p(i),this%a(i))
+				call dpm%FSensSourceTerm(this%p(i)%qs,this%p(i)%ms,dpm%f_A,this%m%E)
+				call CPU_TIME(time2)
+				dr%cpt_temp(8) = dr%cpt_temp(8) + (time2-time1)/dr%mod
 
-			fs%f_A = 0.0_mp
-			do i=1,fs%dpm%n
-				call numberDensity(fs,fs%dpm%p(i),fs%dpm%a(i),fs%f_A)
+				dpm%f_A = 0.0_mp
+				call dpm%numberDensity(dpm%p(i),dpm%a(i),dpm%f_A)
+				call dpm%updateWeight(dpm%p(i),dpm%a(i),dpm%f_A,dpm%j)
+				call CPU_TIME(time1)
+				dr%cpt_temp(9) = dr%cpt_temp(9) + (time1-time2)/dr%mod
 			end do
-			do i=1,fs%dpm%n
-				call updateWeight_temp(fs,fs%dpm%p(i),fs%dpm%a(i),fs%f_A,fs%j)
-			end do
-!			call fs%updateWeight(fs%j)
-			call CPU_TIME(time1)
-			fsr%cpt_temp(9) = fsr%cpt_temp(9) + (time1-time2)/fsr%mod
 
 !			call fs%InjectSource(fs%j,fs%NInject)
-			call inputQoI(fs%dpm,k,grad)
+			call inputQoI(dpm,k,grad)
 			grad_hist(k) = grad
-			call fsr%recordPlasma(fs%dpm, k)
+			call dr%recordPlasma(dpm, k)
 
-			if( (fsr%mod.eq.1) .or. (mod(k,fsr%mod).eq.0) ) then
-				kr = merge(k,k/fsr%mod,fsr%mod.eq.1)
+			if( (dr%mod.eq.1) .or. (mod(k,dr%mod).eq.0) ) then
+				kr = merge(k,k/dr%mod,dr%mod.eq.1)
 				write(kstr,*) kr
-				open(unit=305,file='data/'//fsr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
+				open(unit=305,file='data/'//dr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
 						status='replace',form='unformatted',access='stream')
-				call fs%FSensDistribution
-				write(305) fs%f_A
+				call dpm%FSensDistribution(dpm%p(1),this%a(1))
+				write(305) dpm%f_A
 				close(305)
-				open(unit=305,file='data/'//fsr%dir//'/j_'//trim(adjustl(kstr))//'.bin',	&
+				open(unit=305,file='data/'//dr%dir//'/j_'//trim(adjustl(kstr))//'.bin',	&
 						status='replace',form='unformatted',access='stream')
-				write(305) fs%j
+				write(305) dpm%j
 				close(305)
 			end if
 		end do
-		open(unit=305,file='data/'//fsr%dir//'/grad_hist.bin',	&
+		open(unit=305,file='data/'//dr%dir//'/grad_hist.bin',	&
 					status='replace',form='unformatted',access='stream')
 		write(305) grad_hist
 		close(305)
-		open(unit=305,file='data/'//fsr%dir//'/J_hist.bin',	&
+		open(unit=305,file='data/'//dr%dir//'/J_hist.bin',	&
 					status='replace',form='unformatted',access='stream')
 		write(305) J_hist
 		close(305)
 	end subroutine
 
 	subroutine halfStep_Sensitivity(dpm,pm,PtrControl)
-		type(PM1D), intent(inout) :: dpm
+		type(FSens), intent(inout) :: dpm
 		type(PM1D), intent(in) :: pm
 		procedure(control), pointer :: PtrControl
 		integer :: i, j
@@ -154,7 +150,7 @@ contains
 	end subroutine
 
 	subroutine updateSensitivity(dpm,pm,PtrControl,PtrSource,k,r)
-		type(PM1D), intent(inout) :: dpm
+		type(FSens), intent(inout) :: dpm
 		type(PM1D), intent(in) :: pm
 		procedure(control), pointer :: PtrControl
 		procedure(source), pointer :: PtrSource

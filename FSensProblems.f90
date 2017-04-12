@@ -82,7 +82,7 @@ contains
 !		NInject = 5*N/pm%nt
 		call buildFSens(fs,pm,Lv,Ngv,NInject,NLimit)
 		dir = 'Debye_sensitivity/f_A'
-		call buildRecord(fsr,fs%dpm%nt,1,fs%dpm%L,fs%dpm%ng,trim(dir),20)
+		call buildRecord(fsr,fs%nt,1,fs%L,fs%ng,trim(dir),20)
 		call Debye_sensitivity_init(fs,N,vT,'vT')
 !		call Debye_sensitivity_init_sync(fs,pm,vT,'vT')
 
@@ -134,7 +134,7 @@ contains
 			Lv = A(1)*6.0_mp
 			call buildFSens(fs,d,Lv,Ngv,NInject,NLimit)
 			dir = 'Debye_sensitivity_curve/'//trim(adjustl(mpih%rank_str))//'/f_A'
-			call buildRecord(fsr,fs%dpm%nt,1,fs%dpm%L,fs%dpm%ng,trim(dir),20)
+			call buildRecord(fsr,fs%nt,1,fs%L,fs%ng,trim(dir),20)
 			call Debye_sensitivity_init(fs,2*N,A(1))
 	
 			call forwardsweep_sensitivity(d,r,fs,fsr,Debye,J,grad)
@@ -202,7 +202,7 @@ contains
 				Lv = A(1)*6.0_mp
 				call buildFSens(fs,d,Lv,Ngv,NInject,NLimit)
 				dir = 'Debye_sampling/'//trim(adjustl(mpih%rank_str))//'/f_A'
-				call buildRecord(fsr,fs%dpm%nt,1,fs%dpm%L,fs%dpm%ng,trim(dir),20)
+				call buildRecord(fsr,fs%nt,1,fs%L,fs%ng,trim(dir),20)
 				call Debye_sensitivity_init(fs,2*N,A(1))
 	
 				call forwardsweep_sensitivity(d,r,fs,fsr,Debye,J,grad)

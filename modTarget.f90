@@ -8,7 +8,7 @@ module modTarget
 	abstract interface
 		subroutine control(pm,k,str)
 			use modPM1D
-			type(PM1D), intent(inout) :: pm
+			class(PM1D), intent(inout) :: pm
 			integer, intent(in) :: k
 			character(len=*), intent(in) :: str
 		end subroutine
@@ -39,7 +39,7 @@ contains
 !==============Default=====================================================
 
 	subroutine Null_input(this,k,str)
-		type(PM1D), intent(inout) :: this
+		class(PM1D), intent(inout) :: this
 		integer, intent(in) :: k
 		character(len=*), intent(in) :: str
 	end subroutine
@@ -62,7 +62,7 @@ contains
 !==============Initial electron temperature================================
 
 	subroutine Te(pm,k,str)
-		type(PM1D), intent(inout) :: pm
+		class(PM1D), intent(inout) :: pm
 		integer, intent(in) :: k
 		character(len=*), intent(in) :: str
 
@@ -96,7 +96,7 @@ contains
 !==============Wave perturbation on position===============================
 
 	subroutine IC_wave(this,k,str)
-		type(PM1D), intent(inout) :: this
+		class(PM1D), intent(inout) :: this
 		integer, intent(in) :: k
 		character(len=*), intent(in) :: str
 
@@ -137,7 +137,7 @@ contains
 !==============RF discharge current source=================================
 
    subroutine RF_current(this,k,str)
-      type(PM1D), intent(inout) :: this
+      class(PM1D), intent(inout) :: this
       integer, intent(in) :: k
       character(len=*), intent(in) :: str
       real(mp) :: dQwall
@@ -156,7 +156,7 @@ contains
 !==================Injection from left wall=================================
 
 	subroutine Injection(this,k,str)
-		type(PM1D), intent(inout) :: this
+		class(PM1D), intent(inout) :: this
 		integer, intent(in) :: k
 		character(len=*), intent(in) :: str
 		real(mp) :: vT_e, vT_i

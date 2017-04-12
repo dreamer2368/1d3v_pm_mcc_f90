@@ -7,7 +7,7 @@ module modQoI
 	abstract interface
 		subroutine QoI(pm,k,J)
 			use modPM1D
-			type(PM1D), intent(in) :: pm
+			class(PM1D), intent(in) :: pm
 			integer, intent(in) :: k
 			real(mp), intent(inout) :: J
 		end subroutine
@@ -25,7 +25,7 @@ module modQoI
 contains
 
 	subroutine Null_QoI(pm,k,J)
-		type(PM1D), intent(in) :: pm
+		class(PM1D), intent(in) :: pm
 		integer, intent(in) :: k
 		real(mp), intent(inout) :: J
 	end subroutine
@@ -33,7 +33,7 @@ contains
 !=============Mean Kinetic Energy====================
 
 	subroutine MKE(pm,k,J)
-		type(PM1D), intent(in) :: pm
+		class(PM1D), intent(in) :: pm
 		integer, intent(in) :: k
 		real(mp), intent(inout) :: J
 
@@ -55,7 +55,7 @@ contains
 !============Mean Efield Energy======================
 
 	subroutine MPE(pm,k,J)
-		type(PM1D), intent(in) :: pm
+		class(PM1D), intent(in) :: pm
 		integer, intent(in) :: k
 		real(mp), intent(inout) :: J
 
@@ -77,7 +77,7 @@ contains
 !============Testmodule : Final timestep 1D Total Kinetic Energy
 
 	subroutine TestQoI(pm,k,J)
-		type(PM1D), intent(in) :: pm
+		class(PM1D), intent(in) :: pm
 		integer, intent(in) :: k
 		real(mp), intent(inout) :: J
 
@@ -99,7 +99,7 @@ contains
 !==============Debye-length?
 
 	subroutine Debye(pm,k,J)
-		type(PM1D), intent(in) :: pm
+		class(PM1D), intent(in) :: pm
 		integer, intent(in) :: k
 		real(mp), intent(inout) :: J
 

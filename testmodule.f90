@@ -82,7 +82,7 @@ contains
 		call pm%buildPM1D(Tf,Ti,Ng,N=1,pBC=0,mBC=0,order=1,L=L,dt=dt)
 		call pm%p(1)%buildSpecies(1.0_mp,1.0_mp)
 		call fs%buildFSens(pm,Lv,Ng/2,NInject,NInject)
-		call fs%dpm%p(1)%setSpecies(1,(/0.0_mp/),(/0.0_mp,0.0_mp,0.0_mp/),(/0.0_mp/))
+		call fs%p(1)%setSpecies(1,(/0.0_mp/),(/0.0_mp,0.0_mp,0.0_mp/),(/0.0_mp/))
 		call r%buildRecord(pm%nt,N,pm%L,Ng,'updateWeightTest',1)
 
 		call RANDOM_NUMBER(xp0)
@@ -92,18 +92,18 @@ contains
 		xp0(1:N/2) = randn(N/2)*w + 0.5_mp*L
 		vp0(1:N/2,:) = randn(N/2,3)*w
 		spwt0 = 1.0_mp/N
-		call fs%dpm%p(1)%setSpecies(N,xp0,vp0,spwt0)
+		call fs%p(1)%setSpecies(N,xp0,vp0,spwt0)
 
-		call fs%dpm%applyBC(fs%dpm%p(1),fs%dpm%m,fs%dpm%dt,fs%dpm%A0(1))
+		call fs%applyBC(fs%p(1),fs%m,fs%dt,fs%A0(1))
 		!X-direction Interpolation
 		do k=1,N
-			CALL fs%dpm%a(1)%assignMatrix(xp0(k),pm%m%dx,g,frac)
-			CALL fs%dpm%a(1)%adjustGrid(fs%dpm%m%ng,g,frac)
-			fs%dpm%a(1)%g(:,k) = g
-			fs%dpm%a(1)%frac(:,k) = frac
+			CALL fs%a(1)%assignMatrix(xp0(k),pm%m%dx,g,frac)
+			CALL fs%a(1)%adjustGrid(fs%m%ng,g,frac)
+			fs%a(1)%g(:,k) = g
+			fs%a(1)%frac(:,k) = frac
 		end do
 
-		call fs%FSensDistribution
+		call fs%FSensDistribution(fs%p(1),fs%a(1))
 
 		open(unit=300,file='data/updateWeightTest/record.bin',status='replace',form='unformatted',access='stream')
 		open(unit=301,file='data/updateWeightTest/xp.bin',status='replace',form='unformatted',access='stream')
@@ -123,11 +123,11 @@ contains
 
 		j = -1.0_mp
 
-		call fs%updateWeight(j)
+		call fs%updateWeight(fs%p(1),fs%a(1),fs%f_A,j)
 		open(unit=304,file='data/updateWeightTest/n_A.bin',status='replace',form='unformatted',access='stream')
 		write(304) fs%f_A
 		close(304)
-		call fs%FSensDistribution
+		call fs%FSensDistribution(fs%p(1),fs%a(1))
 
 		open(unit=304,file='data/updateWeightTest/f_A_after.bin',status='replace',form='unformatted',access='stream')
 		write(304) fs%f_A
@@ -153,7 +153,7 @@ contains
 		call pm%buildPM1D(Tf,Ti,Ng,N=1,pBC=0,mBC=0,order=1,L=L,dt=dt)
 		call pm%p(1)%buildSpecies(1.0_mp,1.0_mp)
 		call fs%buildFSens(pm,Lv,Ng/2,NInject,NInject)
-		call fs%dpm%p(1)%setSpecies(1,(/0.0_mp/),(/0.0_mp,0.0_mp,0.0_mp/),(/0.0_mp/))
+		call fs%p(1)%setSpecies(1,(/0.0_mp/),(/0.0_mp,0.0_mp,0.0_mp/),(/0.0_mp/))
 		call r%buildRecord(pm%nt,N,pm%L,Ng,'RedistributionTest',1)
 
 		call RANDOM_NUMBER(xp0)
@@ -161,18 +161,18 @@ contains
 		vp0 = randn(N,3)
 		vp0 = vp0*w
 		spwt0 = pm%L*SIN(2.0_mp*pi*xp0/pm%L)/N
-		call fs%dpm%p(1)%setSpecies(N,xp0,vp0,spwt0)
+		call fs%p(1)%setSpecies(N,xp0,vp0,spwt0)
 
-		call fs%dpm%applyBC(fs%dpm%p(1),fs%dpm%m,fs%dpm%dt,fs%dpm%A0(1))
+		call fs%applyBC(fs%p(1),fs%m,fs%dt,fs%A0(1))
 		!X-direction Interpolation
 		do k=1,N
-			CALL fs%dpm%a(1)%assignMatrix(xp0(k),pm%m%dx,g,frac)
-			CALL fs%dpm%a(1)%adjustGrid(fs%dpm%m%ng,g,frac)
-			fs%dpm%a(1)%g(:,k) = g
-			fs%dpm%a(1)%frac(:,k) = frac
+			CALL fs%a(1)%assignMatrix(xp0(k),pm%m%dx,g,frac)
+			CALL fs%a(1)%adjustGrid(fs%m%ng,g,frac)
+			fs%a(1)%g(:,k) = g
+			fs%a(1)%frac(:,k) = frac
 		end do
 
-		call fs%FSensDistribution
+		call fs%FSensDistribution(fs%p(1),fs%a(1))
 
 		open(unit=300,file='data/RedistributionTest/record.bin',status='replace',form='unformatted',access='stream')
 		open(unit=301,file='data/RedistributionTest/xp.bin',status='replace',form='unformatted',access='stream')
@@ -191,15 +191,15 @@ contains
 		close(304)
 
 		call fs%Redistribute
-		call fs%FSensDistribution
+		call fs%FSensDistribution(fs%p(1),fs%a(1))
 
 		open(unit=301,file='data/RedistributionTest/xp_rdst.bin',status='replace',form='unformatted',access='stream')
 		open(unit=302,file='data/RedistributionTest/vp_rdst.bin',status='replace',form='unformatted',access='stream')
 		open(unit=303,file='data/RedistributionTest/spwt_rdst.bin',status='replace',form='unformatted',access='stream')
 		open(unit=304,file='data/RedistributionTest/f_A_rdst.bin',status='replace',form='unformatted',access='stream')
-		write(301) fs%dpm%p(1)%xp
-		write(302) fs%dpm%p(1)%vp
-		write(303) fs%dpm%p(1)%spwt
+		write(301) fs%p(1)%xp
+		write(302) fs%p(1)%vp
+		write(303) fs%p(1)%spwt
 		write(304) fs%f_A
 		close(301)
 		close(302)
@@ -232,25 +232,26 @@ contains
 		write(300) Ng, Ng/2, N
 		close(300)
 
-		call Debye_sensitivity_init(fs,NInit,fs%dpm%A0(1))
-		call fs%dpm%applyBC(fs%dpm%p(1),fs%dpm%m,fs%dpm%dt,fs%dpm%A0(1))
+		call Debye_sensitivity_init(fs,NInit,fs%A0(1))
+		call fs%applyBC(fs%p(1),fs%m,fs%dt,fs%A0(1))
 		!X-direction Interpolation
 		do k=1,N
-			CALL fs%dpm%a(1)%assignMatrix(fs%dpm%p(1)%xp(k),pm%m%dx,g,frac)
-			CALL fs%dpm%a(1)%adjustGrid(fs%dpm%m%ng,g,frac)
-			fs%dpm%a(1)%g(:,k) = g
-			fs%dpm%a(1)%frac(:,k) = frac
+			CALL fs%a(1)%assignMatrix(fs%p(1)%xp(k),pm%m%dx,g,frac)
+			CALL fs%a(1)%adjustGrid(fs%m%ng,g,frac)
+			fs%a(1)%g(:,k) = g
+			fs%a(1)%frac(:,k) = frac
 		end do
-		fs%dpm%m%E = 1.0_mp
-		call fs%FSensSourceTerm(fs%dpm)
+		fs%m%E = 1.0_mp
+		call fs%FSensDistribution(pm%p(1),pm%a(1))
+		call fs%FSensSourceTerm(pm%p(1)%qs,pm%p(1)%ms,fs%f_A,pm%m%E)
 
 		open(unit=301,file='data/SensitivityInitTest/xp.bin',status='replace',form='unformatted',access='stream')
 		open(unit=302,file='data/SensitivityInitTest/vp.bin',status='replace',form='unformatted',access='stream')
 		open(unit=303,file='data/SensitivityInitTest/spwt.bin',status='replace',form='unformatted',access='stream')
 		open(unit=304,file='data/SensitivityInitTest/j.bin',status='replace',form='unformatted',access='stream')
-		write(301) fs%dpm%p(1)%xp
-		write(302) fs%dpm%p(1)%vp
-		write(303) fs%dpm%p(1)%spwt
+		write(301) fs%p(1)%xp
+		write(302) fs%p(1)%vp
+		write(303) fs%p(1)%spwt
 		write(304) fs%j
 		close(301)
 		close(302)
@@ -294,7 +295,7 @@ contains
 		call pm%buildPM1D(Tf,Ti,Ng,N=1,pBC=0,mBC=0,order=1,L=L,dt=dt)
 		call pm%p(1)%buildSpecies(1.0_mp,1.0_mp)
 		call fs%buildFSens(pm,Lv,Ng/2,NInject,NInject)
-		call fs%dpm%p(1)%setSpecies(1,(/0.0_mp/),(/0.0_mp,0.0_mp,0.0_mp/),(/0.0_mp/))
+		call fs%p(1)%setSpecies(1,(/0.0_mp/),(/0.0_mp,0.0_mp,0.0_mp/),(/0.0_mp/))
 		call r%buildRecord(pm%nt,N,pm%L,Ng,'InjectionTest',1)
 
 		call RANDOM_NUMBER(xp0)
@@ -304,8 +305,8 @@ contains
 		spwt0 = 1.0_mp/N
 !		spwt0 = SQRT(2.0_mp*pi)*w/EXP( -vp0(:,1)**2/2.0_mp/w/w )/N
 		call pm%p(1)%setSpecies(N,xp0,vp0,spwt0)
-!		fs%dpm%m%E = 1.0_mp
-		fs%dpm%m%E = (/ (SIN( 2.0_mp*pi*i/Ng ),i=1,Ng) /)
+!		fs%m%E = 1.0_mp
+		fs%m%E = (/ (SIN( 2.0_mp*pi*i/Ng ),i=1,Ng) /)
 
 		call pm%applyBC(pm%p(1),pm%m,pm%dt,pm%A0(1))
 		!X-direction Interpolation
@@ -316,7 +317,8 @@ contains
 			pm%a(1)%frac(:,k) = frac
 		end do
 
-		call fs%FSensSourceTerm(pm)
+		call fs%FSensDistribution(pm%p(1),pm%a(1))
+		call fs%FSensSourceTerm(pm%p(1)%qs,pm%p(1)%ms,fs%f_A,pm%m%E)
 
 		open(unit=300,file='data/InjectionTest/record.bin',status='replace',form='unformatted',access='stream')
 		open(unit=301,file='data/InjectionTest/xp.bin',status='replace',form='unformatted',access='stream')
@@ -344,23 +346,23 @@ contains
 		close(304)
 		call fs%InjectSource(fs%j,fs%NInject)
 
-		call fs%dpm%applyBC(fs%dpm%p(1),fs%dpm%m,fs%dpm%dt,fs%dpm%A0(1))
+		call fs%applyBC(fs%p(1),fs%m,fs%dt,fs%A0(1))
 		!X-direction Interpolation
 		do k=1,N
-			CALL fs%dpm%a(1)%assignMatrix(fs%dpm%p(1)%xp(k),pm%m%dx,g,frac)
-			CALL fs%dpm%a(1)%adjustGrid(fs%dpm%m%ng,g,frac)
-			fs%dpm%a(1)%g(:,k) = g
-			fs%dpm%a(1)%frac(:,k) = frac
+			CALL fs%a(1)%assignMatrix(fs%p(1)%xp(k),pm%m%dx,g,frac)
+			CALL fs%a(1)%adjustGrid(fs%m%ng,g,frac)
+			fs%a(1)%g(:,k) = g
+			fs%a(1)%frac(:,k) = frac
 		end do
-		call fs%FSensDistribution
+		call fs%FSensDistribution(fs%p(1),fs%a(1))
 
 		open(unit=301,file='data/InjectionTest/xp_inject.bin',status='replace',form='unformatted',access='stream')
 		open(unit=302,file='data/InjectionTest/vp_inject.bin',status='replace',form='unformatted',access='stream')
 		open(unit=303,file='data/InjectionTest/spwt_inject.bin',status='replace',form='unformatted',access='stream')
 		open(unit=304,file='data/InjectionTest/j_inject.bin',status='replace',form='unformatted',access='stream')
-		write(301) fs%dpm%p(1)%xp
-		write(302) fs%dpm%p(1)%vp
-		write(303) fs%dpm%p(1)%spwt
+		write(301) fs%p(1)%xp
+		write(302) fs%p(1)%vp
+		write(303) fs%p(1)%spwt
 		write(304) fs%f_A
 		close(301)
 		close(302)

@@ -8,14 +8,14 @@ module modSource
 	abstract interface
 		subroutine source(pm)
 			use modPM1D
-			type(PM1D), intent(inout) :: pm
+			class(PM1D), intent(inout) :: pm
 		end subroutine
 	end interface
 
 contains
 
 	subroutine Null_source(pm)
-		type(PM1D), intent(inout) :: pm
+		class(PM1D), intent(inout) :: pm
 	end subroutine
 
 !======= [Spatial]_[Velocity] source distribution ==================
@@ -24,7 +24,7 @@ contains
 	!Rayleigh on v with \sigma = A(2),A(3) (electron,ion)
 	!Keep A(4) number of ion
 	subroutine PartialUniform_Rayleigh(pm)
-		type(PM1D), intent(inout) :: pm
+		class(PM1D), intent(inout) :: pm
 		integer :: Nadd, newN, i
 		real(mp), allocatable :: xp_add(:), vp_add(:,:), spwt_add(:)
 
@@ -52,7 +52,7 @@ contains
 	!Rayleigh on v with \sigma = A(1),A(2) (electron,ion)
 	!Keep A(4) number of ion
 	subroutine PartialUniform_Rayleigh2(pm)
-		type(PM1D), intent(inout) :: pm
+		class(PM1D), intent(inout) :: pm
 		integer :: Nadd, newN, i
 		real(mp), allocatable :: xp_add(:), vp_add(:,:), spwt_add(:)
 
@@ -80,7 +80,7 @@ contains
 	!Maxwellian on v with \sigma = A(2),A(3) (electron,ion)
 	!Keep A(4) number of ion
 	subroutine PartialUniform_Maxwellian(pm)
-		type(PM1D), intent(inout) :: pm
+		class(PM1D), intent(inout) :: pm
 		integer :: Nadd, newN, i
 		real(mp), allocatable :: xp_add(:), vp_add(:,:), spwt_add(:)
 
@@ -108,7 +108,7 @@ contains
 	!Maxwellian on v with \sigma = A(1),A(2) (electron,ion)
 	!Keep A(4) number of ion
 	subroutine PartialUniform_Maxwellian2(pm)
-		type(PM1D), intent(inout) :: pm
+		class(PM1D), intent(inout) :: pm
 		integer :: Nadd, newN, i
 		real(mp), allocatable :: xp_add(:), vp_add(:,:), spwt_add(:)
 
