@@ -7,8 +7,8 @@ N = spec(1); Ng = spec(2); Nt = spec(3); L = spec(4); mod = spec(5);
 Nt = floor(Nt/mod);
 
 fileID = fopen('Np.bin');
-Np = fread(fileID,N*Nt,'int32');
-Np = reshape(Np, [N,Nt]);
+Np = fread(fileID,N*(Nt+1),'int32');
+Np = reshape(Np, [N,Nt+1]);
 
 % fileID = fopen('xp_1.bin');
 % xp1 = fread(fileID,sum(Np(1,:)),'double');
@@ -56,19 +56,20 @@ for i=1:Nt
 %     npsum2 = npsum2 + Np(2,i);
     
     figure(2)
-    plot(xg,phi(:,i) - phi(floor(Ng/2),i),'-k');
-%     axis([0 L -1e0 1]);
+    plot(xg,phi(:,i),'-k');
+    axis([0 L -140 30]);
 %     axis([0 L 0 4]);
     title('potential');
     xlabel('$x$(m)','interpreter','latex');
     ylabel('$\phi$(V)','interpreter','latex');
-    set(gca,'fontsize',25);
+    set(gca,'fontsize',25,'ticklabelinterpreter','latex');
     
     
 %     %videoclip
 %     frame = getframe(gcf);
 %     writeVideo(writerObj,frame);
-    pause(.0001);
+%     pause();
+    drawnow;
 end
 
 % % videoclip close
@@ -95,60 +96,81 @@ mu = 1836;
 mi = mu*me;
 K = 1.38065E-23;
 vB = sqrt(K*(Te+3*Ti)/mi);
-
 ve = sqrt(K*Te/me); vi = sqrt(K*Ti/mi);
+
+n0 = 2e14; wt = n0*L/5E4;
 
 % %video clip
 % writerObj1 = VideoWriter('electron.avi');
-% writerObj1.FrameRate = 60;
+% writerObj1.FrameRate = 70;
 % open(writerObj1);
 % 
 % %video clip
 % writerObj2 = VideoWriter('ion.avi');
-% writerObj2.FrameRate = 60;
+% writerObj2.FrameRate = 70;
 % open(writerObj2);
 % 
 % %video clip
 % writerObj3 = VideoWriter('phi.avi');
-% writerObj3.FrameRate = 60;
+% writerObj3.FrameRate = 70;
 % open(writerObj3);
+% 
+% %video clip
+% writerObj4 = VideoWriter('number.avi');
+% writerObj4.FrameRate = 70;
+% open(writerObj4);
 
-for i=1:Nt
+% for i=1:Nt
+    i=Nt
     fileID = fopen(strcat('xp/',num2str(i),'_1.bin'));
-    xp_e = fread(fileID,Np(1,i),'double');
+    xp_e = fread(fileID,Np(1,i+1),'double');
     fileID = fopen(strcat('vp/',num2str(i),'_1.bin'));
-    vp_e = fread(fileID,Np(1,i)*3,'double');
-    vp_e = reshape(vp_e,[Np(1,i), 3]);
+    vp_e = fread(fileID,Np(1,i+1)*3,'double');
+    vp_e = reshape(vp_e,[Np(1,i+1), 3]);
     
     fileID = fopen(strcat('xp/',num2str(i),'_2.bin'));
-    xp_i = fread(fileID,Np(2,i),'double');
+    xp_i = fread(fileID,Np(2,i+1),'double');
     fileID = fopen(strcat('vp/',num2str(i),'_2.bin'));
-    vp_i = fread(fileID,Np(2,i)*3,'double');
-    vp_i = reshape(vp_i,[Np(2,i), 3]);
+    vp_i = fread(fileID,Np(2,i+1)*3,'double');
+    vp_i = reshape(vp_i,[Np(2,i+1), 3]);
     
     f1=figure(1);
     plot(xp_e,vp_e(:,1),'.k');
     axis([0 L -5*ve 5*ve]);
-    title('Electron distribution');
+    title('Electron distribution','interpreter','latex');
     xlabel('$x$(m)','interpreter','latex');
     ylabel('$v$(m/s)','interpreter','latex');
-    set(gca,'fontsize',25);
+    set(gca,'fontsize',25,'ticklabelinterpreter','latex');
     
     f2=figure(2);
-    plot(xp_i,vp_i(:,1),'.r',[0 L], [vB vB], '-b', [0 L], [-vB -vB],'-b');
+    plot([0 L], [-vB -vB],'-b', xp_i,vp_i(:,1),'.r',[0 L], [vB vB], '-b');
     axis([0 L -35*vi 35*vi]);
-    title('Ion distribution');
+    title('Ion distribution','interpreter','latex');
     xlabel('$x$(m)','interpreter','latex');
     ylabel('$v$(m/s)','interpreter','latex');
-    set(gca,'fontsize',25);
+    h=legend('$v_B$');
+    set(h,'interpreter','latex','location','southwest');
+    set(gca,'fontsize',25,'ticklabelinterpreter','latex');
     
     f3=figure(3);
     plot(xg,phi(:,i),'-k');
-    axis([0 L -2e2 1]);
-    title('potential');
+    axis([0 L -140 30]);
+    title('Potential $\phi(x)$','interpreter','latex');
     xlabel('$x$(m)','interpreter','latex');
     ylabel('$\phi$(V)','interpreter','latex');
-    set(gca,'fontsize',25);
+    set(gca,'fontsize',25,'ticklabelinterpreter','latex');
+    
+    f4=figure(4);
+    n_e = histcounts(xp_e,Ng); n_e = n_e*wt;
+    n_i = histcounts(xp_i,Ng); n_i = n_i*wt;
+    semilogy(xg,n_e,'-k',xg,n_i,'-r');
+    axis([0 L 1e9 1e12]);
+    title('Number density','interpreter','latex');
+    xlabel('$x$(m)','interpreter','latex');
+    ylabel('$n$(m$^{-1}$)','interpreter','latex');
+    h=legend('Electron','Ion');
+    set(h,'interpreter','latex','location','southwest');
+    set(gca,'fontsize',25,'ticklabelinterpreter','latex');
     
 %     %videoclip
 %     frame = getframe(f1);
@@ -161,15 +183,21 @@ for i=1:Nt
 %     %videoclip
 %     frame = getframe(f3);
 %     writeVideo(writerObj3,frame);
+%     
+%     %videoclip
+%     frame = getframe(f4);
+%     writeVideo(writerObj4,frame);
 
     fclose('all');
-    pause();
-end
+%     pause();
+    drawnow;
+% end
 
 % % videoclip close
 % close(writerObj1);
 % close(writerObj2);
 % close(writerObj3);
+% close(writerObj4);
 
 %%
 close all

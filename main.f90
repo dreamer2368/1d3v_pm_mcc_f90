@@ -20,7 +20,7 @@ program main
 !	call test_mcc_electron
 !	call test_mcc_Argon
 !	call test_ext_voltage_Poisson
-   call Ar_discharge
+!	call Ar_discharge
 !	call test_particle_adj(64,2)
 !	call test_backward_sweep
 !	call twostream_adj(output(1),output(2))
@@ -33,7 +33,7 @@ program main
 !	call InjectionTest
 !	call MPITest
 !	call SensitivityInitializeTest
-!	call Debye_sensitivity
+	call Debye_sensitivity
 !	call forYeoh
 !	call RedistributionTest
 !	call updateWeightTest

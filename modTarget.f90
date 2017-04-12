@@ -5,6 +5,36 @@ module modTarget
 
 	implicit none
 
+	abstract interface
+		subroutine control(pm,k,str)
+			use modPM1D
+			type(PM1D), intent(inout) :: pm
+			integer, intent(in) :: k
+			character(len=*), intent(in) :: str
+		end subroutine
+	end interface
+
+	abstract interface
+		subroutine Adj_Dcontrol(adj,pm,k,str)
+			use modAdj
+			type(adjoint), intent(inout) :: adj
+			type(PM1D), intent(in) :: pm
+			integer, intent(in) :: k
+			character(len=*), intent(in) :: str
+		end subroutine
+	end interface
+
+	abstract interface
+		subroutine Adj_grad(adj,pm,k,str,grad)
+			use modAdj
+			type(adjoint), intent(in) :: adj
+			type(PM1D), intent(in) :: pm
+			integer, intent(in) :: k
+			character(len=*), intent(in) :: str
+			real(mp), intent(inout) :: grad(:)
+		end subroutine
+	end interface		
+
 contains
 !==============Default=====================================================
 

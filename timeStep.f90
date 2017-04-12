@@ -12,35 +12,15 @@ module timeStep
 
 contains
 
-	subroutine forwardsweep(this,r,target_input,source,QoI,J)
+	subroutine forwardsweep(this,r,inputControl,inputSource,inputQoI,J)
 		type(PM1D), intent(inout) :: this
 		type(recordData), intent(inout) :: r
-		integer :: i,k
+		procedure(control) :: inputControl
+		procedure(source) :: inputSource
+		procedure(QoI), optional :: inputQoI
 		real(mp), intent(out), optional :: J
+		integer :: i,k
 		real(mp) :: J_hist(this%nt)
-		interface
-			subroutine target_input(pm,k,str)
-				use modPM1D
-				type(PM1D), intent(inout) :: pm
-				integer, intent(in) :: k
-				character(len=*), intent(in) :: str
-			end subroutine
-		end interface
-		interface
-			subroutine source(pm)
-				use modPM1D
-				type(PM1D), intent(inout) :: pm
-			end subroutine
-		end interface
-		interface
-			subroutine QoI(pm,k,J)
-				use modQoI
-				type(PM1D), intent(in) :: pm
-				real(mp), intent(inout) :: J
-				integer, intent(in) :: k
-			end subroutine
-		end interface
-		optional :: QoI
 		if( present(J) ) then
 			J = 0.0_mp
 		end if
@@ -50,13 +30,13 @@ contains
 		!Time stepping
 !		call halfStep(this,target_input)
 		if( present(J) ) then
-			call QoI(this,k,J)
+			call inputQoI(this,k,J)
 		end if
 		call r%recordPlasma(this, k)									!record for n=1~Nt
 		do k=1,this%nt
-			call updatePlasma(this,target_input,source,k,r)
+			call updatePlasma(this,inputControl,inputSource,k,r)
 			if( present(J) ) then
-				call QoI(this,k,J)
+				call inputQoI(this,k,J)
 				J_hist(k) = J
 			end if
 			call r%recordPlasma(this, k)									!record for n=1~Nt
@@ -67,7 +47,7 @@ contains
 		close(305)
 	end subroutine
 
-	subroutine halfStep(this,target_input)
+	subroutine halfStep(this,inputControl)
 		type(PM1D), intent(inout) :: this
 		integer :: i, j
 		real(mp) :: rhs(this%ng-1)
@@ -76,14 +56,7 @@ contains
 		integer :: N,Ng
 		integer :: g(this%p(1)%np,2)
 		real(mp) :: frac(this%p(1)%np,2)
-		interface
-			subroutine target_input(pm,k,str)
-				use modPM1D
-				type(PM1D), intent(inout) :: pm
-				integer, intent(in) :: k
-				character(len=*), intent(in) :: str
-			end subroutine
-		end interface
+		procedure(control) :: inputControl
 		dt = this%dt
 		L = this%L
 		N = this%N
@@ -99,7 +72,7 @@ contains
 			call this%a(i)%chargeAssign(this%p(i),this%m)
 		end do
 
-		call target_input(this,0,'rho_back')
+		call inputControl(this,0,'rho_back')
 		call this%m%solveMesh(this%eps0)
 
 		!Electric field : -D*phi
@@ -116,7 +89,7 @@ contains
 		end do
 	end subroutine
 
-	subroutine updatePlasma(this,target_input,source,k,r)
+	subroutine updatePlasma(this,inputControl,inputSource,k,r)
 		type(PM1D), intent(inout) :: this
 		type(recordData), intent(inout), optional :: r
 		integer, intent(in) :: k
@@ -124,29 +97,17 @@ contains
 		real(mp) :: dt, L
 		integer :: N, Ng, i
 		real(mp) :: time1, time2, cpt_temp(7)
-		interface
-			subroutine target_input(pm,k,str)
-				use modPM1D
-				type(PM1D), intent(inout) :: pm
-				integer, intent(in) :: k
-				character(len=*), intent(in) :: str
-			end subroutine
-		end interface
-		interface
-			subroutine source(pm)
-				use modPM1D
-				type(PM1D), intent(inout) :: pm
-			end subroutine
-		end interface
+		procedure(control) :: inputControl
+		procedure(source) :: inputSource
 		dt = this%dt
 		L = this%L
 		N = this%n
 		Ng = this%ng
 		cpt_temp = 0.0_mp
 
-		call target_input(this,k,'xp')
+		call inputControl(this,k,'xp')
 
-		call source(this)
+		call inputSource(this)
 
 		call CPU_TIME(time1)
 		do i=1,this%n
@@ -169,7 +130,7 @@ contains
 		call CPU_TIME(time2)
 		cpt_temp(3) = (time2-time1)
 
-		call target_input(this,k,'rho_back')
+		call inputControl(this,k,'rho_back')
 		call this%m%solveMesh(this%eps0)
 		call CPU_TIME(time1)
 		cpt_temp(4) = (time1-time2)
@@ -397,7 +358,7 @@ contains
 
 !===============Forward, continuum Sensitivity
 
-	subroutine forwardsweep_sensitivity(this,r,fs,fsr,target_input,source,QoI,J,grad)
+	subroutine forwardsweep_sensitivity(this,r,fs,fsr,inputControl,inputSource,inputQoI,J,grad)
 		type(PM1D), intent(inout) :: this
 		type(FSens), intent(inout) :: fs
 		type(recordData), intent(inout) :: r, fsr
@@ -406,28 +367,9 @@ contains
 		real(mp), intent(out) :: J,grad
 		real(mp), dimension(this%nt) :: J_hist, grad_hist
 		real(mp) :: time1, time2
-		interface
-			subroutine target_input(pm,k,str)
-				use modPM1D
-				type(PM1D), intent(inout) :: pm
-				integer, intent(in) :: k
-				character(len=*), intent(in) :: str
-			end subroutine
-		end interface
-		interface
-			subroutine source(pm)
-				use modPM1D
-				type(PM1D), intent(inout) :: pm
-			end subroutine
-		end interface
-		interface
-			subroutine QoI(pm,k,J)
-				use modQoI
-				type(PM1D), intent(in) :: pm
-				real(mp), intent(inout) :: J
-				integer, intent(in) :: k
-			end subroutine
-		end interface
+		procedure(control) :: inputControl
+		procedure(source) :: inputSource
+		procedure(QoI) :: inputQoI
 		J = 0.0_mp
 		grad = 0.0_mp
 		J_hist = 0.0_mp
@@ -435,11 +377,11 @@ contains
 		k=0
 
 		!Time stepping
-		call halfStep(this,target_input)
-		call QoI(this,k,J)
+		call halfStep(this,inputControl)
+		call inputQoI(this,k,J)
 		call r%recordPlasma(this, k)										!record for n=1~Nt
 
-		call halfStep_Sensitivity(fs%dpm,this,target_input)
+		call halfStep_Sensitivity(fs%dpm,this,inputControl)
 		call fsr%recordPlasma(fs%dpm, k)
 		call fs%FSensDistribution
 
@@ -452,12 +394,12 @@ contains
 			close(305)
 		end if
 		do k=1,this%nt
-			call updatePlasma(this,target_input,source,k,r)
-			call QoI(this,k,J)
+			call updatePlasma(this,inputControl,inputSource,k,r)
+			call inputQoI(this,k,J)
 			J_hist(k) = J
 			call r%recordPlasma(this, k)									!record for n=1~Nt
 
-			call updateSensitivity(fs%dpm,this,target_input,source,k,fsr)
+			call updateSensitivity(fs%dpm,this,inputControl,inputSource,k,fsr)
 !			call fs%FSensDistribution
 !			call fs%Redistribute
 
@@ -466,19 +408,19 @@ contains
 			call CPU_TIME(time2)
 			fsr%cpt_temp(8) = fsr%cpt_temp(8) + (time2-time1)/fsr%mod
 
-			fs%f_A = 0.0_mp
-			do i=1,fs%dpm%n
-				call numberDensity(fs,fs%dpm%p(i),fs%dpm%a(i),fs%f_A)
-			end do
-			do i=1,fs%dpm%n
-				call updateWeight_temp(fs,fs%dpm%p(i),fs%dpm%a(i),fs%f_A,fs%j)
-			end do
-!			call fs%updateWeight(fs%j)
+!			fs%f_A = 0.0_mp
+!			do i=1,fs%dpm%n
+!				call numberDensity(fs,fs%dpm%p(i),fs%dpm%a(i),fs%f_A)
+!			end do
+!			do i=1,fs%dpm%n
+!				call updateWeight_temp(fs,fs%dpm%p(i),fs%dpm%a(i),fs%f_A,fs%j)
+!			end do
+			call fs%updateWeight(fs%j)
 			call CPU_TIME(time1)
 			fsr%cpt_temp(9) = fsr%cpt_temp(9) + (time1-time2)/fsr%mod
 
 !			call fs%InjectSource(fs%j,fs%NInject)
-			call QoI(fs%dpm,k,grad)
+			call inputQoI(fs%dpm,k,grad)
 			grad_hist(k) = grad
 			call fsr%recordPlasma(fs%dpm, k)
 

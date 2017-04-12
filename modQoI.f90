@@ -4,6 +4,24 @@ module modQoI
 
 	implicit none
 
+	abstract interface
+		subroutine QoI(pm,k,J)
+			use modPM1D
+			type(PM1D), intent(in) :: pm
+			integer, intent(in) :: k
+			real(mp), intent(inout) :: J
+		end subroutine
+	end interface
+
+	abstract interface
+		subroutine Adj_dJ(adj,pm,nk)
+			use modAdj
+			type(adjoint), intent(inout) :: adj
+			type(PM1D), intent(in) :: pm
+			integer, intent(in) :: nk
+		end subroutine
+	end interface
+
 contains
 
 !=============Mean Kinetic Energy====================

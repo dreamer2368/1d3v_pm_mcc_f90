@@ -15,4 +15,5 @@ doc/*.toc
 *.stackdump
 *.log
 *.swp
+data/**
 data/rf_Ar/sheath.asv

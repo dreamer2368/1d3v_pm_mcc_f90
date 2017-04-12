@@ -35,10 +35,10 @@ contains
 		type(PM1D) :: sheath
 		type(recordData) :: r
 		real(mp), parameter :: Kb = 1.38065E-23, EV_TO_K = 11604.52_mp, eps = 8.85418782E-12
-		real(mp), parameter :: Te = 50.0_mp*EV_TO_K, tau = 100.0_mp
+		real(mp), parameter :: Te = 10.0_mp*EV_TO_K, tau = 100.0_mp
 		real(mp), parameter :: me = 9.10938215E-31, qe = 1.602176565E-19, mu = 1836
-		real(mp), parameter :: n0 = 2.00000000E14
-		integer, parameter :: Ne = 10000, Ni = 10000
+		real(mp), parameter :: n0 = 2.0E14
+		integer, parameter :: Ne = 5E4, Ni = 5E4
 		real(mp) :: mi, Ti, wp0, lambda0, dt, dx, L
 		real(mp) :: ve0, vi0, Time_f
 		real(mp) :: A(4)
@@ -48,7 +48,7 @@ contains
 		Ti = Te/tau
 		wp0 = sqrt(n0*qe*qe/me/eps)
 		lambda0 = sqrt(eps*Kb*Te/n0/qe/qe)
-		L = 2.0_mp*lambda0
+		L = 20.0_mp*lambda0
 
 		print *, 'L = ',L,', lambda0 = ',lambda0,' e = lambda/L = ',lambda0/L
 
@@ -63,13 +63,13 @@ contains
 		A = (/ ve0, vi0, 0.2_mp, 1.0_mp*Ni /)
 		call buildPM1D(sheath,Time_f,0.0_mp,ceiling(L/dx),2,pBC=2,mBC=2,order=1,A=A,L=L,dt=dt,eps=eps)
 		sheath%wp = wp0
-		call buildRecord(r,sheath%nt,2,sheath%L,sheath%ng,'test',20)
+		call buildRecord(r,sheath%nt,2,sheath%L,sheath%ng,'Procassini',20)
 
 		call buildSpecies(sheath%p(1),-qe,me)
 		call buildSpecies(sheath%p(2),qe,mi)
 
 		call sheath_initialize(sheath,Ne,Ni,Te,Ti,Kb,n0)
-		call forwardsweep(sheath,r,Null_input,Null_source)
+		call forwardsweep(sheath,r,Null_input,PartialUniform_Maxwellian2)
 
 		call printPlasma(r)
 
