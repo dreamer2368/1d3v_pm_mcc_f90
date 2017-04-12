@@ -1,7 +1,7 @@
 module AdjointProblems
 
 	use init
-	use timeStep
+	use timeStepAdj
 	use modMPI
 
 	implicit none
