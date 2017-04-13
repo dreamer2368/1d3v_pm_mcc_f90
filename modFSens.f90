@@ -8,10 +8,15 @@ module modFSens
 	type, extends(PM1D) :: FSens
 		real(mp) :: Lv, dv
 		integer :: ngv
-		real(mp), allocatable :: j(:,:), f_A(:,:), frac(:,:,:)
-		integer, allocatable :: gv(:,:)
+		real(mp), allocatable :: j(:,:), f_A(:,:)
+
 		integer :: NInject										!Number of injecting particle per direction
+		real(mp), allocatable :: xp_inject(:), vp_inject(:,:), frac_inject(:,:,:)
+		integer, allocatable :: g_inject(:,:), gv_inject(:,:)
+
 		integer :: NLimit											!Number limit of particle for redistribution
+		real(mp), allocatable :: xp_remesh(:), vp_remesh(:,:), frac_remesh(:,:,:)
+		integer, allocatable :: g_remesh(:,:), gv_remesh(:,:)
 	contains
 		procedure, pass(dpm) :: buildFSens
 		procedure, pass(this) :: destroyFSens
@@ -31,6 +36,7 @@ contains
 		real(mp), intent(in) :: Lv
 		integer, intent(in) :: Ngv, NInject, NLimit
 		integer :: i
+		real(mp), allocatable :: temp(:)
 
 		call dpm%buildPM1D(pm%nt*pm%dt,pm%ni*pm%dt,pm%ng,pm%n,	&
 							pm%pBCindex,pm%mBCindex,pm%a(1)%order,	&
@@ -40,13 +46,20 @@ contains
 		end do
 		call dpm%m%setMesh(pm%m%rho_back)
 
-		dpm%NInject = NInject
-		dpm%NLimit = NLimit
+		dpm%NInject = INT(SQRT(1.0_mp*NInject))**2
+		dpm%NLimit = INT(SQRT(1.0_mp*NLimit))**2
 		dpm%Lv = Lv
 		dpm%ngv = Ngv
 		dpm%dv = Lv/Ngv
 		allocate(dpm%j(pm%ng,2*Ngv+1))
 		allocate(dpm%f_A(pm%ng,2*Ngv+1))
+		dpm%j = 0.0_mp
+		dpm%f_A = 0.0_mp
+
+		call createDistribution(dpm,dpm%NInject,dpm%xp_inject,dpm%vp_inject,	&
+										dpm%g_inject,dpm%gv_inject,dpm%frac_inject)
+		call createDistribution(dpm,dpm%NLimit,dpm%xp_remesh,dpm%vp_remesh,	&
+										dpm%g_remesh,dpm%gv_remesh,dpm%frac_remesh)
 	end subroutine
 
 	subroutine destroyFSens(this)
@@ -56,6 +69,16 @@ contains
 		call destroyPM1D(this)
 		deallocate(this%j)
 		deallocate(this%f_A)
+		deallocate(this%xp_inject)
+		deallocate(this%vp_inject)
+		deallocate(this%g_inject)
+		deallocate(this%gv_inject)
+		deallocate(this%frac_inject)
+		deallocate(this%xp_remesh)
+		deallocate(this%vp_remesh)
+		deallocate(this%g_remesh)
+		deallocate(this%gv_remesh)
+		deallocate(this%frac_remesh)
 	end subroutine
 
 	subroutine FSensSourceTerm(dpm,qs,ms,f,E,nk,fsr)							!Take v-derivative, Multiply dE
@@ -102,98 +125,83 @@ contains
 		dpm%j = -dpm%j*dpm%dt
 	end subroutine
 
-	subroutine InjectSource(this,f,N)
+	subroutine InjectSource(this,p,f)
 		class(FSens), intent(inout) :: this
+		type(species), intent(inout) :: p
 		real(mp), intent(in), dimension(this%m%ng,2*this%ngv+1) :: f
-		integer, intent(in) :: N
-		real(mp), allocatable :: xp0(:), vp0(:,:), spwt0(:)
+		real(mp) :: spwt0(this%NInject)
 
-		call createDistribution(this,f,N,xp0,vp0,spwt0)
-		call this%p(1)%appendSpecies(size(xp0),xp0,vp0,spwt0)
+		call SourceAssign(f,this%L,this%Lv,this%g_inject,this%gv_inject,this%frac_inject,spwt0)
+		call p%appendSpecies(this%NInject,this%xp_inject,this%vp_inject,spwt0)
 	end subroutine
 
-	subroutine createDistribution(this,f,N,xp0,vp0,spwt0)
+	subroutine SourceAssign(f,Lx,Lv,g,gv,frac,spwt0)
+		real(mp), intent(in) :: f(:,:)
+		real(mp), intent(in) :: Lx,Lv
+		integer, intent(in) :: g(:,:), gv(:,:)
+		real(mp), intent(in) :: frac(:,:,:)
+		real(mp), intent(out) :: spwt0(size(g,2))
+		integer :: k,N
+		N = size(g,2)
+
+		do k=1,N
+			spwt0(k) = SUM( f(g(:,k),gv(:,k))*frac(:,:,k) )*Lx*2.0_mp*Lv/N
+		end do
+	end subroutine
+
+	subroutine createDistribution(this,N,xp0,vp0,g,gv,frac)
 		class(FSens), intent(inout) :: this
-		real(mp), intent(in), dimension(this%m%ng,2*this%ngv+1) :: f
-		integer, intent(in) :: N
-		real(mp), intent(out), allocatable :: xp0(:), vp0(:,:), spwt0(:)
+		integer, intent(inout) :: N
+		real(mp), intent(out), allocatable :: xp0(:), vp0(:,:)
+		integer, intent(out), allocatable :: g(:,:), gv(:,:)
+		real(mp), intent(out), allocatable :: frac(:,:,:)
 		integer :: Nx, newN
 		integer :: i,i1,i2,k,Np,nk
 		integer :: vgl, vgr
 		real(mp) :: w, h, dx,dv
-		integer :: g(this%a(1)%order+1)
-		real(mp) :: fx(this%a(1)%order+1)
-		real(mp), allocatable :: frac(:,:)
+		real(mp), allocatable :: fx(:,:)
 		dx = this%m%dx
 		dv = this%dv
 		Nx = INT(SQRT(N*1.0_mp))
 		newN = Nx*Nx
-!		newN = N
+		N = newN
 
-		do i=1,this%n
-			allocate(xp0(newN))
-			allocate(vp0(newN,3))
-			allocate(spwt0(newN))
-
-			!Spatial distribution: Uniformly-random x dimension
-!			call RANDOM_NUMBER(xp0)
-!			xp0 = xp0*this%L
-!			!Apply periodic BC
-!			do k=1,newN
-!				if( xp0(k)<0.0_mp ) then
-!					xp0(k) = xp0(k) + this%dpm%L
-!				elseif( xp0(k)>this%L ) then
-!					xp0(k) = xp0(k) - this%dpm%L
-!				end if
-!			end do
-
-			!Velocity distribution: Gaussian-random v dimension
-!			vp0 = randn(newN,3)
-!			w = 0.4_mp*this%Lv
-!			vp0 = vp0*w
-			!Velocity distribution: Uniformly-random x dimension
-!			call RANDOM_NUMBER(vp0)
-!			vp0 = (2.0_mp*vp0-1.0_mp)*this%Lv
-
-			!Uniform grid distribution on phase space
-			xp0 = 0.0_mp
-			vp0 = 0.0_mp
-			spwt0 = 0.0_mp
-			do i2=1,Nx
-				do i1=1,Nx
-					xp0(i1+Nx*(i2-1)) = (i1-0.5_mp)*this%L/Nx
-					vp0(i1+Nx*(i2-1),:) = (i2-0.5_mp)*2.0_mp*this%Lv/Nx - 1.0_mp*this%Lv
-				end do
+		allocate(xp0(newN))
+		allocate(vp0(newN,3))
+		allocate(g(this%a(1)%order+1,newN))
+		allocate(gv(2,newN))
+		allocate(frac(this%a(1)%order+1,2,newN))
+		allocate(fx(this%a(1)%order+1,newN))
+	
+		!Uniform grid distribution on phase space
+		xp0 = 0.0_mp
+		vp0 = 0.0_mp
+		do i2=1,Nx
+			do i1=1,Nx
+				xp0(i1+Nx*(i2-1)) = (i1-0.5_mp)*this%L/Nx
+				vp0(i1+Nx*(i2-1),:) = (i2-0.5_mp)*2.0_mp*this%Lv/Nx - 1.0_mp*this%Lv
 			end do
+		end do
 
+		do k=1,newN
 			!X-direction Interpolation
-			do k=1,newN
-				CALL this%a(i)%assignMatrix(xp0(k),dx,g,fx)
-				CALL this%a(i)%adjustGrid(this%m%ng,g,fx)
-				this%a(i)%g(:,k) = g
-				this%a(i)%frac(:,k) = fx
-			end do
+			CALL this%a(1)%assignMatrix(xp0(k),dx,g(:,k),fx(:,k))
+			CALL this%a(1)%adjustGrid(this%m%ng,g(:,k),fx(:,k))
 
-			!V-direction Interpolation and determine spwt
-			allocate(frac(this%a(i)%order+1,2))
-			frac = 0.0_mp
-			do k=1,newN
-				vgl = FLOOR(vp0(k,1)/this%dv) + this%ngv+1
-				vgr = vgl+1
+			!V-direction Interpolation
+			vgl = FLOOR(vp0(k,1)/this%dv) + this%ngv+1
+			vgr = vgl+1
 
-				if( vgl<1 .or. vgr>2*this%ngv+1 ) then
-					spwt0(k) = 0.0_mp
-					cycle
-				end if
+			if( vgl<1 .or. vgr>2*this%ngv+1 ) then
+				gv(:,k) = this%ngv
+				frac(:,:,k) = 0.0_mp
+				cycle
+			end if
 
-				h = vp0(k,1)/this%dv - FLOOR(vp0(k,1)/this%dv)
-				frac(:,1) = this%a(i)%frac(:,k)*(1.0_mp-h)
-				frac(:,2) = this%a(i)%frac(:,k)*h
-				spwt0(k) = SUM( f(this%a(i)%g(:,k),(/vgl,vgr/))*frac )	&
-!								*this%L*sqrt(2.0_mp*pi)*w/EXP( -vp0(k,1)**2/2.0_mp/w/w )
-								*this%L*2.0_mp*this%Lv
-			end do
-			spwt0 = spwt0/newN
+			gv(:,k) = (/vgl,vgr/)
+			h = vp0(k,1)/dv - FLOOR(vp0(k,1)/dv)
+			frac(:,1,k) = fx(:,k)*(1.0_mp-h)
+			frac(:,2,k) = fx(:,k)*h
 		end do
 	end subroutine
 
@@ -221,14 +229,16 @@ contains
 		this%f_A(:,2*this%ngv+1) = this%f_A(:,2*this%ngv+1)*2.0_mp
 	end subroutine
 
-	subroutine Redistribute(this)
+	subroutine Redistribute(this,p,a)
 		class(FSens), intent(inout) :: this
-		real(mp), allocatable :: xp0(:), vp0(:,:), spwt0(:)
+		type(species), intent(inout) :: p
+		type(pmAssign), intent(in) :: a
+		real(mp) :: spwt0(this%NLimit)
 		integer :: i
-		if( this%p(1)%np.ge.INT(1.5_mp*this%NLimit) ) then
-			call this%FSensDistribution(this%p(1),this%a(1))
-			call createDistribution(this,this%f_A,INT(0.5_mp*this%NLimit),xp0,vp0,spwt0)
-			call this%p(1)%setSpecies(size(xp0),xp0,vp0,spwt0)
+		if( p%np.ge.3*this%NLimit ) then
+			call this%FSensDistribution(p,a)
+			call SourceAssign(this%f_A,this%L,this%Lv,this%g_remesh,this%gv_remesh,this%frac_remesh,spwt0)
+			call p%setSpecies(this%NLimit,this%xp_remesh,this%vp_remesh,spwt0)
 		end if
 	end subroutine
 
@@ -244,10 +254,6 @@ contains
 		real(mp) :: vp, h
 		integer, dimension(:,:), pointer :: g_x
 		real(mp), dimension(:,:), pointer :: frac_x
-		if( ALLOCATED(this%gv) ) DEALLOCATE(this%gv)
-		if( ALLOCATED(this%frac) ) DEALLOCATE(this%frac)
-		ALLOCATE(this%gv(2,p%np))
-		ALLOCATE(this%frac(a%order+1,2,p%np))
 
 		!F_A to phase space
 		n_temp = 0.0_mp
@@ -258,8 +264,8 @@ contains
 			vgl = FLOOR(vp/this%dv) + this%ngv+2
 			vgr = vgl+1
 			if( vgl<1 .or. vgr>2*this%ngv+3 )	then
-				this%gv(:,k) = this%ngv
-				this%frac(:,:,k) = 0.0_mp
+!				this%gv(:,k) = this%ngv
+!				this%frac(:,:,k) = 0.0_mp
 				cycle
 			end if
 			g = g_x(:,k)

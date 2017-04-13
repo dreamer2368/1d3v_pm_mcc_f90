@@ -51,8 +51,6 @@ contains
 			call r%recordPlasma(this, k)									!record for n=1~Nt
 
 			call updateSensitivity(dpm,this,PtrControl,PtrSource,k,dr)
-!			call fs%FSensDistribution
-!			call fs%Redistribute
 
 			do i=1,dpm%n
 				call CPU_TIME(time1)
@@ -61,14 +59,18 @@ contains
 				call CPU_TIME(time2)
 				dr%cpt_temp(8) = dr%cpt_temp(8) + (time2-time1)/dr%mod
 
-				dpm%f_A = 0.0_mp
-				call dpm%numberDensity(dpm%p(i),dpm%a(i),dpm%f_A)
-				call dpm%updateWeight(dpm%p(i),dpm%a(i),dpm%f_A,dpm%j)
+				!InjectSource+Remeshing
+				call dpm%Redistribute(dpm%p(i),dpm%a(i))
+				call dpm%InjectSource(dpm%p(i),dpm%j)
+
+				!Weight updating
+!				dpm%f_A = 0.0_mp
+!				call dpm%numberDensity(dpm%p(i),dpm%a(i),dpm%f_A)
+!				call dpm%updateWeight(dpm%p(i),dpm%a(i),dpm%f_A,dpm%j)
 				call CPU_TIME(time1)
 				dr%cpt_temp(9) = dr%cpt_temp(9) + (time1-time2)/dr%mod
 			end do
 
-!			call fs%InjectSource(fs%j,fs%NInject)
 			call inputQoI(dpm,k,grad)
 			grad_hist(k) = grad
 			call dr%recordPlasma(dpm, k)
@@ -78,7 +80,7 @@ contains
 				write(kstr,*) kr
 				open(unit=305,file='data/'//dr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
 						status='replace',form='unformatted',access='stream')
-				call dpm%FSensDistribution(dpm%p(1),this%a(1))
+!				call dpm%FSensDistribution(dpm%p(1),this%a(1))
 				write(305) dpm%f_A
 				close(305)
 				open(unit=305,file='data/'//dr%dir//'/j_'//trim(adjustl(kstr))//'.bin',	&

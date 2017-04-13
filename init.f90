@@ -79,7 +79,7 @@ contains
 				CASE('vT')
 					spwt0 = ( vp0(:,1)**2/vT/vT - 1.0_mp )/SQRT(2.0_mp*pi)/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
 			!					*fs%L*w/EXP( -vp0(:,1)**2/2.0_mp/w/w )/newN
-								*fs%L*2.0_mp*fs%Lv/newN
+								*fs%L*2.4_mp*fs%Lv/newN
 					rho_back = 0.0_mp
 				CASE('Q')
 					spwt0 = 0.0_mp
@@ -93,7 +93,7 @@ contains
 		else		!Default case: vT
 			spwt0 = ( vp0(:,1)**2/vT/vT - 1.0_mp )/SQRT(2.0_mp*pi)/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
 !					*fs%L*w/EXP( -vp0(:,1)**2/2.0_mp/w/w )/newN
-						*fs%L*2.0_mp*fs%Lv/newN
+						*fs%L*2.4_mp*fs%Lv/newN
 			rho_back = 0.0_mp
 		end if
 

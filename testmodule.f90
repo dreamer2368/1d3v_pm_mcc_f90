@@ -190,7 +190,7 @@ contains
 		close(303)
 		close(304)
 
-		call fs%Redistribute
+		call fs%Redistribute(fs%p(1),fs%a(1))
 		call fs%FSensDistribution(fs%p(1),fs%a(1))
 
 		open(unit=301,file='data/RedistributionTest/xp_rdst.bin',status='replace',form='unformatted',access='stream')
@@ -344,7 +344,7 @@ contains
 		open(unit=304,file='data/InjectionTest/j_source.bin',status='replace',form='unformatted',access='stream')
 		write(304) fs%j
 		close(304)
-		call fs%InjectSource(fs%j,fs%NInject)
+		call fs%InjectSource(fs%p(1),fs%j)
 
 		call fs%applyBC(fs%p(1),fs%m,fs%dt,fs%A0(1))
 		!X-direction Interpolation
