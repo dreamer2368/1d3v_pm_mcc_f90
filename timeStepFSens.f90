@@ -60,13 +60,13 @@ contains
 				dr%cpt_temp(8) = dr%cpt_temp(8) + (time2-time1)/dr%mod
 
 				!InjectSource+Remeshing
-				call dpm%Redistribute(dpm%p(i),dpm%a(i))
-				call dpm%InjectSource(dpm%p(i),dpm%j)
+!				call dpm%Redistribute(dpm%p(i),dpm%a(i))
+!				call dpm%InjectSource(dpm%p(i),dpm%j)
 
 				!Weight updating
-!				dpm%f_A = 0.0_mp
-!				call dpm%numberDensity(dpm%p(i),dpm%a(i),dpm%f_A)
-!				call dpm%updateWeight(dpm%p(i),dpm%a(i),dpm%f_A,dpm%j)
+				dpm%f_A = 0.0_mp
+				call dpm%numberDensity(dpm%p(i),dpm%a(i),dpm%f_A)
+				call dpm%updateWeight(dpm%p(i),dpm%a(i),dpm%f_A,dpm%j)
 				call CPU_TIME(time1)
 				dr%cpt_temp(9) = dr%cpt_temp(9) + (time1-time2)/dr%mod
 			end do
