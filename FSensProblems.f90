@@ -194,7 +194,7 @@ contains
 			adj_grad = 0.0_mp
 			do i=1,mpih%sendcnt
 				call buildPM1D(d,Time(k),0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt)
-				dir = 'Debye_sampling/'//trim(adjustl(mpih%rank_str))
+				dir = 'Sync1/'//trim(adjustl(mpih%rank_str))
 				call buildRecord(r,d%nt,1,d%L,d%ng,trim(dir),20)
 
 				call buildSpecies(d%p(1),-1.0_mp,1.0_mp)
@@ -202,9 +202,10 @@ contains
 		
 				Lv = A(1)*6.0_mp
 				call buildFSens(fs,d,Lv,Ngv,NInject,NLimit)
-				dir = 'Debye_sampling/'//trim(adjustl(mpih%rank_str))//'/f_A'
+				dir = trim(adjustl(dir))//'/f_A'
 				call buildRecord(fsr,fs%nt,1,fs%L,fs%ng,trim(dir),20)
-				call Debye_sensitivity_init(fs,2*N,A(1))
+!				call Debye_sensitivity_init(fs,2*N,A(1))
+		      call Debye_sensitivity_init_sync(fs,d,vT,'vT')
 	
 				call forwardsweep_sensitivity(d,r,fs,fsr,Debye,J,grad)
 
@@ -226,9 +227,9 @@ contains
 
 			if( mpih%my_rank.eq.mpih%size-1 ) then
 				write(Time_str,'(F5.2)') Time(k)
-				open(unit=301,file='data/Debye_sampling/Jk_'//trim(Time_str)//'.bin',	&
+				open(unit=301,file='data/Sync1/Jk_'//trim(Time_str)//'_N105.bin',	&
 						status='replace',form='unformatted',access='stream')
-				open(unit=302,file='data/Debye_sampling/gradk_'//trim(Time_str)//'.bin',	&
+				open(unit=302,file='data/Sync1/gradk_'//trim(Time_str)//'_N105.bin',	&
 						status='replace',form='unformatted',access='stream')
 !				open(unit=303,file='data/Debye_sampling/adjk_'//trim(Time_str)//'.bin',	&
 !						status='replace',form='unformatted',access='stream')
