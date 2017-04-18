@@ -83,8 +83,8 @@ contains
 		call buildFSens(fs,pm,Lv,Ngv,NInject,NLimit)
 		dir = 'Debye_sensitivity/f_A'
 		call buildRecord(fsr,fs%nt,1,fs%L,fs%ng,trim(dir),20)
-		call Debye_sensitivity_init(fs,N,vT,'vT')
-!		call Debye_sensitivity_init_sync(fs,pm,vT,'vT')
+!		call Debye_sensitivity_init(fs,N,vT,'vT')
+		call Debye_sensitivity_init_sync(fs,pm,vT,'vT')
 
 		call forwardsweep_sensitivity(pm,r,fs,fsr,Debye,J,grad)
 

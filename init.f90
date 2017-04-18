@@ -22,7 +22,8 @@ contains
 			SELECT CASE(input_str)
 				CASE('vT')
 					spwt0 = ( vp0(:,1)**2/vT/vT - 1.0_mp )/SQRT(2.0_mp*pi)/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
-								*dpm%L*2.0_mp*dpm%Lv/N
+!								*dpm%L*2.4_mp*dpm%Lv/N
+								*dpm%L*SQRT(2.0_mp*pi)*vT*vT/EXP( -vp0(:,1)**2/2.0_mp/vT/vT )/N
 					rho_back = 0.0_mp
 				CASE('Q')
 					spwt0 = 0.0_mp
@@ -35,7 +36,7 @@ contains
 			END SELECT
 		else		!Default case: vT
 			spwt0 = ( vp0(:,1)**2/vT/vT - 1.0_mp )/SQRT(2.0_mp*pi)/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
-						*dpm%L*2.0_mp*dpm%Lv/N
+						*dpm%L*2.4_mp*dpm%Lv/N
 			rho_back = 0.0_mp
 		end if
 
@@ -139,16 +140,16 @@ contains
 !		xp0 = 0.0_mp
 !		vp0 = 0.0_mp
 !		spwt0 = 0.0_mp
-
+!
 !		do i2=1,Nx
 !			do i1=1,Nx
 !				xp0(i1+Nx*(i2-1)) = (i1-0.5_mp)*pm%L/Nx
-!				vp0(i1+Nx*(i2-1),:) = (i2-0.5_mp)*2.0_mp*Lv/Nx - 1.0_mp*Lv
+!				vp0(i1+Nx*(i2-1),:) = (i2-0.5_mp)*2.4_mp*Lv/Nx - 1.2_mp*Lv
 !			end do
 !		end do
-
+!
 !		spwt0 = 1/SQRT(2.0_mp*pi)/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
-!					*pm%L*2.0_mp*Lv/newN
+!					*pm%L*2.4_mp*Lv/newN
 
 		!Gaussian Random distribution
 		allocate(xp0(Np))

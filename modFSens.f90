@@ -21,6 +21,7 @@ module modFSens
 		procedure, pass(dpm) :: buildFSens
 		procedure, pass(this) :: destroyFSens
 		procedure, pass(this) :: FSensDistribution
+		procedure, pass(this) :: FSensDistribution_sync
 		procedure, pass(dpm) :: FSensSourceTerm
 		procedure, pass(this) :: InjectSource
 		procedure, pass(this) :: Redistribute
@@ -83,24 +84,31 @@ contains
 
 	subroutine FSensSourceTerm(dpm,qs,ms,f,E,nk,fsr)							!Take v-derivative, Multiply dE
 		class(FSens), intent(inout) :: dpm
-		real(mp), intent(in) :: qs,ms,f(dpm%m%ng,2*dpm%ngv+1), E(dpm%m%ng)
+		real(mp), intent(inout) :: f(dpm%m%ng,2*dpm%ngv+1)
+		real(mp), intent(in) :: qs,ms,E(dpm%m%ng)
 		integer, intent(in), optional :: nk
 		type(recordData), intent(in), optional :: fsr
 		integer :: ng,ngv,kr,i
 		character(len=100) :: kstr
 		real(mp) :: dx,dv
 		real(mp) :: E_temp(dpm%m%ng)
+		real(mp) :: Dvf(dpm%m%ng,2*dpm%ngv+1)
 		ng = dpm%m%ng
 		ngv = dpm%ngv
 		dx = dpm%m%dx
 		dv = dpm%dv
 
 		!Gradient in v direction
-		do i=1,ng
-			dpm%j(i,2:2*ngv) = ( f(i,3:2*ngv+1)-f(i,1:2*ngv-1) )/2.0_mp/dv
-		end do
-		dpm%j(:,1) = 0.0_mp
-		dpm%j(:,2*ngv+1) = 0.0_mp
+!		do i=1,ng
+!			dpm%j(i,2:2*ngv) = ( f(i,3:2*ngv+1)-f(i,1:2*ngv-1) )/2.0_mp/dv
+!		end do
+!		dpm%j(:,1) = 0.0_mp
+!		dpm%j(:,2*ngv+1) = 0.0_mp
+		Dvf(:,2:2*ngv) = ( f(:,3:2*ngv+1)-f(:,1:2*ngv-1) )/2.0_mp/dv
+		Dvf(:,1) = 0.0_mp
+		Dvf(:,2*ngv+1) = 0.0_mp
+		dpm%j=Dvf
+
 !		if( present(nk) ) then
 !			if( (fsr%mod.eq.1) .or. (mod(nk,fsr%mod).eq.0) ) then
 !				kr = merge(nk,nk/fsr%mod,fsr%mod.eq.1)
@@ -320,6 +328,36 @@ contains
 !			g=g_x(:,k)
 !			p%spwt(k) = p%spwt(k) + SUM( j(g,this%gv(:,k))*this%frac(:,:,k)/n_A(g,this%gv(:,k)) )
 		end do
+	end subroutine
+
+	subroutine FSensDistribution_sync(this,p,a)
+		class(FSens), intent(inout) :: this
+		type(species), intent(in) :: p
+		type(pmAssign), intent(in) :: a
+		real(mp), dimension(this%m%ng,2*this%ngv+3) :: n_temp, f_temp
+		integer :: i,k, g(a%order+1),gv(2)
+		real(mp) :: frac(a%order+1,2)
+		integer :: vgl, vgr
+		real(mp) :: vp, h
+
+		!F to phase space
+		n_temp = 0.0_mp
+		f_temp = 0.0_mp
+		do k = 1, p%np
+			vp = p%vp(k,1)
+			vgl = FLOOR(vp/this%dv) + this%ngv+2
+			vgr = vgl+1
+			if( vgl<1 .or. vgr>2*this%ngv+3 )	cycle
+			g = a%g(:,k)
+			gv = (/vgl,vgr/)
+			h = vp/this%dv - FLOOR(vp/this%dv)
+			frac(:,1) = (1.0_mp-h)*a%frac(:,k)
+			frac(:,2) = h*a%frac(:,k)
+			n_temp(g,gv) = n_temp(g,gv) + frac/this%m%dx/this%dv
+			f_temp(g,gv) = f_temp(g,gv) + p%spwt(k)*frac/this%m%dx/this%dv
+		end do
+		this%f_A = n_temp(:,2:2*this%ngv+2)
+		this%j = f_temp(:,2:2*this%ngv+2)
 	end subroutine
 
 end module

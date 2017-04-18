@@ -50,12 +50,19 @@ contains
 			J_hist(k) = J
 			call r%recordPlasma(this, k)									!record for n=1~Nt
 
-			call updateSensitivity(dpm,this,PtrControl,PtrSource,k,dr)
+			call updateSensitivity_sync(dpm,this,PtrControl,PtrSource,k,dr)
 
 			do i=1,dpm%n
+				!For Synchronized weight-updating
+				dpm%p(i)%xp=this%p(i)%xp
+				dpm%p(i)%vp=this%p(i)%vp
+
 				call CPU_TIME(time1)
-				call dpm%FSensDistribution(this%p(i),this%a(i))
-				call dpm%FSensSourceTerm(this%p(i)%qs,this%p(i)%ms,dpm%f_A,this%m%E)
+				call dpm%FSensDistribution_sync(this%p(i),this%a(i))
+				!Synchronized
+				call dpm%FSensSourceTerm(this%p(i)%qs,this%p(i)%ms,dpm%j,this%m%E)
+				!Asynchronous
+!				call dpm%FSensSourceTerm(this%p(i)%qs,this%p(i)%ms,dpm%f_A,this%m%E)
 				call CPU_TIME(time2)
 				dr%cpt_temp(8) = dr%cpt_temp(8) + (time2-time1)/dr%mod
 
@@ -64,9 +71,9 @@ contains
 !				call dpm%InjectSource(dpm%p(i),dpm%j)
 
 				!Weight updating
-				dpm%f_A = 0.0_mp
-				call dpm%numberDensity(dpm%p(i),dpm%a(i),dpm%f_A)
-				call dpm%updateWeight(dpm%p(i),dpm%a(i),dpm%f_A,dpm%j)
+!				dpm%f_A = 0.0_mp
+!				call dpm%numberDensity(dpm%p(i),this%a(i),dpm%f_A)
+				call dpm%updateWeight(dpm%p(i),this%a(i),dpm%f_A,dpm%j)
 				call CPU_TIME(time1)
 				dr%cpt_temp(9) = dr%cpt_temp(9) + (time1-time2)/dr%mod
 			end do
@@ -80,7 +87,7 @@ contains
 				write(kstr,*) kr
 				open(unit=305,file='data/'//dr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
 						status='replace',form='unformatted',access='stream')
-!				call dpm%FSensDistribution(dpm%p(1),this%a(1))
+				call dpm%FSensDistribution(dpm%p(1),this%a(1))
 				write(305) dpm%f_A
 				close(305)
 				open(unit=305,file='data/'//dr%dir//'/j_'//trim(adjustl(kstr))//'.bin',	&
@@ -112,13 +119,6 @@ contains
 		L = dpm%L
 		N = dpm%N
 		Ng = dpm%ng
-
-!		do i=1, dpm%n
-!			dpm%p(i)%xp = pm%p(i)%xp
-!			dpm%p(i)%vp = pm%p(i)%vp
-!			dpm%a(i)%g = pm%a(i)%g
-!			dpm%a(i)%frac = pm%a(i)%frac
-!		end do
 
 		do i=1,dpm%n
 			call dpm%applyBC(dpm%p(i),dpm%m,dt,dpm%A0(i))
@@ -176,13 +176,6 @@ contains
 			call dpm%p(i)%moveSpecies(dt)
 		end do
 
-!		do i=1, dpm%n
-!			dpm%p(i)%xp = pm%p(i)%xp
-!			dpm%p(i)%vp = pm%p(i)%vp
-!			dpm%a(i)%g = pm%a(i)%g
-!			dpm%a(i)%frac = pm%a(i)%frac
-!		end do
-
 		call CPU_TIME(time2)
 		r%cpt_temp(1) = r%cpt_temp(1) + (time2-time1)/r%mod
 
@@ -232,6 +225,74 @@ contains
 !		else
 !			call mcc_collision(this)
 !		end if
+	end subroutine
+
+	subroutine updateSensitivity_sync(dpm,pm,PtrControl,PtrSource,k,r)
+		type(FSens), intent(inout) :: dpm
+		type(PM1D), intent(in) :: pm
+		procedure(control), pointer :: PtrControl
+		procedure(source), pointer :: PtrSource
+		type(recordData), intent(inout), optional :: r
+		integer, intent(in) :: k
+		real(mp) :: rhs(dpm%ng-1), phi1(dpm%ng-1)
+		real(mp) :: dt, L
+		integer :: N, Ng, i,j
+		real(mp) :: time1, time2
+		integer, dimension(:,:), pointer :: g
+		real(mp), dimension(:,:), pointer :: frac
+		real(mp), allocatable :: spwt(:)
+		dt = dpm%dt
+		L = dpm%L
+		N = dpm%n
+		Ng = dpm%ng
+
+		call PtrControl(dpm,k,'xp')
+
+		call PtrSource(dpm)
+
+		call CPU_TIME(time1)
+
+		call CPU_TIME(time2)
+		r%cpt_temp(1) = r%cpt_temp(1) + (time2-time1)/r%mod
+
+		call CPU_TIME(time1)
+		r%cpt_temp(2) = r%cpt_temp(2) + (time1-time2)/r%mod
+
+		!charge assignment
+		dpm%m%rho = 0.0_mp
+		do i=1, dpm%n
+			g=>pm%a(i)%g
+			frac=>pm%a(i)%frac
+			allocate(spwt(dpm%p(i)%np))
+			spwt=dpm%p(i)%spwt
+			do j=1,dpm%p(i)%np
+				dpm%m%rho( g(:,j) ) = dpm%m%rho( g(:,j) ) + spwt(j)*dpm%p(i)%qs/dpm%m%dx*frac(:,j)
+			end do
+			deallocate(spwt)
+!			call dpm%a(i)%chargeAssign(dpm%p(i),dpm%m)
+		end do
+		call CPU_TIME(time2)
+		r%cpt_temp(3) = r%cpt_temp(3) + (time2-time1)/r%mod
+
+		call PtrControl(dpm,k,'rho_back')
+
+		!for control parameter qp
+!		dpm%m%rho = dpm%m%rho + pm%m%rho/pm%p(1)%qs
+
+		call dpm%m%solveMesh(dpm%eps0)
+		call CPU_TIME(time1)
+		r%cpt_temp(4) = r%cpt_temp(4) + (time1-time2)/r%mod
+
+		!Electric field : E_A = -D*phi_A
+		dpm%m%E = - multiplyD(dpm%m%phi,dpm%m%dx,dpm%m%BCindex)
+		call CPU_TIME(time2)
+		r%cpt_temp(5) = r%cpt_temp(5) + (time2-time1)/r%mod
+
+		call CPU_TIME(time1)
+		r%cpt_temp(6) = r%cpt_temp(6) + (time1-time2)/r%mod
+
+		call CPU_TIME(time2)
+		r%cpt_temp(7) = r%cpt_temp(7) + (time2-time1)/r%mod
 	end subroutine
 
 end module
