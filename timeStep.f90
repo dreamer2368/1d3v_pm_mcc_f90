@@ -159,7 +159,7 @@ contains
 
 		if( present(r) ) then
 			call this%mcc_collision(this%p,this%A0,r%n_coll(:,k))
-			r%cpt_temp(1:7) = r%cpt_temp(1:7) + cpt_temp/r%mod
+			r%cpt_temp(1:7) = r%cpt_temp(1:7) + cpt_temp
 		else
 			call this%mcc_collision(this%p,this%A0)
 		end if
