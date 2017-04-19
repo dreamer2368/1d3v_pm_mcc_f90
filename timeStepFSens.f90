@@ -57,7 +57,7 @@ contains
 				call dpm%FSensDistribution(this%p(i),this%a(i))
 				call dpm%FSensSourceTerm(this%p(i)%qs,this%p(i)%ms,dpm%f_A,this%m%E)
 				call CPU_TIME(time2)
-				dr%cpt_temp(8) = dr%cpt_temp(8) + (time2-time1)/dr%mod
+				dr%cpt_temp(8) = dr%cpt_temp(8) + (time2-time1)
 
 				!InjectSource+Remeshing
 !				call dpm%Redistribute(dpm%p(i),dpm%a(i))
@@ -68,7 +68,7 @@ contains
 				call dpm%numberDensity(dpm%p(i),dpm%a(i),dpm%f_A)
 				call dpm%updateWeight(dpm%p(i),dpm%a(i),dpm%f_A,dpm%j)
 				call CPU_TIME(time1)
-				dr%cpt_temp(9) = dr%cpt_temp(9) + (time1-time2)/dr%mod
+				dr%cpt_temp(9) = dr%cpt_temp(9) + (time1-time2)
 			end do
 
 			call inputQoI(dpm,k,grad)
@@ -184,13 +184,13 @@ contains
 !		end do
 
 		call CPU_TIME(time2)
-		r%cpt_temp(1) = r%cpt_temp(1) + (time2-time1)/r%mod
+		r%cpt_temp(1) = r%cpt_temp(1) + (time2-time1)
 
 		do i=1,dpm%n
 			call dpm%applyBC(dpm%p(i),dpm%m,dt,dpm%A0(i))
 		end do
 		call CPU_TIME(time1)
-		r%cpt_temp(2) = r%cpt_temp(2) + (time1-time2)/r%mod
+		r%cpt_temp(2) = r%cpt_temp(2) + (time1-time2)
 
 		!charge assignment
 		dpm%m%rho = 0.0_mp
@@ -198,7 +198,7 @@ contains
 			call dpm%a(i)%chargeAssign(dpm%p(i),dpm%m)
 		end do
 		call CPU_TIME(time2)
-		r%cpt_temp(3) = r%cpt_temp(3) + (time2-time1)/r%mod
+		r%cpt_temp(3) = r%cpt_temp(3) + (time2-time1)
 
 		call PtrControl(dpm,k,'rho_back')
 
@@ -207,25 +207,25 @@ contains
 
 		call dpm%m%solveMesh(dpm%eps0)
 		call CPU_TIME(time1)
-		r%cpt_temp(4) = r%cpt_temp(4) + (time1-time2)/r%mod
+		r%cpt_temp(4) = r%cpt_temp(4) + (time1-time2)
 
 		!Electric field : E_A = -D*phi_A
 		dpm%m%E = - multiplyD(dpm%m%phi,dpm%m%dx,dpm%m%BCindex)
 		call CPU_TIME(time2)
-		r%cpt_temp(5) = r%cpt_temp(5) + (time2-time1)/r%mod
+		r%cpt_temp(5) = r%cpt_temp(5) + (time2-time1)
 
 		!Force assignment : mat'*E  (NOT E_A !!)
 		do i=1, dpm%n
 			call dpm%a(i)%forceAssign(dpm%p(i), pm%m)
 		end do
 		call CPU_TIME(time1)
-		r%cpt_temp(6) = r%cpt_temp(6) + (time1-time2)/r%mod
+		r%cpt_temp(6) = r%cpt_temp(6) + (time1-time2)
 
 		do i=1, dpm%n
 			call dpm%p(i)%accelSpecies(dt)
 		end do
 		call CPU_TIME(time2)
-		r%cpt_temp(7) = r%cpt_temp(7) + (time2-time1)/r%mod
+		r%cpt_temp(7) = r%cpt_temp(7) + (time2-time1)
 
 !		if( present(r) ) then
 !			call mcc_collision(this,r%n_coll(:,k))
