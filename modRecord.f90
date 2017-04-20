@@ -47,7 +47,7 @@ contains
 		allocate(this%rhodata(ng,nr))
 		allocate(this%PE(nr))
 		allocate(this%KE(n,nr))
-		allocate(this%cpt_time(9,nr))
+		allocate(this%cpt_time(9,nt+1))
 
 		this%np = 0
 		this%phidata = 0.0_mp
@@ -101,6 +101,8 @@ contains
 		character(len=100) :: nstr, kstr
 		real(mp) :: qe = 1.602176565E-19
 
+		this%cpt_time(:,k+1) = this%cpt_temp
+		this%cpt_temp=0.0_mp
 		if( (this%mod.eq.1) .or. (mod(k,this%mod).eq.0) ) then
 			kr = merge(k,k/this%mod,this%mod.eq.1)
 			do n=1,pm%n
@@ -127,7 +129,7 @@ contains
 			this%Edata(:,kr+1) = pm%m%E
 			this%rhodata(:,kr+1) = pm%m%rho
 			this%PE(kr+1) = 0.5_mp*SUM(pm%m%E**2)*pm%m%dx
-			this%cpt_time(:,kr+1) = this%cpt_temp
+!			this%cpt_time(:,kr+1) = this%cpt_temp
 
 			print *, '============= ',k,'-th Time Step ================='
 			do n=1,pm%n
@@ -150,6 +152,7 @@ contains
 		open(unit=304,file='data/'//this%dir//'/Np.bin',status='replace',form='unformatted',access='stream')
 		open(unit=305,file='data/'//this%dir//'/phi.bin',status='replace',form='unformatted',access='stream')
 		open(unit=306,file='data/'//this%dir//'/Ncoll.bin',status='replace',form='unformatted',access='stream')
+		open(unit=307,file='data/'//this%dir//'/cpt_time.bin',status='replace',form='unformatted',access='stream')
 		do i=1,this%n
 			write(s,*) i
 			open(unit=307+i,file='data/'//this%dir//'/KE_'//trim(adjustl(s))//'.bin',status='replace',form='unformatted',access='stream')
@@ -160,6 +163,9 @@ contains
 
       write(306) this%n_coll
       close(306)
+
+		write(307) this%cpt_time
+		close(307)
 
 		do i = 1,this%nt/this%mod+1
 			write(301) this%Edata(:,i)
@@ -187,39 +193,39 @@ contains
 			write(301,*) 'Step	Total	Mean	Percentage'
 			print *, "================ Computation Time Summary ==================================="
 			print *, "Original simulation	   	     Total            Mean	 Percentage	"
-			total = SUM(this%cpt_time(1,:))*this%mod
+			total = SUM(this%cpt_time(1,:))
 			mean = total/this%nt
-			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Particle Move			", total, mean, pct
 			write(301,701) 'Particle-Move	', total, mean, pct
-			total = SUM(this%cpt_time(2,:))*this%mod
+			total = SUM(this%cpt_time(2,:))
 			mean = total/this%nt
-			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "ApplyBC				", total, mean, pct
 			write(301,701) 'ApplyBC	', total, mean, pct
-			total = SUM(this%cpt_time(3,:))*this%mod
+			total = SUM(this%cpt_time(3,:))
 			mean = total/this%nt
-			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "ChargeAssign			", total, mean, pct
 			write(301,701) 'Charge-Assign	', total, mean, pct
-			total = SUM(this%cpt_time(4,:))*this%mod
+			total = SUM(this%cpt_time(4,:))
 			mean = total/this%nt
-			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Poisson Solver			", total, mean, pct
 			write(301,701) 'Poisson-Solver	', total, mean, pct
-			total = SUM(this%cpt_time(5,:))*this%mod
+			total = SUM(this%cpt_time(5,:))
 			mean = total/this%nt
-			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Efield Gradient			", total, mean, pct
 			write(301,701) 'Efield-Gradient	', total, mean, pct
-			total = SUM(this%cpt_time(6,:))*this%mod
+			total = SUM(this%cpt_time(6,:))
 			mean = total/this%nt
-			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Force Assign			", total, mean, pct
 			write(301,701) 'Force-Assign	', total, mean, pct
-			total = SUM(this%cpt_time(7,:))*this%mod
+			total = SUM(this%cpt_time(7,:))
 			mean = total/this%nt
-			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Particle Accel			", total, mean, pct
 			write(301,701) 'Particle-Accel	', total, mean, pct
 			print *, "============================================================================="
@@ -229,49 +235,49 @@ contains
 			write(301,*) 'Step	Total	Mean	Percentage'
 			print *, "================ Computation Time Summary ==================================="
 			print *, "Sensitivity simulation	  	     Total            Mean   	 Percentage	"
-			total = SUM(this%cpt_time(1,:))*this%mod
+			total = SUM(this%cpt_time(1,:))
 			mean = total/this%nt
-			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Particle Move			", total, mean, pct
 			write(301,701) 'Particle-Move	', total, mean, pct
-			total = SUM(this%cpt_time(2,:))*this%mod
+			total = SUM(this%cpt_time(2,:))
 			mean = total/this%nt
-			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "ApplyBC				", total, mean, pct
 			write(301,701) 'ApplyBC	', total, mean, pct
-			total = SUM(this%cpt_time(3,:))*this%mod
+			total = SUM(this%cpt_time(3,:))
 			mean = total/this%nt
-			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "ChargeAssign			", total, mean, pct
 			write(301,701) 'Charge-Assign	', total, mean, pct
-			total = SUM(this%cpt_time(4,:))*this%mod
+			total = SUM(this%cpt_time(4,:))
 			mean = total/this%nt
-			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Poisson Solver			", total, mean, pct
 			write(301,701) 'Poisson-Solver	', total, mean, pct
-			total = SUM(this%cpt_time(5,:))*this%mod
+			total = SUM(this%cpt_time(5,:))
 			mean = total/this%nt
-			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Efield Gradient			", total, mean, pct
 			write(301,701) 'Efield-Gradient	', total, mean, pct
-			total = SUM(this%cpt_time(6,:))*this%mod
+			total = SUM(this%cpt_time(6,:))
 			mean = total/this%nt
-			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Force Assign			", total, mean, pct
 			write(301,701) 'Force-Assign	', total, mean, pct
-			total = SUM(this%cpt_time(7,:))*this%mod
+			total = SUM(this%cpt_time(7,:))
 			mean = total/this%nt
-			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Particle Accel			", total, mean, pct
 			write(301,701) 'Particle-Accel	', total, mean, pct
-			total = SUM(this%cpt_time(8,:))*this%mod
+			total = SUM(this%cpt_time(8,:))
 			mean = total/this%nt
-			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Sensitivity Source		", total, mean, pct
 			write(301,701) 'Sensitivity-Source	', total, mean, pct
-			total = SUM(this%cpt_time(9,:))*this%mod
+			total = SUM(this%cpt_time(9,:))
 			mean = total/this%nt
-			pct = total/this%mod/SUM(this%cpt_time)*100.0_mp
+			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Weight Update			", total, mean, pct
 			write(301,701) 'Weight-update	', total, mean, pct
 			print *, "============================================================================="
