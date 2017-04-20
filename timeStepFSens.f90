@@ -50,19 +50,19 @@ contains
 			J_hist(k) = J
 			call r%recordPlasma(this, k)									!record for n=1~Nt
 
-			call updateSensitivity_sync(dpm,this,PtrControl,PtrSource,k,dr)
+			call updateSensitivity(dpm,this,PtrControl,PtrSource,k,dr)
 
 			do i=1,dpm%n
 				!For Synchronized weight-updating
-				dpm%p(i)%xp=this%p(i)%xp
-				dpm%p(i)%vp=this%p(i)%vp
+!				dpm%p(i)%xp=this%p(i)%xp
+!				dpm%p(i)%vp=this%p(i)%vp
 
 				call CPU_TIME(time1)
-				call dpm%FSensDistribution_sync(this%p(i),this%a(i))
+				call dpm%FSensDistribution(this%p(i),this%a(i))
 				!Synchronized
-				call dpm%FSensSourceTerm(this%p(i)%qs,this%p(i)%ms,dpm%j,this%m%E)
+!				call dpm%FSensSourceTerm(this%p(i)%qs,this%p(i)%ms,dpm%j,this%m%E)
 				!Asynchronous
-!				call dpm%FSensSourceTerm(this%p(i)%qs,this%p(i)%ms,dpm%f_A,this%m%E)
+				call dpm%FSensSourceTerm(this%p(i)%qs,this%p(i)%ms,dpm%f_A,this%m%E)
 				call CPU_TIME(time2)
 				dr%cpt_temp(8) = dr%cpt_temp(8) + (time2-time1)
 
@@ -71,8 +71,8 @@ contains
 !				call dpm%InjectSource(dpm%p(i),dpm%j)
 
 				!Weight updating
-!				dpm%f_A = 0.0_mp
-!				call dpm%numberDensity(dpm%p(i),this%a(i),dpm%f_A)
+				dpm%f_A = 0.0_mp
+				call dpm%numberDensity(dpm%p(i),this%a(i),dpm%f_A)
 				call dpm%updateWeight(dpm%p(i),this%a(i),dpm%f_A,dpm%j)
 				call CPU_TIME(time1)
 				dr%cpt_temp(9) = dr%cpt_temp(9) + (time1-time2)
