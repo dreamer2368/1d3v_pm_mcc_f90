@@ -170,7 +170,7 @@ contains
 		type(FSens) :: fs
 		type(recordData) :: r,fsr
 		type(mpiHandler) :: mpih
-		integer, parameter  :: Nsample=1E3
+		integer, parameter  :: Nsample=1
 		real(mp), parameter :: vT=1.5_mp
 		integer, parameter :: N = 1E5, Ng = 64
 		integer, parameter :: NInit=5E4, Ngv=32, NInject=5E3, NLimit=3E5
