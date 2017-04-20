@@ -9,6 +9,49 @@ module testmodule
 
 contains
 
+	subroutine redistribute_temp_test
+		type(PM1D) :: pm
+		type(FSens) :: fs
+		real(mp), parameter :: L=2.7_mp, Lv=4.6_mp, wv=0.4_mp, dt=0.05_mp
+		integer, parameter :: Ng=64, NInject=5E3, NLimit=1E5
+
+		call pm%buildPM1D(1.0_mp,1.0_mp,Ng,N=1,pBC=0,mBC=0,order=1,L=L,dt=dt)
+		call pm%p(1)%buildSpecies(1.0_mp,1.0_mp)
+		
+		allocate(pm%p(1)%xp(NLimit))
+		allocate(pm%p(1)%vp(NLimit,3))
+		allocate(pm%p(1)%spwt(NLimit))
+		call RANDOM_NUMBER(pm%p(1)%xp)
+		pm%p(1)%xp = pm%p(1)%xp*L
+		pm%p(1)%vp = wv*randn(NLimit,3)
+		pm%p(1)%spwt = 1.0_mp/NLimit
+
+		call fs%buildFSens(pm,Lv,Ng/2,NInject,NLimit)
+		call fs%p(1)%buildSpecies(1.0_mp,1.0_mp)
+		call fs%p(1)%setSpecies(NLimit,pm%p(1)%xp,pm%p(1)%vp,pm%p(1)%spwt)
+		call Redistribute_temp(fs,fs%p(1))
+
+		open(unit=301,file='data/redistribution/xp0.bin',status='replace',form='unformatted',access='stream')
+		open(unit=302,file='data/redistribution/vp0.bin',status='replace',form='unformatted',access='stream')
+		write(301) pm%p(1)%xp
+		write(302) pm%p(1)%vp(:,1)
+		close(301)
+		close(302)
+
+		open(unit=301,file='data/redistribution/xp1.bin',status='replace',form='unformatted',access='stream')
+		open(unit=302,file='data/redistribution/vp1.bin',status='replace',form='unformatted',access='stream')
+		open(unit=303,file='data/redistribution/spwt1.bin',status='replace',form='unformatted',access='stream')
+		write(301) fs%p(1)%xp
+		write(302) fs%p(1)%vp(:,1)
+		write(303) fs%p(1)%spwt
+		close(301)
+		close(302)
+		close(303)
+
+		call destroyPM1D(pm)
+		call destroyFSens(fs)
+	end subroutine
+
 	subroutine debye_adj(fk,Time,str,k,output)
 		real(mp), intent(in) :: fk, Time
 		character(len=*), intent(in) ::str
