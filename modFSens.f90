@@ -25,6 +25,7 @@ module modFSens
 		procedure, pass(dpm) :: FSensSourceTerm
 		procedure, pass(this) :: InjectSource
 		procedure, pass(this) :: Redistribute
+		procedure, pass(this) :: Redistribute_temp
 		procedure, pass(this) :: numberDensity
 		procedure, pass(this) :: updateWeight
 	end type
@@ -364,52 +365,55 @@ contains
 		class(FSens), intent(inout) :: this
 		type(species), intent(inout) :: p
 		real(mp), dimension(this%NLimit) :: spwt0
-		real(mp) :: xp, vp, dx, dv
+		real(mp) :: xp, vp, dx, dv, Lv
 		integer :: k, k1, k2, wk, nx, gx(4),gv(4)
 		real(mp) :: fx(4), fv(4), hx, hv
 		spwt0 = 0.0_mp
 		nx = INT(SQRT(1.0_mp*this%NLimit))
 		dx = this%m%L/nx
 		dv = 2.0_mp*this%Lv/nx
+		Lv = this%Lv
 
-		do k=1,p%np
-			xp=p%xp(k)
-			vp=p%vp(k,1)
+		if( p%np>3*this%NLimit ) then
+			do k=1,p%np
+				xp=p%xp(k)
+				vp=p%vp(k,1)
 
-			gx = FLOOR(xp/dx-0.5_mp) + (/0,1,2,3/)
-			gv = FLOOR(vp/dv-0.5_mp) + (/0,1,2,3/) + CEILING(nx/2.0_mp)
+				gx = FLOOR(xp/dx-0.5_mp) + (/0,1,2,3/)
+				gv = FLOOR((vp+Lv)/dv-0.5_mp) + (/0,1,2,3/)
 
-			hx = xp/dx-0.5_mp - FLOOR(xp/dx-0.5_mp)
-			hv = vp/dv-0.5_mp - FLOOR(vp/dv-0.5_mp)
-			fx = ABS((/hx+1.0_mp,hx,1.0_mp-hx,2.0_mp-hx/))
-			fv = ABS((/hv+1.0_mp,hv,1.0_mp-hv,2.0_mp-hv/))
-			fx(2:3) = 1.0_mp - 2.5_mp*fx(2:3)**2 + 1.5_mp*fx(2:3)**3
-			fx((/1,4/)) = 0.5_mp*(2.0_mp-fx((/1,4/)))**2*(1.0_mp-fx((/1,4/)))
-			fv(2:3) = 1.0_mp - 2.5_mp*fv(2:3)**2 + 1.5_mp*fv(2:3)**3
-			fv((/1,4/)) = 0.5_mp*(2.0_mp-fv((/1,4/)))**2*(1.0_mp-fv((/1,4/)))
+				hx = xp/dx-0.5_mp - FLOOR(xp/dx-0.5_mp)
+				hv = (vp+Lv)/dv-0.5_mp - FLOOR((vp+Lv)/dv-0.5_mp)
+				fx = ABS((/hx+1.0_mp,hx,1.0_mp-hx,2.0_mp-hx/))
+				fv = ABS((/hv+1.0_mp,hv,1.0_mp-hv,2.0_mp-hv/))
+				fx(2:3) = 1.0_mp - 2.5_mp*fx(2:3)**2 + 1.5_mp*fx(2:3)**3
+				fx((/1,4/)) = 0.5_mp*(2.0_mp-fx((/1,4/)))**2*(1.0_mp-fx((/1,4/)))
+				fv(2:3) = 1.0_mp - 2.5_mp*fv(2:3)**2 + 1.5_mp*fv(2:3)**3
+				fv((/1,4/)) = 0.5_mp*(2.0_mp-fv((/1,4/)))**2*(1.0_mp-fv((/1,4/)))
 
-			where( gx<1 )
-				gx = gx+nx
-			elsewhere( gx>nx )
-				gx = gx-nx
-			end where
-			where( gv<1 )
-				gv = 1
-				fv = 0.0_mp
-			elsewhere( gv>nx )
-				gv = nx
-				fv = 0.0_mp
-			end where
-			
-			do k2=1,4
-				do k1=1,4
-					wk = gx(k1) + nx*(gv(k2)-1)
-					spwt0(wk) = spwt0(wk) + p%spwt(k)*fx(k1)*fv(k2)
+				where( gx<1 )
+					gx = gx+nx
+				elsewhere( gx>nx )
+					gx = gx-nx
+				end where
+				where( gv<1 )
+					gv = 1
+					fv = 0.0_mp
+				elsewhere( gv>nx )
+					gv = nx
+					fv = 0.0_mp
+				end where
+
+				do k2=1,4
+					do k1=1,4
+						wk = gx(k1) + nx*(gv(k2)-1)
+						spwt0(wk) = spwt0(wk) + p%spwt(k)*fx(k1)*fv(k2)
+					end do
 				end do
 			end do
-		end do
 
-		call p%setSpecies(this%NLimit,this%xp_remesh,this%vp_remesh,spwt0)
+			call p%setSpecies(this%NLimit,this%xp_remesh,this%vp_remesh,spwt0)
+		end if
 	end subroutine
 
 end module

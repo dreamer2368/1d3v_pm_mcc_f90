@@ -66,7 +66,7 @@ contains
 		integer :: NInit=5E4, Ngv=32, NInject=5E3, NLimit=5E4
 		real(mp) :: L = 20.0_mp, Lv, Q = 2.0_mp
 		real(mp) :: dt=0.05_mp, dx
-		real(mp) :: Time = 30.0_mp, vT = 1.5_mp
+		real(mp) :: Time = 150.0_mp, vT = 1.5_mp
 		real(mp) :: A(2), J, grad
 		character(len=100)::dir
 		A = (/ vT, 0.0_mp /)
@@ -83,8 +83,8 @@ contains
 		call buildFSens(fs,pm,Lv,Ngv,NInject,NLimit)
 		dir = 'Debye_sensitivity/f_A'
 		call buildRecord(fsr,fs%nt,1,fs%L,fs%ng,trim(dir),20)
-!		call Debye_sensitivity_init(fs,N,vT,'vT')
-		call Debye_sensitivity_init_sync(fs,pm,vT,'vT')
+		call Debye_sensitivity_init(fs,N,vT,'vT')
+!		call Debye_sensitivity_init_sync(fs,pm,vT,'vT')
 
 		call forwardsweep_sensitivity(pm,r,fs,fsr,Debye,J,grad)
 

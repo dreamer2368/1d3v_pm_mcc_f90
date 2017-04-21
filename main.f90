@@ -33,7 +33,7 @@ program main
 !	call InjectionTest
 !	call MPITest
 !	call SensitivityInitializeTest
-!	call Debye_sensitivity
+	call Debye_sensitivity
 !	call forYeoh
 !	call RedistributionTest
 !	call updateWeightTest
@@ -41,7 +41,7 @@ program main
 !	call adj_convergence(twostream_grad)
 !	call adjoint_convergence_in_time(debye_adj)
 !	call debye_sampling
-	call redistribute_temp_test
+!	call redistribute_temp_test
 
 	! print to screen
 	print *, 'program main...done.'

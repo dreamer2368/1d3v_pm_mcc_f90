@@ -13,7 +13,7 @@ contains
 		type(PM1D) :: pm
 		type(FSens) :: fs
 		real(mp), parameter :: L=2.7_mp, Lv=4.6_mp, wv=0.4_mp, dt=0.05_mp
-		integer, parameter :: Ng=64, NInject=5E3, NLimit=1E5
+		integer, parameter :: Ng=64, NInject=5E3, NLimit=5E4
 
 		call pm%buildPM1D(1.0_mp,1.0_mp,Ng,N=1,pBC=0,mBC=0,order=1,L=L,dt=dt)
 		call pm%p(1)%buildSpecies(1.0_mp,1.0_mp)
