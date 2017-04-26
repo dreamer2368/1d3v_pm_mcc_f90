@@ -63,10 +63,10 @@ contains
 		type(FSens) :: fs
 		type(recordData) :: r, fsr
 		integer :: N=1E5, Ng=64
-		integer :: NInit=5E4, Ngv=32, NInject=5E3, NLimit=5E4
+		integer :: NInit=5E4, Ngv=32, NInject=5E4, NLimit=5E4
 		real(mp) :: L = 20.0_mp, Lv, Q = 2.0_mp
 		real(mp) :: dt=0.05_mp, dx
-		real(mp) :: Time = 150.0_mp, vT = 1.5_mp
+		real(mp) :: Time = 30.0_mp, vT = 1.5_mp
 		real(mp) :: A(2), J, grad
 		character(len=100)::dir
 		A = (/ vT, 0.0_mp /)

@@ -139,9 +139,21 @@ contains
 		type(species), intent(inout) :: p
 		real(mp), intent(in), dimension(this%m%ng,2*this%ngv+1) :: f
 		real(mp) :: spwt0(this%NInject)
+		logical, dimension(this%NInject) :: IsNonTrivial
+		real(mp) :: maxspwt
+		integer :: N0
+		real(mp), allocatable :: v0(:,:)
 
 		call SourceAssign(f,this%L,this%Lv,this%g_inject,this%gv_inject,this%frac_inject,spwt0)
-		call p%appendSpecies(this%NInject,this%xp_inject,this%vp_inject,spwt0)
+		maxspwt = MAXVAL(ABS(spwt0))
+		IsNonTrivial = (ABS(spwt0).ge.maxspwt*1e-8)
+		N0 = COUNT(IsNonTrivial)
+		allocate(v0(N0,3))
+		v0 = 0.0_mp
+		v0(:,1) = PACK(this%vp_inject(:,1),IsNonTrivial)
+		call p%appendSpecies(N0,PACK(this%xp_inject,IsNonTrivial),	&
+									v0,PACK(spwt0,IsNonTrivial))
+		deallocate(v0)
 	end subroutine
 
 	subroutine SourceAssign(f,Lx,Lv,g,gv,frac,spwt0)
