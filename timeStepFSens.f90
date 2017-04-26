@@ -69,6 +69,9 @@ contains
 				!InjectSource+Remeshing
 !				call dpm%Redistribute(dpm%p(i),dpm%a(i))
 				call dpm%InjectSource(dpm%p(i),dpm%j)
+				call CPU_TIME(time1)
+				dr%cpt_temp(9) = dr%cpt_temp(9) + (time1-time2)
+
 				call dpm%Redistribute_temp(dpm%p(i))
 
 				!Weight updating
@@ -78,8 +81,8 @@ contains
 !				dpm%f_A = 0.0_mp
 !				call dpm%numberDensity(dpm%p(i),dpm%a(i),dpm%f_A)
 !				call dpm%updateWeight(dpm%p(i),dpm%a(i),dpm%f_A,dpm%j)
-				call CPU_TIME(time1)
-				dr%cpt_temp(9) = dr%cpt_temp(9) + (time1-time2)
+				call CPU_TIME(time2)
+				dr%cpt_temp(10) = dr%cpt_temp(10) + (time2-time1)
 			end do
 
 			call inputQoI(dpm,k,grad)

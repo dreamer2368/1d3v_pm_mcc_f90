@@ -365,9 +365,13 @@ contains
 		class(FSens), intent(inout) :: this
 		type(species), intent(inout) :: p
 		real(mp), dimension(this%NLimit) :: spwt0
+		logical, dimension(this%NLimit) :: IsNonTrivial
 		real(mp) :: xp, vp, dx, dv, Lv
 		integer :: k, k1, k2, wk, nx, gx(4),gv(4)
 		real(mp) :: fx(4), fv(4), hx, hv
+		real(mp) :: maxspwt
+		integer :: N0
+		real(mp), allocatable :: v0(:,:)
 		spwt0 = 0.0_mp
 		nx = INT(SQRT(1.0_mp*this%NLimit))
 		dx = this%m%L/nx
@@ -411,8 +415,20 @@ contains
 					end do
 				end do
 			end do
+			maxspwt = MAXVAL(abs(spwt0))
+			IsNonTrivial = (ABS(spwt0).ge.maxspwt*1e-6)
+			N0 = COUNT(IsNonTrivial)
+!print *, maxspwt, MINVAL(PACK(ABS(spwt0),IsNonTrivial)),MINVAL(ABS(spwt0))
+!print *, N0, this%NLimit
+			allocate(v0(N0,3))
+			v0=0.0_mp
+			v0(:,1) = PACK(this%vp_remesh(:,1),IsNonTrivial)
 
-			call p%setSpecies(this%NLimit,this%xp_remesh,this%vp_remesh,spwt0)
+!			call p%setSpecies(this%NLimit,this%xp_remesh,this%vp_remesh,spwt0)
+			call p%setSpecies(N0,PACK(this%xp_remesh,IsNonTrivial),	&
+										v0,	&
+										PACK(spwt0,IsNonTrivial))
+			deallocate(v0)
 		end if
 	end subroutine
 

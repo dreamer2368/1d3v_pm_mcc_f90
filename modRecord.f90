@@ -16,7 +16,7 @@ module modRecord
 		real(mp), allocatable :: PE(:), KE(:,:)
 		integer, allocatable :: n_coll(:,:)               !(species*collision type, time)
 
-		real(mp) :: cpt_temp(9)
+		real(mp) :: cpt_temp(10)
 		real(mp), allocatable :: cpt_time(:,:)
 	contains
 		procedure, pass(this) :: buildRecord
@@ -47,7 +47,7 @@ contains
 		allocate(this%rhodata(ng,nr))
 		allocate(this%PE(nr))
 		allocate(this%KE(n,nr))
-		allocate(this%cpt_time(9,nt+1))
+		allocate(this%cpt_time(10,nt+1))
 
 		this%np = 0
 		this%phidata = 0.0_mp
@@ -278,8 +278,13 @@ contains
 			total = SUM(this%cpt_time(9,:))
 			mean = total/this%nt
 			pct = total/SUM(this%cpt_time)*100.0_mp
-			print 701, "Weight Update			", total, mean, pct
-			write(301,701) 'Weight-update	', total, mean, pct
+			print 701, "Injection			", total, mean, pct
+			write(301,701) 'Injection	', total, mean, pct
+			total = SUM(this%cpt_time(10,:))
+			mean = total/this%nt
+			pct = total/SUM(this%cpt_time)*100.0_mp
+			print 701, "Remeshing			", total, mean, pct
+			write(301,701) 'Remeshing	', total, mean, pct
 			print *, "============================================================================="
 			close(301)
 		end if
