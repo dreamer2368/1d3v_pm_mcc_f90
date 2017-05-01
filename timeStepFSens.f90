@@ -19,10 +19,18 @@ contains
 		character(len=100) :: kstr
 		real(mp), dimension(this%nt) :: J_hist, grad_hist
 		real(mp) :: time1, time2
-		procedure(control), pointer :: PtrControl=>Null_input
-		procedure(source), pointer :: PtrSource=>Null_source
-		if( PRESENT(inputControl) ) PtrControl=>inputControl
-		if( PRESENT(inputSource) ) PtrSource=>inputSource
+		procedure(control), pointer :: PtrControl=>NULL()
+		procedure(source), pointer :: PtrSource=>NULL()
+		if( PRESENT(inputControl) ) then
+                        PtrControl=>inputControl
+                else
+                        PtrControl=>Null_input
+                end if
+		if( PRESENT(inputSource) ) then
+                        PtrSource=>inputSource
+                else 
+                        PtrSource=>Null_source
+                end if       
 		J = 0.0_mp
 		grad = 0.0_mp
 		J_hist = 0.0_mp
@@ -89,21 +97,19 @@ contains
 			grad_hist(k) = grad
 			call dr%recordPlasma(dpm, k)
 
-			if( (dr%mod.eq.1) .or. (mod(k,dr%mod).eq.0) ) then
-				kr = merge(k,k/dr%mod,dr%mod.eq.1)
-				write(kstr,*) kr
-				open(unit=305,file='data/'//dr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
-						status='replace',form='unformatted',access='stream')
+!			if( (dr%mod.eq.1) .or. (mod(k,dr%mod).eq.0) ) then
+!				kr = merge(k,k/dr%mod,dr%mod.eq.1)
+!				write(kstr,*) kr
+!				open(unit=305,file='data/'//dr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
+!						status='replace',form='unformatted',access='stream')
 !				call dpm%FSensDistribution(dpm%p(1),this%a(1))
-				call dpm%a(1)%chargeAssign(dpm%p(1),dpm%m)
-				call dpm%FSensDistribution(dpm%p(1),dpm%a(1))
-				write(305) dpm%f_A
-				close(305)
-				open(unit=305,file='data/'//dr%dir//'/j_'//trim(adjustl(kstr))//'.bin',	&
-						status='replace',form='unformatted',access='stream')
-				write(305) dpm%j
-				close(305)
-			end if
+!				write(305) dpm%f_A
+!				close(305)
+!				open(unit=305,file='data/'//dr%dir//'/j_'//trim(adjustl(kstr))//'.bin',	&
+!						status='replace',form='unformatted',access='stream')
+!				write(305) dpm%j
+!				close(305)
+!			end if
 		end do
 		open(unit=305,file='data/'//dr%dir//'/grad_hist.bin',	&
 					status='replace',form='unformatted',access='stream')

@@ -19,14 +19,26 @@ contains
 		procedure(source), optional :: inputSource
 		procedure(QoI), optional :: inputQoI
 		real(mp), intent(out), optional :: J
-		procedure(control), pointer :: PtrControl=>Null_input
-		procedure(source), pointer :: PtrSource=>Null_source
-		procedure(QoI), pointer :: PtrQoI=>Null_QoI
+		procedure(control), pointer :: PtrControl=>NULL()
+		procedure(source), pointer :: PtrSource=>NULL()
+		procedure(QoI), pointer :: PtrQoI=>NULL()
 		integer :: i,k
 		real(mp) :: Jtemp, J_hist(this%nt)
-		if( PRESENT(inputControl) ) PtrControl=>inputControl
-		if( PRESENT(inputSource) ) PtrSource=>inputSource
-		if( PRESENT(inputQoI) ) PtrQoI=>inputQoI
+		if( PRESENT(inputControl) ) then
+                        PtrControl=>inputControl
+                else
+                        PtrControl=>Null_input
+                end if
+		if( PRESENT(inputSource) ) then
+                        PtrSource=>inputSource
+                else 
+                        PtrSource=>Null_source
+                end if       
+		if( PRESENT(inputQoI) ) then
+                        PtrQoI=>inputQoI
+                else
+                        PtrQoI=>Null_QoI
+                end if
 		if( present(J) ) then
 			J = 0.0_mp
 		end if
