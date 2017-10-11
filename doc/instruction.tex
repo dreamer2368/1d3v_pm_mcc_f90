@@ -78,6 +78,7 @@
 \def\Dtotal#1#2{ \frac{D #1 }{ D #2} }
 \def\Del#1#2{ \frac{\delta #1}{\delta #2} }
 \def\Var#1{\Dnorm{}{\epsilon} #1 \bigg|_{\epsilon=0}}
+\def\inprod#1#2{ \left\langle #1 , #2 \right\rangle}
 
 \def\eps{\varepsilon}
 
@@ -152,6 +153,80 @@
 \tableofcontents
 \clearpage
 
+\subsection*{Continuous governing equation}
+Following equation is the governing equation for particle-in-cell methods,
+continuous in both time and space.
+\begin{equation*}
+\begin{split}
+\Dnorm{\xp}{t} - \vp &= 0\\
+\rho - \sum_p f(x,\xp) &= 0\\
+\nabla^2\phi + \frac{\rho}{\varepsilon_0} &= 0\\
+E + \nabla\phi &= 0\\
+E_p - \int E(x')g(x'-\xp)\;dx' &= 0\\
+\Dnorm{\vp}{t} - \frac{q}{m}E_p &= 0
+\end{split}
+\end{equation*}
+$f(\cdot,\cdot)$ and $g(\cdot,\cdot)$ correspond to the interpolation from particle to grid and vice versa, respectively.
+
+\subsection*{Continuous constraint functional}
+For continuous governing equation, we have following constraint functional $\cH$ (or Lagrangian)
+\begin{equation*}
+\begin{split}
+\cH :=& \langle \hat{Q}, \mathcal{M}[Q] \rangle\\
+=& \int_0^T\sum_{p=1}^{N} \xph\left[ \Dnorm{\xp}{t} - \vp \right]dt\\
+&+ \int_0^T\int_X \rhoh\left[ \rho - \sum_p f(x,\xp) \right]dxdt\\
+&+ \int_0^T\int_X \phih\left[ \nabla^2\phi + \frac{\rho}{\varepsilon_0} \right]dxdt\\
+&+ \int_0^T\int_X \Eh\cdot\left[ E + \nabla\phi \right]dxdt\\
+&+ \int_0^T\sum_{p=1}^{N} \Eh_p\left[ E_p - \int E(x')g(x'-\xp)\;dx' \right]dt\\
+&+ \int_0^T\sum_{p=1}^{N} \vph\left[ \Dnorm{\vp}{t} - \frac{q}{m}E_p \right]dt,
+\end{split}
+\end{equation*}
+where 6 integral terms correspond to sub-inner-products with respect to which we are supposed to find sub-adjoint operators.
+Adjoint formulation for other operators can be trivial, here we formulate the sub-adjoint operator for time-derivative,
+for the purpose of comparison with discrete case.
+\begin{equation*}
+\int_0^T \xph\Dnorm{\delta\xp}{t}\;dt = - \int_0^T \Dnorm{\xph}{t}\delta\xp\;dt + \xph\delta\xp\bigg|_0^T,
+\end{equation*}
+where $\xph\delta\xp\bigg|_T$ is used to set final condition for adjoint variable,
+and $\xph\delta\xp\bigg|_0$ is used to compute sensitivity to initial condition.
+
+\subsection*{Discrete governing equation}
+$n=1,\cdots,N_t$
+\begin{equation*}
+\begin{split}
+\frac{\xp^{n} - \xp^{n-1}}{\Dt} - \vp^{n-1/2} &= 0\\
+\rho_{i}^n - \sum\limits_p f\left( x_{i}, x_p^n \right) &= 0\\
+\phi_i^n + K^{-1}\frac{\rho_i^n}{\varepsilon_0} &= 0\\
+E_i^n + D\phi_i^n &= 0\\
+E_{p}^{n} - \sum\limits_{i}E_{i}^{n}\cdot g\left( x_{i}, x_p^{n} \right) &= 0\\
+\frac{\vp^{n+1/2} - \vp^{n-1/2}}{\Dt} - \frac{q_p}{m_p}E_p^{n} &= 0
+\end{split}
+\end{equation*}
+where $K^{-1}$, $D$ are spatial-discretized operators of $(\nabla^2)^{-1}$ and $\nabla\cdot$, respectively.
+
+\subsection*{Discrete constraint functional}
+We have constraint functional analogous to continuous case.
+\begin{equation*}
+\begin{split}
+\cH :=& \langle \hat{Q}, \mathcal{M}[Q] \rangle\\
+&+ \sum_{n=1}^{N_T}\sum_{p=1}^{N}\xph^{n}\left[ \frac{\xp^{n} - \xp^{n-1}}{\Dt} - \vp^{n-1/2} \right]\\
+&+ \sum_{n=1}^{N_T}\sum_{i=1}^{N_g}\rhoh_{i}^n\left[ \rho_{i}^n - \sum\limits_p f\left( x_{i}, x_p^n \right) \right]\\
+&+ \sum_{n=1}^{N_T}\sum_{i=1}^{N_g}\left( \phih_i^{n} \right)^T\left[ \phi_i^n + K^{-1}\frac{\rho_i^n}{\varepsilon_0} \right]\\
+&+ \sum_{n=1}^{N_T}\sum_{i=1}^{N_g}\left( \Eh_i^n \right)^T\left[ E_i^n + D\phi_i^n \right]\\
+&+ \sum_{n=1}^{N_T}\sum_{p=1}^{N}\Eh_{p}^{n}\left[ E_{p}^{n} - \sum\limits_{i}E_{i}^{n}\cdot g\left( x_{i}, x_p^{n} \right) \right]\\
+&+ \sum_{n=1}^{N_T}\sum_{p=1}^{N}\vph^{n+1/2}\left[ \frac{\vp^{n+1/2} - \vp^{n-1/2}}{\Dt} - \frac{q_p}{m_p}E_p^{n} \right]
+\end{split}
+\end{equation*}
+Technically, we are supposed to add quadrature weights corresponding to $\Delta x$ and $\Delta t$.
+But we didn't, and as a result we have $1/\Delta t$ factors in sensitivity term to initial condition.
+Furthermore, at this point the inner product and the time derivative are not defined such that
+the time derivative operator would satisfy SBP property.
+In fact, while $\xph$ have the size $N_T$ in timestep $n=1,\cdots,N_T$,
+$\xp$ have the size $N_T+1$ with timestep $n=0,\cdots,N_T$.
+This makes the time derivative operator not even a square matrix.
+This requires us to carefully transpose this matrix and handle final and initial conditions.
+\clearpage
+
 \subsection*{Adjoints blocks}
 \addcontentsline{toc}{subsection}{Adjoint blocks}
 
@@ -192,7 +267,7 @@ but for the case we have initial conditions in $\cJ$, this computation for initi
 \begin{equation}
 \frac{\vph^{N_t+3/2}}{\Dt}\delta v_p^{N_t+1/2} = 0\qquad\qquad\frac{\xph^{N_t+1}}{\Dt}\delta x_p^{N_t} = 0
 \end{equation}
-\item Remaining term (add to $\delta \cJ$)
+\item Sensitivity to initial condition (add to $\delta \cJ$)
 \begin{equation}
 -\frac{\xph^0}{\Dt}\delta \xp^0 - \frac{\vph^{1/2}}{\Dt}\delta \vp^{1/2}
 \end{equation}

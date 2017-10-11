@@ -23,6 +23,7 @@ program main
 !	call Ar_discharge
 !	call test_particle_adj(64,2)
 !	call test_backward_sweep
+!   call twostream
 !	call twostream_adj(output(1),output(2))
 !	call Landau(0.0_mp, 6.0_mp ,'Landau', 1,output )
 !	call random_test
@@ -33,13 +34,13 @@ program main
 !	call InjectionTest
 !	call MPITest
 !	call SensitivityInitializeTest
-	call Debye_sensitivity
+!	call Debye_sensitivity
 !	call forYeoh
 !	call RedistributionTest
 !	call updateWeightTest
 !	call debye_sensitivity_curve
 !	call adj_convergence(twostream_grad)
-!	call adjoint_convergence_in_time(debye_adj)
+	call adjoint_convergence_in_time(debye_adj)
 !	call debye_sampling
 !	call redistribute_temp_test
 

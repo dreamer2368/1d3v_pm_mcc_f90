@@ -18,12 +18,12 @@ contains
 		real(mp) :: J0,J1, grad(1)
 		character(len=100)::dir1
 
-		call buildPM1D(pm,70.0_mp,65.0_mp,Ng,N,0,0,1,A=(/1.0_mp,0.0_mp/))
+		call buildPM1D(pm,150.0_mp,150.0_mp,Ng,N,0,0,1,A=(/1.0_mp,0.0_mp/))
 		dir1='twostream_test'
-		call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir1),5)
+		call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir1),1)
 		call set_null_discharge(r)
 		call twostream_initialize(pm,Np,v0,vT,mode)
-		call forwardsweep(pm,r,Null_input,Null_source,MKE,J0)
+		call forwardsweep(pm,r,Null_input,Null_source,MPE,J0)
 		call printPlasma(r)
 		print *, 'J0=',J0
 

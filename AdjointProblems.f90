@@ -236,7 +236,7 @@ contains
 	end subroutine
 
 	subroutine adjoint_convergence_in_time(problem)
-		integer, parameter :: N=23, Nt=1
+		integer, parameter :: N=23, Nt=4
 		real(mp) :: fk(N)
 		real(mp) :: Tk(Nt)
 		real(mp) :: ek(N,Nt)
@@ -259,7 +259,7 @@ contains
 		end interface
 
 		fk = (/ (EXP(-1.0_mp*(i-1)),i=1,N) /)
-		Tk = (/ 3.0_mp /)
+		Tk = (/ 0.1_mp, 30.0_mp, 150.0_mp, 750.0_mp /)
 		ek = 0.0_mp
 
 		dir = 'debye_adj_test'
