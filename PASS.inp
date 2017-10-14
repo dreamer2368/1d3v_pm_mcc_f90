@@ -1,0 +1,4 @@
+#test input file
+test1 = "string input"
+test2 = 1.2E-5
+test3 = 24
