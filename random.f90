@@ -28,9 +28,9 @@ contains
 
 		call RANDOM_SEED(size=nseed)
 		allocate(seed(nseed))
-!      call SYSTEM_CLOCK(clock)
+      call SYSTEM_CLOCK(clock)
 !		seed = clock + 3433*(/ ( i, i=1,nseed ) /)
-		seed = 3433*(/ ( i, i=1,nseed ) /) + add
+		seed = 3433*(/ ( i, i=1,nseed ) /) + 17*add + clock
 		call RANDOM_SEED(put=seed)
 		deallocate(seed)
    end subroutine

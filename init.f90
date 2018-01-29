@@ -155,7 +155,7 @@ contains
 		allocate(xp0(Np))
 		allocate(vp0(Np,3))
 		allocate(spwt0(Np))
-!		call init_random_seed
+		call init_random_seed
 		vp0 = randn(Np,3)
 		vp0 = pm%A0(1)*vp0
 		call RANDOM_NUMBER(xp0)
