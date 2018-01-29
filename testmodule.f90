@@ -1105,44 +1105,49 @@ contains
 
     subroutine MPI_write_test
 		type(mpiHandler) :: mpih
-		integer, parameter  :: Nsample=50
-		integer :: i,k
-		character(len=100) :: prefix, dir_temp
-        real(mp), dimension(Nsample) :: J, dJf, dJadj
-        prefix = 'MPIwrite'
+		integer, parameter  :: Nsample=6
+		integer :: i, k, thefile
+      integer(KIND=MPI_OFFSET_KIND) :: disp
+		character(len=100) :: filename, dir_temp
+      real(mp), dimension(3,Nsample) :: data_output
+        filename = 'MPIwrite.bin'
 
 		call buildMPIHandler(mpih)
-        call allocateBuffer(Nsample,3,mpih)
+      call allocateBuffer(Nsample,3,mpih)
 
 		call init_random_seed(mpih%my_rank)
-        do i=1,mpih%sendcnt
-            call RANDOM_NUMBER(mpih%writebuf)
-            call writeData(mpih,trim(prefix))
-        end do
 
-        if( mpih%my_rank.eq.mpih%size-1 ) then
-			dir_temp=trim(prefix)//'_J.bin' 
-            open(unit=305,file=trim(dir_temp),form='unformatted',access='stream')
-			dir_temp=trim(prefix)//'_dJf.bin' 
-			open(unit=306,file=trim(dir_temp),form='unformatted',access='stream')
-			dir_temp=trim(prefix)//'_dJadj.bin' 
-			open(unit=307,file=trim(dir_temp),form='unformatted',access='stream')
-			read(305) J
-			read(306) dJf
-			read(307) dJadj
-			close(305)
-			close(306)
-			close(307)
+      thefile = MPIWriteSetup(mpih,filename)
 
-            print *, 'J'
-            print *, J
-            print *, 'dJf'
-            print *, dJf
-            print *, 'dJadj'
-            print *, dJadj
-        end if
+      print *, 'rank: ',mpih%my_rank, ', disp: ',disp
+      call MPI_BARRIER(MPI_COMM_WORLD,mpih%ierr)
 
-        call destroyMPIHandler(mpih)
+      do i=1,mpih%sendcnt
+         call RANDOM_NUMBER(mpih%writebuf)
+         print *, i, mpih%my_rank
+         print *, mpih%writebuf
+
+         call MPI_FILE_WRITE(thefile, mpih%writebuf, 3, MPI_DOUBLE, & 
+                             MPI_STATUS_IGNORE, mpih%ierr)
+            
+      end do
+      call MPI_FILE_CLOSE(thefile, mpih%ierr)
+
+      call MPI_BARRIER(MPI_COMM_WORLD,mpih%ierr)
+
+      if( mpih%my_rank.eq.mpih%size-1 ) then
+   	   dir_temp=trim(filename) 
+         open(unit=304,file=trim(dir_temp),form='unformatted',access='stream')
+	      read(304) data_output
+		   close(304)
+
+         do i=1,3
+            print ('(A,I5)'), 'data_output',i
+            print *, data_output(i,:)
+         end do
+      end if
+
+      call destroyMPIHandler(mpih)
     end subroutine
 
 end module

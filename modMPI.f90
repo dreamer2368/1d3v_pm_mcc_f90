@@ -87,27 +87,19 @@ contains
 		end do
 	end subroutine
 
-    subroutine writeData(this, prefix)
+    function MPIWriteSetup(this, filename) result(thefile)
         class(mpiHandler), intent(inout) :: this
-        character(len=*), intent(in) :: prefix
-        character(len=100), allocatable :: data_type(:)
-        integer(kind=MPI_OFFSET_KIND) disp
-        integer :: i, thefile
-        allocate(data_type(size(this%writebuf)))
-        data_type(1) = 'J'
-        data_type(2) = 'dJf'
-        if( size(this%writebuf).eq.3 ) then
-            data_type(3) = 'dJadj'
-        end if
+        character(len=*), intent(in) :: filename
+        integer :: thefile
+        integer(kind=MPI_OFFSET_KIND) :: disp
+        integer :: i
             
-        do i=1,size(this%writebuf)
-            call MPI_FILE_OPEN(MPI_COMM_WORLD, trim(prefix)//'_'//trim(data_type(i))//'.bin', & 
-                               MPI_MODE_WRONLY + MPI_MODE_CREATE + MPI_MODE_APPEND, & 
-                               MPI_INFO_NULL, thefile, this%ierr)
-            call MPI_FILE_WRITE(thefile, this%writebuf(i), 1, MPI_DOUBLE, & 
-                                MPI_STATUS_IGNORE, this%ierr) 
-            call MPI_FILE_CLOSE(thefile, this%ierr)
-        end do
-    end subroutine
+        call MPI_FILE_OPEN(MPI_COMM_WORLD, trim(filename), & 
+                           MPI_MODE_WRONLY + MPI_MODE_CREATE, & 
+                           MPI_INFO_NULL, thefile, this%ierr)
+        disp = this%displc(this%my_rank)*8*size(this%writebuf)
+        call MPI_FILE_SET_VIEW(thefile,disp,MPI_DOUBLE,MPI_DOUBLE,   &
+                                'native',MPI_INFO_NULL,this%ierr)
+    end function
 
 end module
