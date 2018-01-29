@@ -51,6 +51,7 @@ program main
 !	call adjoint_convergence_in_time(debye_adj)
 !	call debye_sampling
 !	call redistribute_temp_test
+    call MPI_write_test
 
 	! print to screen
 	print *, 'program main...done.'

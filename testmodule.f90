@@ -1103,4 +1103,46 @@ contains
 		call destroyRecord(r)
 	end subroutine
 
+    subroutine MPI_write_test
+		type(mpiHandler) :: mpih
+		integer, parameter  :: Nsample=50
+		integer :: i,k
+		character(len=100) :: prefix, dir_temp
+        real(mp), dimension(Nsample) :: J, dJf, dJadj
+        prefix = 'MPIwrite'
+
+		call buildMPIHandler(mpih)
+        call allocateBuffer(Nsample,3,mpih)
+
+		call init_random_seed(mpih%my_rank)
+        do i=1,mpih%sendcnt
+            call RANDOM_NUMBER(mpih%writebuf)
+            call writeData(mpih,trim(prefix))
+        end do
+
+        if( mpih%my_rank.eq.mpih%size-1 ) then
+			dir_temp=trim(prefix)//'_J.bin' 
+            open(unit=305,file=trim(dir_temp),form='unformatted',access='stream')
+			dir_temp=trim(prefix)//'_dJf.bin' 
+			open(unit=306,file=trim(dir_temp),form='unformatted',access='stream')
+			dir_temp=trim(prefix)//'_dJadj.bin' 
+			open(unit=307,file=trim(dir_temp),form='unformatted',access='stream')
+			read(305) J
+			read(306) dJf
+			read(307) dJadj
+			close(305)
+			close(306)
+			close(307)
+
+            print *, 'J'
+            print *, J
+            print *, 'dJf'
+            print *, dJf
+            print *, 'dJadj'
+            print *, dJadj
+        end if
+
+        call destroyMPIHandler(mpih)
+    end subroutine
+
 end module
