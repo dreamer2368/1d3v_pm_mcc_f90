@@ -5,13 +5,21 @@ program main
 	use AdjointProblems
 	use MCCProblems
 	use FSensProblems
+    use modInputHelper
 
 	implicit none
 
 	real(mp) :: output(2) = (/(0.1_mp)**3,0.0_mp/)
+    character(len=STRING_LENGTH), parameter :: PROJECT_NAME='PASS'
+    character(len=STRING_LENGTH) :: filename
 
 	! print to screen
 	print *, 'calling program main'
+
+    ! Parse options from the input file.
+    filename = trim(PROJECT_NAME) // ".inp"
+    print *, filename
+    call parseInputFile(filename)
 
 !	call cross_section
 !	call Procassini
@@ -40,7 +48,7 @@ program main
 !	call updateWeightTest
 !	call debye_sensitivity_curve
 !	call adj_convergence(twostream_grad)
-	call adjoint_convergence_in_time(debye_adj)
+!	call adjoint_convergence_in_time(debye_adj)
 !	call debye_sampling
 !	call redistribute_temp_test
 

@@ -10,7 +10,7 @@ module modMPI
 		integer :: ierr, my_rank, size
 		character(len=100) :: rank_str
 		integer :: sendcnt
-		real(mp), allocatable :: sendbuf(:,:), recvbuf(:,:)
+		real(mp), allocatable :: sendbuf(:,:), recvbuf(:,:), writebuf(:)
 		integer, allocatable :: recvcnt(:), displc(:)
 	contains
 		procedure, pass(this) :: buildMPIHandler
@@ -73,6 +73,8 @@ contains
 			allocate(this%sendbuf(this%sendcnt,Ndata))
 		end if
 		this%sendbuf = 0.0_mp
+
+        allocate(this%writebuf(Ndata))
 	end subroutine
 
 	subroutine gatherData(this)
@@ -84,5 +86,28 @@ contains
 							this%size-1,MPI_COMM_WORLD,this%ierr)
 		end do
 	end subroutine
+
+    subroutine writeData(this, prefix)
+        class(mpiHandler), intent(inout) :: this
+        character(len=*), intent(in) :: prefix
+        character(len=100), allocatable :: data_type(:)
+        integer(kind=MPI_OFFSET_KIND) disp
+        integer :: i, thefile
+        allocate(data_type(size(this%writebuf)))
+        data_type(1) = 'J'
+        data_type(2) = 'dJf'
+        if( size(this%writebuf).eq.3 ) then
+            data_type(3) = 'dJadj'
+        end if
+            
+        do i=1,size(this%writebuf)
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, trim(prefix)//'_'//trim(data_type(i))//'.bin', & 
+                               MPI_MODE_WRONLY + MPI_MODE_CREATE + MPI_MODE_APPEND, & 
+                               MPI_INFO_NULL, thefile, this%ierr)
+            call MPI_FILE_WRITE(thefile, this%writebuf(i), 1, MPI_DOUBLE, & 
+                                MPI_STATUS_IGNORE, this%ierr) 
+            call MPI_FILE_CLOSE(thefile, this%ierr)
+        end do
+    end subroutine
 
 end module
