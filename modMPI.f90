@@ -87,12 +87,16 @@ contains
 		end do
 	end subroutine
 
-    function MPIWriteSetup(this, filename) result(thefile)
+    function MPIWriteSetup(this, dir) result(thefile)
         class(mpiHandler), intent(inout) :: this
-        character(len=*), intent(in) :: filename
+        character(len=*), intent(in) :: dir
+        character(len=100) :: filename
         integer :: thefile
         integer(kind=MPI_OFFSET_KIND) :: disp
         integer :: i
+
+		call system('mkdir -p data/'//trim(dir))
+        filename = trim(dir)//'/sampling.bin'
             
         call MPI_FILE_OPEN(MPI_COMM_WORLD, trim(filename), & 
                            MPI_MODE_WRONLY + MPI_MODE_CREATE, & 

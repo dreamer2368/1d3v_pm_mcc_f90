@@ -170,7 +170,7 @@ contains
 		type(FSens) :: fs
 		type(recordData) :: r,fsr
 		type(mpiHandler) :: mpih
-		integer, parameter  :: Nsample=1
+		integer, parameter  :: Nsample=12
 		real(mp), parameter :: vT=1.5_mp
 		integer, parameter :: N = 1E5, Ng = 64
 		integer, parameter :: NInit=5E4, Ngv=32, NInject=5E3, NLimit=3E5
@@ -178,14 +178,18 @@ contains
 		real(mp) :: dt=0.05_mp, dx
 		real(mp) :: Time(1), A(2)
 		real(mp) :: J,grad,adj_grad(1)
-		integer :: i,k
-		character(len=100)::dir,Time_str
-		Time = (/ 30.0_mp /)
+		integer :: i,k,thefile
+		character(len=100) :: prefix,dir,Time_str
+        prefix = 'T750'
+        dir = 'data/'//trim(prefix)
+		Time = (/ 1.0_mp /)
 		A = (/ vT, 0.0_mp /)
 
 		call buildMPIHandler(mpih)
-!		call allocateBuffer(Nsample,3,mpih)
-      call allocateBuffer(Nsample,2,mpih)
+		call allocateBuffer(Nsample,3,mpih)
+!        call allocateBuffer(Nsample,2,mpih)
+
+        thefile = MPIWriteSetup(mpih,dir)
 
 		call init_random_seed(mpih%my_rank)
 		do k=1,size(Time)
@@ -194,7 +198,7 @@ contains
 			adj_grad = 0.0_mp
 			do i=1,mpih%sendcnt
 				call buildPM1D(d,Time(k),0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt)
-				dir = 'Async1/'//trim(adjustl(mpih%rank_str))
+				dir = trim(prefix)//'/'//trim(adjustl(mpih%rank_str))
 				call buildRecord(r,d%nt,1,d%L,d%ng,trim(dir),20)
 
 				call buildSpecies(d%p(1),-1.0_mp,1.0_mp)
@@ -208,37 +212,44 @@ contains
 	
 				call forwardsweep_sensitivity(d,r,fs,fsr,Debye,J,grad)
 
-!				call buildAdjoint(adj,d)
-!				call adj%m%setMesh(d%m%rho_back)
-!				call backward_sweep(adj,d,r,adj_grad,dDebye,Null_dinput,dDebye_dvT,Null_input,Null_source)
+				call buildAdjoint(adj,d)
+				call adj%m%setMesh(d%m%rho_back)
+				call backward_sweep(adj,d,r,adj_grad,dDebye,Null_dinput,dDebye_dvT,Null_input,Null_source)
 
 !				mpih%sendbuf(i,:) = (/J,grad,adj_grad(1)/)
-            mpih%sendbuf(i,:) = (/J,grad/)
+!                mpih%sendbuf(i,:) = (/J,grad/)
+                mpih%writebuf = (/ J,grad,adj_grad(1) /)
+
+                call MPI_FILE_WRITE(thefile, mpih%writebuf, 3, MPI_DOUBLE, & 
+                                    MPI_STATUS_IGNORE, mpih%ierr)
+                call MPI_FILE_SYNC(thefile,mpih%ierr)
 
 				call destroyRecord(r)
 				call destroyPM1D(d)
-!				call destroyAdjoint(adj)
+				call destroyAdjoint(adj)
 				call destroyRecord(fsr)
 				call destroyFSens(fs)
 			end do
 
-			call gatherData(mpih)
+!			call gatherData(mpih)
 
-			if( mpih%my_rank.eq.mpih%size-1 ) then
-				write(Time_str,'(F5.2)') Time(k)
-				open(unit=301,file='data/Async1/Jk_'//trim(Time_str)//'_N105.bin',	&
-						status='replace',form='unformatted',access='stream')
-				open(unit=302,file='data/Async1/gradk_'//trim(Time_str)//'_N105.bin',	&
-						status='replace',form='unformatted',access='stream')
+!			if( mpih%my_rank.eq.mpih%size-1 ) then
+!				write(Time_str,'(F5.2)') Time(k)
+!				open(unit=301,file='data/Async1/Jk_'//trim(Time_str)//'_N105.bin',	&
+!						status='replace',form='unformatted',access='stream')
+!				open(unit=302,file='data/Async1/gradk_'//trim(Time_str)//'_N105.bin',	&
+!						status='replace',form='unformatted',access='stream')
 !				open(unit=303,file='data/Debye_sampling/adjk_'//trim(Time_str)//'.bin',	&
 !						status='replace',form='unformatted',access='stream')
-			   write(301) mpih%recvbuf(:,1)
-			   write(302) mpih%recvbuf(:,2)
+!			   write(301) mpih%recvbuf(:,1)
+!			   write(302) mpih%recvbuf(:,2)
 !				write(303) mpih%recvbuf(:,3)
-			   close(301)
-			   close(302)
+!			   close(301)
+!			   close(302)
 !				close(303)
-			end if
+!			end if
+
+            call MPI_FILE_CLOSE(thefile, mpih%ierr)            
 		end do
 
 		call destroyMPIHandler(mpih)
