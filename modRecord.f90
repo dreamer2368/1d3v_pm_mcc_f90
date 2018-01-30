@@ -131,11 +131,13 @@ contains
 			this%PE(kr+1) = 0.5_mp*SUM(pm%m%E**2)*pm%m%dx
 !			this%cpt_time(:,kr+1) = this%cpt_temp
 
-			print *, '============= ',k,'-th Time Step ================='
-			do n=1,pm%n
-				print *, 'Species(',n,'): ',pm%p(n)%np, ', KE: ', this%KE(n,kr+1),'J'
-			end do
-         print *, 'Voltage = ',pm%m%phi(pm%ng),'V'
+            if( print_pm_output ) then
+    			print *, '============= ',k,'-th Time Step ================='
+    			do n=1,pm%n
+    				print *, 'Species(',n,'): ',pm%p(n)%np, ', KE: ', this%KE(n,kr+1),'J'
+    			end do
+                print *, 'Voltage = ',pm%m%phi(pm%ng),'V'
+            end if
 		end if
 	end subroutine
 

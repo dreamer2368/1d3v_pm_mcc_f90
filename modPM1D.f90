@@ -62,13 +62,15 @@ contains
 		this%dt = Tf/this%nt
 		this%ni = FLOOR(Ti/this%dt)
 		this%wp = 1.0_mp
-		print *, 'Plasma is created'
-		print *, 'L = (',this%L,')'
-		print *, 'Ng = (',this%ng,'), N = ',this%n
-		print *, 'Particle BC : ', this%pBCindex
-		print *, 'Mesh BC : ', this%mBCindex
-		print *, 'A = ',this%A0
-		print *, 'Ni = ',this%ni,', Nt = ',this%nt,', dt = ',this%dt
+        if( print_pm_output ) then
+	    	print *, 'Plasma is created'
+    		print *, 'L = (',this%L,')'
+    		print *, 'Ng = (',this%ng,'), N = ',this%n
+    		print *, 'Particle BC : ', this%pBCindex
+    		print *, 'Mesh BC : ', this%mBCindex
+    		print *, 'A = ',this%A0
+    		print *, 'Ni = ',this%ni,', Nt = ',this%nt,', dt = ',this%dt
+        end if
 
 		allocate(this%p(N))
 		call buildMesh(this%m,this%L,Ng,this%mBCindex)

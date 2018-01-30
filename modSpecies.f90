@@ -30,7 +30,7 @@ contains
 		this%ms = ms
 		this%qs = qs
 
-		print *, 'Species built up: ms=',ms,', qs=',qs
+        if( print_pm_output ) print *, 'Species built up: ms=',ms,', qs=',qs
 	end subroutine
 
 	subroutine setSpecies(this,np0,xp0,vp0,spwt0)
