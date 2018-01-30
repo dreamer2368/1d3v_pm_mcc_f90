@@ -1,6 +1,7 @@
 ### Compilers & flags
 F90=mpifort
 
+TOPDIR = $(dir $(firstword $(MAKEFILE_LIST)))
 SRCDIR = src
 OBJDIR = obj
 MODDIR = mod
@@ -12,7 +13,6 @@ BLASLIB=/opt/local/lib/lapack-3.5.0/librefblas.a
 PNETCDFLIBS=
 
 LIBS    = 
-
 
 EXE = exec
 F90SRC = main.f90 \
@@ -45,12 +45,20 @@ F90SRC = main.f90 \
 F90OBJ = $(F90SRC:%.f90=$(OBJDIR)/%.o)
 
 ### Targets
-all: $(EXE)
+all: dir $(EXE)
 run: $(EXE) 
 	./$(EXE)
+dir: $(OBJDIR) $(MODDIR)
+
+# Sub-directories
+$(OBJDIR):
+	mkdir $(TOPDIR)$(OBJDIR)
+$(MODDIR):
+	mkdir $(TOPDIR)$(MODDIR)
 
 # Link object files to executables
 $(EXE): $(F90OBJ)
+	@echo $(dir $(firstword $(MAKEFILE_LIST)))
 	$(F90) -o $(EXE) $(F90OBJ) $(LIBS)
 
 # All .o files depend on the corresponding .f90 file
@@ -105,8 +113,8 @@ $(OBJDIR)/main.o : $(OBJDIR)/testmodule.o \
 					$(OBJDIR)/modInputHelper.o
 
 clean:
-	rm $(OBJDIR)/*.o $(MODDIR)/*.mod $(EXE)
+	rm -rf $(OBJDIR) $(MODDIR) $(EXE)
 
-.PHONY: all run clean
+.PHONY: dir all run clean
 
 
