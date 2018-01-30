@@ -229,6 +229,9 @@ contains
 				call destroyAdjoint(adj)
 				call destroyRecord(fsr)
 				call destroyFSens(fs)
+
+                print ('(A,I5,A,I5,A)'), 'Rank-',mpih%my_rank,  &
+                                        ' Sample-',i,' is collected.'
 			end do
 
 !			call gatherData(mpih)
