@@ -236,13 +236,14 @@ contains
 	end subroutine
 
 	subroutine adjoint_convergence_in_time(problem)
-		integer, parameter :: N=23, Nt=4
-		real(mp) :: fk(N)
-		real(mp) :: Tk(Nt)
-		real(mp) :: ek(N,Nt)
-		character(len=100) :: dir
+		type(mpiHandler) :: mpih
+		integer, parameter :: N=70, Nt=9
+		real(mp) :: fk, Tk(Nt), ek
+		character(len=100) :: dir, Tstr, filename
 		integer :: i,j
-		real(mp) :: J0,J1,grad(Nt),temp(2)
+		real(mp) :: J0,J1,grad,temp(2)
+        integer :: thefile
+        integer(kind=MPI_OFFSET_KIND) :: disp
 		interface
 			subroutine problem(fk,Ti,str,k,output)
 				use modPM1D
@@ -258,33 +259,53 @@ contains
 			end subroutine
 		end interface
 
-		fk = (/ (EXP(-1.0_mp*(i-1)),i=1,N) /)
-		Tk = (/ 0.1_mp, 30.0_mp, 150.0_mp, 750.0_mp /)
+		call mpih%buildMPIHandler
+        if( mpih%my_rank.eq.0 .and.                                          &
+            mpih%size.ne.(N+1) ) then
+            print *, 'Required same number of processors!'
+            print *, 'finite difference iteration: ', N+1
+            print *, 'simulation times: ', Nt
+            print *, 'required processors s=N*Nt: ',(N+1)
+
+            call mpih%destroyMPIHandler
+            stop
+        end if
+
+		call mpih%allocateBuffer(N+1,2)
+
+        fk = 1.0_mp*MOD(mpih%my_rank,N+1)
+        fk = 10.0_mp*EXP( -0.75_mp*(fk-1) )
+        Tk = (/ (60.0_mp*(i-1)/(Nt-1),i=1,Nt) /)
+        Tk(1) = 0.03_mp
+        Tk = Tk*2.0_mp*pi
 		ek = 0.0_mp
 
-		dir = 'debye_adj_test'
+		dir = 'Landau_adj_test_dp'
 
-		do j=1,Nt
-			call problem(fk(i),Tk(j),trim(dir),0,temp)
-			J0 = temp(1)
-			grad(j) = temp(2)
-			do i=1,N
-				call problem(fk(i),Tk(j),trim(dir),1,temp)
-				J1 = temp(1)
-				ek(i,j) = ABS( ((J1-J0)/fk(i) - grad(j))/grad(j) )
-			end do
-		end do
+        do j=1,Nt
+            if( MOD(mpih%my_rank,N+1).eq.0 ) then
+                call problem(fk,Tk(j),trim(dir),0,temp)
+                mpih%sendbuf(1,:) = temp
+            else
+                call problem(fk,Tk(j),trim(dir),1,temp)
+                mpih%sendbuf(1,:) = (/ fk, temp(1) /)
+            end if
 
-		open(unit=301,file='data/'//trim(dir)//'/grad_convergence.dat',status='replace')
-		do i=1,N
-			write(301,*) fk(i), ek(i,:)
-		end do
-		close(301)
-		open(unit=301,file='data/'//trim(dir)//'/grad_in_time.bin',status='replace')
-		do i=1,Nt
-			write(301,*) Tk(i),grad(i)
-		end do
-		close(301)
+			call mpih%gatherData
+
+			if( mpih%my_rank.eq.mpih%size-1 ) then
+                write(Tstr,'(I01)') j
+                filename = 'data/'//trim(dir)//'/grad_convergence.'//trim(Tstr)//'.dat'
+				open(unit=301, file=filename, status='replace')
+                do i=1,N+1
+			        write(301,*) mpih%recvbuf(i,:)
+                end do
+			    close(301)
+                print ('(A,F8.3,A)'), 'Simulation time: ',Tk(j),' is complete.'
+			end if
+        end do
+
+        call mpih%destroyMPIHandler
 	end subroutine
 
 	subroutine adj_convergence(problem)

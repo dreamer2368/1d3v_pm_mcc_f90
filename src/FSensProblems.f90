@@ -170,7 +170,7 @@ contains
 		type(FSens) :: fs
 		type(recordData) :: r,fsr
 		type(mpiHandler) :: mpih
-		integer, parameter  :: Nsample=12
+		integer, parameter  :: Nsample=1E4
 		real(mp), parameter :: vT=1.5_mp
 		integer, parameter :: N = 1E5, Ng = 64
 		integer, parameter :: NInit=5E4, Ngv=32, NInject=5E3, NLimit=3E5
@@ -180,9 +180,9 @@ contains
 		real(mp) :: J,grad,adj_grad(1)
 		integer :: i,k,thefile
 		character(len=100) :: prefix,dir,Time_str
-        prefix = 'T750'
+        prefix = 'T30'
         dir = 'data/'//trim(prefix)
-		Time = (/ 1.0_mp /)
+		Time = (/ 30.0_mp /)
 		A = (/ vT, 0.0_mp /)
 
 		call buildMPIHandler(mpih)

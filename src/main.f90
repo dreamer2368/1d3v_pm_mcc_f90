@@ -48,8 +48,8 @@ program main
 !	call updateWeightTest
 !	call debye_sensitivity_curve
 !	call adj_convergence(twostream_grad)
-!	call adjoint_convergence_in_time(debye_adj)
-	call debye_sampling
+	call adjoint_convergence_in_time(Landau)
+!	call debye_sampling
 !	call redistribute_temp_test
 !    call MPI_write_test
 
