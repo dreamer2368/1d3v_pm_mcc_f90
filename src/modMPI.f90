@@ -81,26 +81,34 @@ contains
 		class(mpiHandler), intent(inout) :: this
 		integer :: i
 		do i=1,size(this%sendbuf,2)
-			call MPI_GATHERV(this%sendbuf(:,i),this%sendcnt,MPI_DOUBLE,	&
-							this%recvbuf(:,i),this%recvcnt,this%displc,MPI_DOUBLE,	&
+			call MPI_GATHERV(this%sendbuf(:,i),this%sendcnt,MPI_REAL8,	&
+							this%recvbuf(:,i),this%recvcnt,this%displc,MPI_REAL8,	&
 							this%size-1,MPI_COMM_WORLD,this%ierr)
 		end do
 	end subroutine
 
-    function MPIWriteSetup(this, dir) result(thefile)
+    function MPIWriteSetup(this, dir, filename) result(thefile)
         class(mpiHandler), intent(inout) :: this
         character(len=*), intent(in) :: dir
-        character(len=100) :: filename
+        character(len=*), intent(in), optional :: filename
+        character(len=100) :: filename_
         integer :: thefile
         integer(kind=MPI_OFFSET_KIND) :: disp
         integer :: i
 
 		call system('mkdir -p data/'//trim(dir))
-        filename = trim(dir)//'/sampling.bin'
+        if( present(filename) ) then
+            filename_ = trim(dir)//trim(filename)
+        else
+            filename_ = trim(dir)//'/sampling.bin'
+        end if
             
-        call MPI_FILE_OPEN(MPI_COMM_WORLD, trim(filename), & 
-                           MPI_MODE_WRONLY + MPI_MODE_CREATE, & 
+        call MPI_FILE_OPEN(MPI_COMM_WORLD, trim(filename_), & 
+                           MPI_MODE_WRONLY  &
+                             + MPI_MODE_CREATE, &
+!                             + MPI_MODE_APPEND, & 
                            MPI_INFO_NULL, thefile, this%ierr)
+!        call MPI_FILE_GET_POSITION(thefile, disp, this%ierr)
         disp = this%displc(this%my_rank)*8*size(this%writebuf)
         call MPI_FILE_SET_VIEW(thefile,disp,MPI_DOUBLE,MPI_DOUBLE,   &
                                 'native',MPI_INFO_NULL,this%ierr)
