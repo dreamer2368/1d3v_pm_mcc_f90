@@ -26,7 +26,6 @@ contains
 		call buildMPIHandler(mpih)
 		call allocateBuffer(1001,2,mpih)
 
-		call init_random_seed
 		do i=1,mpih%sendcnt
 			A = (/ vT(mpih%displc(mpih%my_rank)+i), 0.0_mp /)
 			call buildPM1D(d,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=0.01_mp)
@@ -34,6 +33,7 @@ contains
 			call buildRecord(r,d%nt,1,d%L,d%ng,trim(dir),20)
 
 			call buildSpecies(d%p(1),-1.0_mp,1.0_mp)
+		    call init_random_seed
 			call Debye_initialize(d,N,Q)
 
 			call forwardsweep(d,r,Null_input,Null_source,Debye,J)
@@ -191,7 +191,7 @@ contains
 
         thefile = MPIWriteSetup(mpih,dir)
 
-		call init_random_seed(mpih%my_rank)
+		call init_random_seed(mpih%my_rank,addSystemTime=.true.)
 		do k=1,size(Time)
 			J = 0.0_mp
 			grad = 0.0_mp

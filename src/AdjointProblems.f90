@@ -59,7 +59,7 @@ contains
 		end if
 		sendbuf = 0.0_mp
 
-		call init_random_seed(my_rank)
+		call init_random_seed(my_rank,addSystemTime=.true.)
 
 		do i=1,sendcnt
 			call buildPM1D(pm,Tf,Ti,Ng,N,0,0,1,dt=dt,A=(/0.1_mp,0.0_mp/))
@@ -123,116 +123,60 @@ contains
 	end subroutine
 
 	subroutine Landau_adjoint_sampling
-		integer :: ierr, my_rank, s
+		type(mpiHandler) :: mpih
 		type(adjoint) :: adj
 		type(PM1D) :: pm
 		type(recordData) :: r
-		integer, parameter :: Nsample = 10000
-		integer :: sample_per_core, sendcnt
-		integer, allocatable :: recvcnt(:), displc(:)
-		real(mp), allocatable :: sendbuf(:,:)
-		real(mp) :: recvbuf(Nsample,3)                     !(/J0, J1, dJdA/)
-		real(mp) :: Tf = 20.1_mp, Ti = 20.0_mp
+		integer, parameter :: Nsample = 10000, Nt = 9
+        real(mp) :: Time(Nt)
 		integer, parameter :: Ng=64, Np=3*10**6, N=1
-		real(mp) :: xp0(Np), vp0(Np,3), spwt0(Np)
 		real(mp) :: vT = 1.0_mp, L=4.0_mp*pi
 		real(mp) :: dt=0.1_mp
-		character(len=100)::dir,rank_str
-		real(mp) :: J0,J1,grad(1)
-		integer :: i
+		real(mp) :: J0,grad(1)
+		integer :: i,j, thefile
+		character(len=100) :: rank_str,prefix,dir,Time_str
 
-		call MPI_INIT(ierr)
-		call MPI_COMM_RANK(MPI_COMM_WORLD,my_rank,ierr)
-		call MPI_COMM_SIZE(MPI_COMM_WORLD,s,ierr)
-		sample_per_core = Nsample/s
-		write(rank_str,*) my_rank
+        Time = (/ (60.0_mp*(i-1)/(Nt-1),i=1,Nt) /)
+        Time(1) = 0.03_mp
+        Time = Time*2.0_mp*pi
 
-		if( my_rank.eq.s-1 ) then
-		   print *, 'size: ',s
-		   print *, 'sample/core: ',sample_per_core
-		   print *, 'remainder: ',MOD(Nsample,s)
-			allocate(recvcnt(0:s-1))
-		   allocate(displc(0:s-1))
-			recvcnt(0:MOD(Nsample,s)-1) = sample_per_core+1
-			recvcnt(MOD(Nsample,s):s-1) = sample_per_core
-		   print *, recvcnt
-		   displc = 0
-		   do i=0,s-1
-			  displc(i) = SUM(recvcnt(0:i-1))
-		   end do
-		   print *, displc
-		end if
+		call mpih%buildMPIHandler
+		call mpih%allocateBuffer(Nsample,2)
 
-		if(my_rank<MOD(Nsample,s) ) then
-			sendcnt = sample_per_core+1
-			allocate(sendbuf(sendcnt,3))
-		else
-			sendcnt = sample_per_core
-			allocate(sendbuf(sendcnt,3))
-		end if
-		sendbuf = 0.0_mp
+		call init_random_seed(mpih%my_rank,addSystemTime=.true.)
 
-		call init_random_seed(my_rank)
+        do j=7,Nt
+            write(Time_str,'(I03.3)') INT(Time(j))
+            prefix = 'Landau_sampling/T'//trim(Time_str)
+            dir = 'data/'//trim(prefix)
+            thefile = mpih%MPIWriteSetup(dir)
+            do i=1,mpih%sendcnt
+			    call buildPM1D(pm,Time(j)+0.1_mp,Time(j),Ng,N,0,0,1,dt=dt,L=L,A=(/0.1_mp,0.0_mp/))
+    		    dir = trim(prefix)//'/'//trim(adjustl(mpih%rank_str))
+    			call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
+    			call set_null_discharge(r)
+    			call Landau_initialize(pm,Np,vT)
+    
+    			call forwardsweep(pm,r,Te,Null_source,MPE,J0)
+    
+    			call buildAdjoint(adj,pm)
+    			call backward_sweep(adj,pm,r,grad,dMPE,dTe,dTedA,Te,Null_source)
 
-		do i=1,sendcnt
-			call buildPM1D(pm,Tf,Ti,Ng,N,0,0,1,dt=dt,L=L,A=(/0.1_mp,0.0_mp/))
-			dir = 'Landau_sampling/before'//trim(adjustl(rank_str))
-			call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
-			call set_null_discharge(r)
-			call Landau_initialize(pm,Np,vT)
-			xp0 = pm%p(1)%xp
-			vp0 = pm%p(1)%vp
-			spwt0 = pm%p(1)%spwt
+                mpih%writebuf = (/ J0,grad(1) /)
+                call MPI_FILE_WRITE(thefile, mpih%writebuf, 2, MPI_DOUBLE, & 
+                                    MPI_STATUS_IGNORE, mpih%ierr)
+                call MPI_FILE_SYNC(thefile,mpih%ierr)
+    
+    			call destroyAdjoint(adj)
+    			call destroyRecord(r)
+                print ('(A,I5,A,F8.3,A,I5,A)'), 'Rank-',mpih%my_rank,    &
+                                               'Time: ',Time(j),        &
+                                               ', Sample-',i,' is collected.'
+            end do
+            call MPI_FILE_CLOSE(thefile, mpih%ierr)            
+        end do
 
-			call forwardsweep(pm,r,Te,Null_source,MPE,J0)
-			!call printPlasma(r)
-			print *, 'J0=',J0
-
-			call buildAdjoint(adj,pm)
-			call backward_sweep(adj,pm,r,grad,dMPE,dTe,dTedA,Te,Null_source)
-
-			print *, 'dJdA=',grad
-
-			call destroyAdjoint(adj)
-			call destroyRecord(r)
-
-			dir = 'Landau_sampling/after'//trim(adjustl(rank_str))
-			pm%A0 = (/0.1_mp,(0.1_mp)**9 /)
-			call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),10)
-		   call destroySpecies(pm%p(1))
-			call setSpecies(pm%p(1),Np,xp0,vp0,spwt0)
-			call forwardsweep(pm,r,Te,Null_source,MPE,J1)
-			!call printPlasma(r)
-			print *, 'J1=',J1
-
-			call destroyRecord(r)
-			call destroyPM1D(pm)
-
-			sendbuf(i,:) = (/ J0, J1, grad(1) /)
-		end do
-
-		do i=1,3
-			call MPI_GATHERV(sendbuf(:,i),sendcnt,MPI_DOUBLE,recvbuf(:,i),recvcnt,displc,MPI_DOUBLE,s-1,MPI_COMM_WORLD,ierr)
-		end do
-
-		call MPI_FINALIZE(ierr)
-		if( my_rank.eq.s-1 ) then
-			open(unit=301,file='data/Landau_sampling/sample_J0.bin',status='replace',form='unformatted',access='stream')
-			open(unit=302,file='data/Landau_sampling/sample_J1.bin',status='replace',form='unformatted',access='stream')
-			open(unit=303,file='data/Landau_sampling/sample_grad.bin',status='replace',form='unformatted',access='stream')
-		   write(301) recvbuf(:,1)
-		   write(302) recvbuf(:,2)
-		   write(303) recvbuf(:,3)
-		   close(301)
-		   close(302)
-		   close(303)
-		end if
-
-		deallocate(sendbuf)
-		if( my_rank.eq.s-1) then
-		   deallocate(recvcnt)
-		   deallocate(displc)
-		end if
+        call mpih%destroyMPIHandler
 	end subroutine
 
 	subroutine adjoint_convergence_in_time(problem)

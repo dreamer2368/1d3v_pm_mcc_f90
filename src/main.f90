@@ -35,7 +35,7 @@ program main
 !	call twostream_adj(output(1),output(2))
 !	call Landau(0.0_mp, 6.0_mp ,'Landau', 1,output )
 !	call random_test
-!   call Landau_adjoint_sampling
+   call Landau_adjoint_sampling
 !   call twostream_adjoint_sampling
 !	call debye_shielding
 !	call debye_characterization
@@ -48,7 +48,7 @@ program main
 !	call updateWeightTest
 !	call debye_sensitivity_curve
 !	call adj_convergence(twostream_grad)
-	call adjoint_convergence_in_time(Landau)
+!	call adjoint_convergence_in_time(Landau)
 !	call debye_sampling
 !	call redistribute_temp_test
 !    call MPI_write_test

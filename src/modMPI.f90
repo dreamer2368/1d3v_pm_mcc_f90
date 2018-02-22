@@ -17,6 +17,7 @@ module modMPI
 		procedure, pass(this) :: destroyMPIHandler
 		procedure, pass(this) :: allocateBuffer
 		procedure, pass(this) :: gatherData
+        procedure, pass(this) :: MPIWriteSetup
 	end type
 
 contains

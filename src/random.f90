@@ -16,19 +16,24 @@ MODULE random
 
 contains
 
-   subroutine init_random_seed(input)
+   subroutine init_random_seed(input,addSystemTime)
       integer :: i, nseed, clock, add
       integer, allocatable :: seed(:)
 	  integer, intent(in), optional :: input
+      logical, intent(in), optional :: addSystemTime
 		if( present(input) ) then
 			add = input
 		else
 			add = 0
 		end if
+        if( present(addSystemTime) .and. addSystemTime ) then
+            call SYSTEM_CLOCK(clock)
+        else
+            clock = 0
+        end if
 
 		call RANDOM_SEED(size=nseed)
 		allocate(seed(nseed))
-      call SYSTEM_CLOCK(clock)
 !		seed = clock + 3433*(/ ( i, i=1,nseed ) /)
 		seed = 3433*(/ ( i, i=1,nseed ) /) + 17*add + clock
 		call RANDOM_SEED(put=seed)
