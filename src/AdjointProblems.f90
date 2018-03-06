@@ -127,25 +127,24 @@ contains
 		type(adjoint) :: adj
 		type(PM1D) :: pm
 		type(recordData) :: r
-		integer, parameter :: Nsample = 10000, Nt = 9
+		integer, parameter :: Nsample = 1E4, Nt = 5
         real(mp) :: Time(Nt)
-		integer, parameter :: Ng=64, Np=3*10**6, N=1
+		integer, parameter :: Ng=64, Np=3*10**5, N=1
 		real(mp) :: vT = 1.0_mp, L=4.0_mp*pi
 		real(mp) :: dt=0.1_mp
 		real(mp) :: J0,grad(1)
 		integer :: i,j, thefile
 		character(len=100) :: rank_str,prefix,dir,Time_str
 
-        Time = (/ (60.0_mp*(i-1)/(Nt-1),i=1,Nt) /)
-        Time(1) = 0.1_mp
-        Time = Time*2.0_mp*pi
+        Time = (/ (240.0_mp**(1.0_mp*(i-1)/(Nt-1)),i=1,Nt) /)
 
 		call mpih%buildMPIHandler
 		call mpih%allocateBuffer(Nsample,2)
 
 		call init_random_seed(mpih%my_rank,addSystemTime=.true.)
 
-        do j=1,1
+!        do j=1,1
+         j=5
             write(Time_str,'(I03.3)') INT(Time(j))
             prefix = 'Landau_sampling/T'//trim(Time_str)
             dir = 'data/'//trim(prefix)
@@ -174,7 +173,7 @@ contains
                                                ', Sample-',i,' is collected.'
             end do
             call MPI_FILE_CLOSE(thefile, mpih%ierr)            
-        end do
+!        end do
 
         call mpih%destroyMPIHandler
 	end subroutine
