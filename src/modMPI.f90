@@ -103,9 +103,9 @@ contains
         else
             filename_ = trim(dir)//'/sampling.bin'
         end if
-if( this%my_rank.eq.0 ) then
-    print *, trim(filename_)
-end if
+        if( this%my_rank.eq.0 ) then
+            print *, 'Sampling file directory: ',trim(filename_)
+        end if
             
         call MPI_FILE_OPEN(MPI_COMM_WORLD, trim(filename_), & 
                            MPI_MODE_WRONLY  &
