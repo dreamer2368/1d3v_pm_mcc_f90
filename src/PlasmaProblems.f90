@@ -8,6 +8,53 @@ module PlasmaProblems
 
 contains
 
+	subroutine Landau_Jtheta
+		type(PM1D) :: pm
+		type(recordData) :: r
+		type(mpiHandler) :: mpih
+		integer, parameter :: N = 1, Np = 3E5, Ng = 64
+        integer, parameter :: Nsample = 1001, seed = 1
+		real(mp), parameter :: vT = 1.0_mp, L = 4.0_mp, dt = 0.1_mp
+        real(mp) :: fk(Nsample)
+		real(mp) :: dx
+		real(mp) :: Time = 20.0_mp
+		real(mp) :: A(2),J
+		integer :: i, thefile
+		character(len=100) :: prefix,dir,filename
+		fk = (/ (0.2_mp*(i-1)/(Nsample-1)-0.1_mp,i=1,Nsample) /)
+
+		call buildMPIHandler(mpih)
+		call allocateBuffer(Nsample,2,mpih)
+
+        prefix = 'Landau_Jtheta'
+        dir = 'data/'//trim(prefix)
+        filename = 'Jtheta.bin'
+        thefile = mpih%MPIWriteSetup(dir,filename)
+
+		do i=1,mpih%sendcnt
+			A = (/ 0.1_mp, fk(mpih%displc(mpih%my_rank)+i) /)
+		    call buildPM1D(pm,Time,0.0_mp,Ng,N,0,0,1,dt=dt,L=L,A=A)
+			dir = trim(prefix)//'/'//trim(adjustl(mpih%rank_str))
+			call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),20)
+			call set_null_discharge(r)
+			call init_random_seed(input=seed)
+			call Landau_initialize(pm,Np,vT)
+
+			call forwardsweep(pm,r,Te,Null_source,MPE,J)
+
+			mpih%writebuf = (/ fk(mpih%displc(mpih%my_rank)+i),J /)
+            call MPI_FILE_WRITE(thefile, mpih%writebuf, 2, MPI_DOUBLE, & 
+                                MPI_STATUS_IGNORE, mpih%ierr)
+            call MPI_FILE_SYNC(thefile,mpih%ierr)
+
+			call destroyRecord(r)
+			call destroyPM1D(pm)
+		end do
+
+        call MPI_FILE_CLOSE(thefile, mpih%ierr)            
+		call destroyMPIHandler(mpih)
+	end subroutine
+
 	subroutine twostream
 		type(PM1D) :: pm
 		type(adjoint) :: adj
