@@ -97,12 +97,15 @@ contains
         integer(kind=MPI_OFFSET_KIND) :: disp
         integer :: i
 
-		call system('mkdir -p data/'//trim(dir))
+		call system('mkdir -p '//trim(dir))
         if( present(filename) ) then
             filename_ = trim(dir)//trim(filename)
         else
             filename_ = trim(dir)//'/sampling.bin'
         end if
+if( this%my_rank.eq.0 ) then
+    print *, trim(filename_)
+end if
             
         call MPI_FILE_OPEN(MPI_COMM_WORLD, trim(filename_), & 
                            MPI_MODE_WRONLY  &

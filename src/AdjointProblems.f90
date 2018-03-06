@@ -137,7 +137,7 @@ contains
 		character(len=100) :: rank_str,prefix,dir,Time_str
 
         Time = (/ (60.0_mp*(i-1)/(Nt-1),i=1,Nt) /)
-        Time(1) = 0.03_mp
+        Time(1) = 0.1_mp
         Time = Time*2.0_mp*pi
 
 		call mpih%buildMPIHandler
@@ -145,7 +145,7 @@ contains
 
 		call init_random_seed(mpih%my_rank,addSystemTime=.true.)
 
-        do j=7,Nt
+        do j=1,1
             write(Time_str,'(I03.3)') INT(Time(j))
             prefix = 'Landau_sampling/T'//trim(Time_str)
             dir = 'data/'//trim(prefix)
@@ -266,14 +266,14 @@ contains
 			end subroutine
 		end interface
 		character(len=100) :: dir
-		integer, parameter :: N=20
+		integer, parameter :: N=70
 		real(mp) :: temp(2), J0, J1, grad
 		real(mp), dimension(N) :: fk,ek
 		real(mp) :: Time=0.1_mp
 		integer :: i
 		dir = 'adj_test'
 
-		fk = (/ (EXP(-1.0_mp*(i-1)),i=1,N) /)
+		fk = (/ ( 10.0_mp**(1.0_mp-0.25_mp*(i-1)), i=1, N ) /)
 		ek = 0.0_mp
 
 		call problem(fk(i),Time,trim(dir),0,temp)
