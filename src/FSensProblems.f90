@@ -12,24 +12,30 @@ contains
 	subroutine debye_characterization
 		type(PM1D) :: d
 		type(recordData) :: r
+		type(adjoint) :: adj
 		type(mpiHandler) :: mpih
 		real(mp) :: vT(1001)
-		integer :: N = 100000, Ng = 512
+		integer :: N = 100000, Ng = 64
 		real(mp) :: L = 20.0_mp, Wp, Q = 2.0_mp
 		real(mp) :: dx
-		real(mp) :: Time = 30.0_mp
-		real(mp) :: A(2),J
-		integer :: i
-		character(len=100)::dir
+		real(mp) :: Time = 150.0_mp
+		real(mp) :: A(2),J,adj_grad(1)
+		integer :: i, thefile, idx
+		character(len=100):: prefix, dir, filename
 		vT = (/ (3.0_mp*(i-1)/(1001-1)+0.5_mp,i=1,1001) /)
+        idx = MINLOC( ABS(vT-1.5_mp), DIM=1 )
 
 		call buildMPIHandler(mpih)
 		call allocateBuffer(1001,2,mpih)
+        prefix = 'Debye_curve'
+        dir = 'data/'//trim(prefix)
+        filename = 'J.bin'
+        thefile = MPIWriteSetup(mpih,dir,filename)
 
 		do i=1,mpih%sendcnt
 			A = (/ vT(mpih%displc(mpih%my_rank)+i), 0.0_mp /)
-			call buildPM1D(d,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=0.01_mp)
-			dir = 'Debye_characterization/'//trim(adjustl(mpih%rank_str))
+			call buildPM1D(d,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=0.05_mp)
+			dir = trim(prefix)//trim(adjustl(mpih%rank_str))
 			call buildRecord(r,d%nt,1,d%L,d%ng,trim(dir),20)
 
 			call buildSpecies(d%p(1),-1.0_mp,1.0_mp)
@@ -38,22 +44,44 @@ contains
 
 			call forwardsweep(d,r,Null_input,Null_source,Debye,J)
 
-			mpih%sendbuf(i,:) = (/vT(mpih%displc(mpih%my_rank)+i),J/)
+			mpih%writebuf = (/vT(mpih%displc(mpih%my_rank)+i),J/)
+
+            call MPI_FILE_WRITE(thefile, mpih%writebuf, 2, MPI_DOUBLE, & 
+                                MPI_STATUS_IGNORE, mpih%ierr)
+            call MPI_FILE_SYNC(thefile,mpih%ierr)
+
+            if( idx.eq.mpih%displc(mpih%my_rank)+i ) then
+				call buildAdjoint(adj,d)
+				call adj%m%setMesh(d%m%rho_back)
+
+				call backward_sweep(adj,d,r,adj_grad,dDebye,Null_dinput,dDebye_dvT,Null_input,Null_source)
+
+				call destroyAdjoint(adj)
+
+                print *, 'grad(vT=',mpih%writebuf(1),', idx=',idx,')=',adj_grad(1)
+            end if
 
 			call destroyRecord(r)
 			call destroyPM1D(d)
+
+            print ('(A,I5,A,I5,A,F8.3,A,F8.3)'), 'Rank-',mpih%my_rank,      &
+                                                 ' Sample-',i,              &
+                                                 ', vT=',mpih%writebuf(1),  &
+                                                 ', J=',mpih%writebuf(2)
 		end do
 
-		call gatherData(mpih)
+!		call gatherData(mpih)
+!
+!		if( mpih%my_rank.eq.mpih%size-1 ) then
+!			open(unit=301,file='data/Debye_characterization/Ak.bin',status='replace',form='unformatted',access='stream')
+!			open(unit=302,file='data/Debye_characterization/Jk.bin',status='replace',form='unformatted',access='stream')
+!		   write(301) mpih%recvbuf(:,1)
+!		   write(302) mpih%recvbuf(:,2)
+!		   close(301)
+!		   close(302)
+!		end if
 
-		if( mpih%my_rank.eq.mpih%size-1 ) then
-			open(unit=301,file='data/Debye_characterization/Ak.bin',status='replace',form='unformatted',access='stream')
-			open(unit=302,file='data/Debye_characterization/Jk.bin',status='replace',form='unformatted',access='stream')
-		   write(301) mpih%recvbuf(:,1)
-		   write(302) mpih%recvbuf(:,2)
-		   close(301)
-		   close(302)
-		end if
+        call MPI_FILE_CLOSE(thefile, mpih%ierr)            
 
 		call destroyMPIHandler(mpih)
 	end subroutine
