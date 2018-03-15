@@ -1,6 +1,7 @@
 module modInputHelper
 
   use, intrinsic :: iso_fortran_env, only : output_unit
+  use constants
 
   implicit none
 
@@ -352,10 +353,10 @@ function getOptionScalar_(key, defaultValue) result(val)
 
   ! <<< Arguments >>>
   character(len = *), intent(in) :: key
-  real*8, intent(in) :: defaultValue
+  real(mp), intent(in) :: defaultValue
 
   ! <<< Result >>>
-  real*8 :: val
+  real(mp) :: val
 
   ! <<< Local variables >>>
   integer :: index, stat
@@ -463,7 +464,7 @@ subroutine getRequiredOptionScalar_(key, val, comm)
 
   ! <<< Arguments >>>
   character(len = *), intent(in) :: key
-  real*8, intent(out) :: val
+  real(mp), intent(out) :: val
   integer, intent(in), optional :: comm
 
   ! <<< Local variables >>>
