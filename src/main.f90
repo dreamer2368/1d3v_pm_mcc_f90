@@ -47,9 +47,9 @@ program main
 !	call RedistributionTest
 !	call updateWeightTest
 !	call debye_sensitivity_curve
-	call adj_convergence(debye_adj)
+!	call adj_convergence(debye_adj)
 !	call adjoint_convergence_in_time(Landau)
-!	call debye_sampling
+	call debye_sampling
 !	call redistribute_temp_test
 !    call MPI_write_test
 

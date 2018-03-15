@@ -14,7 +14,7 @@ PNETCDFLIBS=
 
 LIBS    = 
 
-EXE = debye_adj_accuracy
+EXE = debye_sampling
 F90SRC = main.f90 \
 		modInputHelper.f90 \
 		constants.f90 \
@@ -69,6 +69,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.f90
 $(OBJDIR)/random.o : $(OBJDIR)/constants.o
 $(OBJDIR)/MatrixVector.o : $(OBJDIR)/constants.o
 $(OBJDIR)/modMPI.o : $(OBJDIR)/constants.o
+$(OBJDIR)/modInputHelper.o : $(OBJDIR)/constants.o
 $(OBJDIR)/modSpecies.o : $(OBJDIR)/constants.o
 $(OBJDIR)/modMesh.o : $(OBJDIR)/MatrixVector.o
 $(OBJDIR)/modAssign.o : $(OBJDIR)/modSpecies.o \
@@ -107,6 +108,11 @@ $(OBJDIR)/testmodule.o : $(OBJDIR)/init.o \
 							$(OBJDIR)/modMPI.o
 $(OBJDIR)/AdjointProblems.o : $(OBJDIR)/init.o \
 								$(OBJDIR)/timeStepAdj.o \
+								$(OBJDIR)/modMPI.o \
+								$(OBJDIR)/modInputHelper.o
+$(OBJDIR)/FSensProblems.o : $(OBJDIR)/init.o \
+								$(OBJDIR)/timeStepAdj.o \
+								$(OBJDIR)/timeStepFSens.o \
 								$(OBJDIR)/modMPI.o \
 								$(OBJDIR)/modInputHelper.o
 $(OBJDIR)/main.o : $(OBJDIR)/testmodule.o \

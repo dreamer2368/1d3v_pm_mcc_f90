@@ -6,3 +6,7 @@ test3 = 24
 #Adjoint convergence test time
 adjoint_convergence/time = 60.0
 adjoint_convergence/directory = 'debye_adj_test/dp'
+
+#Sampling parameter
+sensitivity_sampling/time = 10.0
+sensitivity_sampling/directory = 'debye_sampling'
