@@ -80,10 +80,17 @@ contains
 
 	subroutine gatherData(this)
 		class(mpiHandler), intent(inout) :: this
+        integer :: MPI_SCALAR_TYPE
 		integer :: i
+        if( mp.eq.SELECTED_REAL_KIND(15,307) ) then
+            MPI_SCALAR_TYPE = MPI_REAL8
+        elseif( mp.eq.SELECTED_REAL_KIND(33,4931) ) then
+            MPI_SCALAR_TYPE = MPI_REAL16
+        end if
+
 		do i=1,size(this%sendbuf,2)
-			call MPI_GATHERV(this%sendbuf(:,i),this%sendcnt,MPI_REAL8,	&
-							this%recvbuf(:,i),this%recvcnt,this%displc,MPI_REAL8,	&
+			call MPI_GATHERV(this%sendbuf(:,i),this%sendcnt,MPI_SCALAR_TYPE,	&
+							this%recvbuf(:,i),this%recvcnt,this%displc,MPI_SCALAR_TYPE,	&
 							this%size-1,MPI_COMM_WORLD,this%ierr)
 		end do
 	end subroutine
