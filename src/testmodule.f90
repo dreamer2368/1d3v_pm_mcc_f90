@@ -72,6 +72,7 @@ contains
 				call buildPM1D(d,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt)
 				call buildRecord(r,d%nt,1,d%L,d%ng,trim(str)//'/before',20)
 
+                call init_random_seed
 				call buildSpecies(d%p(1),-1.0_mp,1.0_mp)
 				call Debye_initialize(d,N,Q)
 
@@ -96,6 +97,7 @@ contains
 				call buildPM1D(d,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt)
 				call buildRecord(r,d%nt,1,d%L,d%ng,trim(str)//'/after',20)
 
+                call init_random_seed
 				call buildSpecies(d%p(1),-1.0_mp,1.0_mp)
 				call Debye_initialize(d,N,Q)
 

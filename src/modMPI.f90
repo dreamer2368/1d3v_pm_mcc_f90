@@ -99,7 +99,7 @@ contains
 
 		call system('mkdir -p '//trim(dir))
         if( present(filename) ) then
-            filename_ = trim(dir)//trim(filename)
+            filename_ = trim(dir)//'/'//trim(filename)
         else
             filename_ = trim(dir)//'/sampling.bin'
         end if

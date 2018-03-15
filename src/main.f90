@@ -38,7 +38,7 @@ program main
 !   call Landau_adjoint_sampling
 !   call twostream_adjoint_sampling
 !	call debye_shielding
-	call debye_characterization
+!	call debye_characterization
 !	call InjectionTest
 !	call MPITest
 !	call SensitivityInitializeTest
@@ -47,7 +47,7 @@ program main
 !	call RedistributionTest
 !	call updateWeightTest
 !	call debye_sensitivity_curve
-!	call adj_convergence(Landau)
+	call adj_convergence(debye_adj)
 !	call adjoint_convergence_in_time(Landau)
 !	call debye_sampling
 !	call redistribute_temp_test

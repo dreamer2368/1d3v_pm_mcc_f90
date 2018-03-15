@@ -3,6 +3,7 @@ module AdjointProblems
 	use init
 	use timeStepAdj
 	use modMPI
+    use modInputHelper
 
 	implicit none
 
@@ -264,31 +265,65 @@ contains
 				real(mp), intent(out) :: output(:)
 			end subroutine
 		end interface
-		character(len=100) :: dir
+		type(mpiHandler) :: mpih
+		character(len=100) :: dir, Tstr, filename
 		integer, parameter :: N=70
-		real(mp) :: temp(2), J0, J1, grad
-		real(mp), dimension(N) :: fk,ek
-		real(mp) :: Time=0.1_mp
+		real(mp) :: temp(2), J0, grad
+		real(mp) :: fk
+        real(mp), dimension(N) :: fk_array, ek, J1
+		real(mp) :: T(6), Time
 		integer :: i
-		dir = 'adj_test'
+        T = (/ ( 0.1_mp*1500.0_mp**(1.0_mp*(i-1)/(size(T)-1)),i=1,size(T) ) /)
+!        Time = T(5)
+        Time = getOption('adjoint_convergence/time',T(6))
 
-		fk = (/ ( 10.0_mp**(1.0_mp-0.25_mp*(i-1)), i=1, N ) /)
-		ek = 0.0_mp
+		call mpih%buildMPIHandler
+        if( mpih%my_rank.eq.0 .and.                                          &
+            mpih%size.ne.(N+1) ) then
+            print *, 'Required same number of processors!'
+            print *, 'finite difference iteration: ', N+1
+            print *, 'simulation times: ', Time
+            print *, 'required processors: ',(N+1)
 
-		call problem(fk(i),Time,trim(dir),0,temp)
-		J0 = temp(1)
-		grad = temp(2)
-		do i=1,N
-			call problem(fk(i),Time,trim(dir),1,temp)
-			J1 = temp(1)
-			ek(i) = ABS( ((J1-J0)/fk(i) - grad)/grad )
-		end do
+            call mpih%destroyMPIHandler
+            stop
+        end if
 
-		open(unit=301,file='data/'//trim(dir)//'/adj_convergence.dat',status='replace')
-		do i=1,N
-			write(301,*) fk(i), ek(i)
-		end do
-		close(301)
+		call mpih%allocateBuffer(N+1,2)
+        fk = 1.0_mp*MOD(mpih%my_rank,N+1)
+		fk = 10.0_mp**(1.0_mp-0.25_mp*(fk-1))
+
+		dir = getOption('adjoint_convergence/directory','debye_adj_test/dp')
+
+        if( MOD(mpih%my_rank,N+1).eq.0 ) then
+           call problem(0.0_mp,Time,trim(dir),0,temp)
+            mpih%sendbuf(1,:) = temp
+        else
+            call problem(fk,Time,trim(dir),1,temp)
+            mpih%sendbuf(1,:) = (/ fk, temp(1) /)
+        end if
+
+		call mpih%gatherData
+
+		if( mpih%my_rank.eq.mpih%size-1 ) then
+            fk_array = mpih%recvbuf(2:N+1,1)
+            J0 = mpih%recvbuf(1,1)
+            grad = mpih%recvbuf(1,2)
+            J1 = mpih%recvbuf(2:N+1,2)
+			ek = ABS( ((J1-J0)/fk_array - grad)/grad )
+            mpih%recvbuf(2:N+1,2) = ek
+
+            write(Tstr,'(F4.1)') Time
+            filename = 'data/'//trim(dir)//'/grad_convergence.T'//trim(adjustl(Tstr))//'.dat'
+			open(unit=301, file=filename, status='replace')
+            do i=1,N+1
+		        write(301,*) mpih%recvbuf(i,:)
+            end do
+		    close(301)
+            print ('(A,F8.3,A)'), 'Simulation time: ',Time,' is complete.'
+		end if
+
+        call mpih%destroyMPIHandler
 	end subroutine
 
 end module

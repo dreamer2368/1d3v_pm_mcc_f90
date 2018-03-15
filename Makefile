@@ -14,7 +14,7 @@ PNETCDFLIBS=
 
 LIBS    = 
 
-EXE = exec
+EXE = debye_adj_accuracy
 F90SRC = main.f90 \
 		modInputHelper.f90 \
 		constants.f90 \
@@ -105,6 +105,10 @@ $(OBJDIR)/testmodule.o : $(OBJDIR)/init.o \
 							$(OBJDIR)/timeStepAdj.o \
 							$(OBJDIR)/timeStepFSens.o \
 							$(OBJDIR)/modMPI.o
+$(OBJDIR)/AdjointProblems.o : $(OBJDIR)/init.o \
+								$(OBJDIR)/timeStepAdj.o \
+								$(OBJDIR)/modMPI.o \
+								$(OBJDIR)/modInputHelper.o
 $(OBJDIR)/main.o : $(OBJDIR)/testmodule.o \
 					$(OBJDIR)/PlasmaProblems.o \
 					$(OBJDIR)/AdjointProblems.o \

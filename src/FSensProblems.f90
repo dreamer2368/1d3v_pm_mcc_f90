@@ -22,20 +22,21 @@ contains
 		real(mp) :: A(2),J,adj_grad(1)
 		integer :: i, thefile, idx
 		character(len=100):: prefix, dir, filename
-		vT = (/ (3.0_mp*(i-1)/(1001-1)+0.5_mp,i=1,1001) /)
+!		vT = (/ (3.0_mp*(i-1)/(1001-1)+0.5_mp,i=1,1001) /)
+		vT = (/ (0.02_mp*(i-1)/(1001-1)+1.49_mp,i=1,1001) /)
         idx = MINLOC( ABS(vT-1.5_mp), DIM=1 )
 
 		call buildMPIHandler(mpih)
 		call allocateBuffer(1001,2,mpih)
         prefix = 'Debye_curve'
         dir = 'data/'//trim(prefix)
-        filename = 'J.bin'
+        filename = 'J3.bin'
         thefile = MPIWriteSetup(mpih,dir,filename)
 
 		do i=1,mpih%sendcnt
 			A = (/ vT(mpih%displc(mpih%my_rank)+i), 0.0_mp /)
 			call buildPM1D(d,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=0.05_mp)
-			dir = trim(prefix)//trim(adjustl(mpih%rank_str))
+			dir = trim(prefix)//'/'//trim(adjustl(mpih%rank_str))
 			call buildRecord(r,d%nt,1,d%L,d%ng,trim(dir),20)
 
 			call buildSpecies(d%p(1),-1.0_mp,1.0_mp)
