@@ -266,7 +266,7 @@ contains
 			end subroutine
 		end interface
 		type(mpiHandler) :: mpih
-		character(len=100) :: dir, Tstr, filename
+		character(len=100) :: dir, Tstr, rank_dir, filename
 		integer, parameter :: N=70
 		real(mp) :: temp(2), J0, grad
 		real(mp) :: fk
@@ -294,12 +294,15 @@ contains
 		fk = 10.0_mp**(1.0_mp-0.25_mp*(fk-1))
 
 		dir = getOption('adjoint_convergence/directory','debye_adj_test/dp')
+        write(Tstr,'(F8.3)') Time
+        rank_dir = trim(dir)//'/'                           &
+                    //trim(adjustl(Tstr))
 
         if( MOD(mpih%my_rank,N+1).eq.0 ) then
-           call problem(0.0_mp,Time,trim(dir),0,temp)
+           call problem(0.0_mp,Time,trim(rank_dir),0,temp)
             mpih%sendbuf(1,:) = temp
         else
-            call problem(fk,Time,trim(dir),1,temp)
+            call problem(fk,Time,trim(rank_dir),1,temp)
             mpih%sendbuf(1,:) = (/ fk, temp(1) /)
         end if
 
@@ -313,7 +316,6 @@ contains
 			ek = ABS( ((J1-J0)/fk_array - grad)/grad )
             mpih%recvbuf(2:N+1,2) = ek
 
-            write(Tstr,'(F4.1)') Time
             filename = 'data/'//trim(dir)//'/grad_convergence.T'//trim(adjustl(Tstr))//'.dat'
 			open(unit=301, file=filename, status='replace')
             do i=1,N+1
