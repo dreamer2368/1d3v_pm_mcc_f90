@@ -14,7 +14,7 @@ PNETCDFLIBS=
 
 LIBS    = 
 
-EXE = debye_sampling
+EXE = debye_curve
 F90SRC = main.f90 \
 		modInputHelper.f90 \
 		constants.f90 \

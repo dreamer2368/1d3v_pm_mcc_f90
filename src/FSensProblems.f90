@@ -19,29 +19,32 @@ contains
 		integer :: N = 100000, Ng = 64
 		real(mp) :: L = 20.0_mp, Wp, Q = 2.0_mp
 		real(mp) :: dx
-		real(mp) :: Time = 150.0_mp
+		real(mp) :: Time
 		real(mp) :: A(2),J,adj_grad(1)
-		integer :: i, thefile, idx
-		character(len=100):: prefix, dir, filename
+		integer :: i, thefile, idx, input
+		character(len=100):: dir, filename
+        logical :: sensitivity
+        Time = getOption('QoI_curve/time',150.0_mp)
+        dir = getOption('QoI_curve/directory','Debye_curve')
+        filename = getOption('QoI_curve/filename','J.bin')
+        input = getOption('QoI_curve/random_seed',0)
+        sensitivity = getOption('QoI_curve/sensitivity', .false.)
+
 !		vT = (/ (3.0_mp*(i-1)/(1001-1)+0.5_mp,i=1,1001) /)
 		vT = (/ (0.02_mp*(i-1)/(1001-1)+1.49_mp,i=1,1001) /)
         idx = MINLOC( ABS(vT-1.5_mp), DIM=1 )
 
 		call buildMPIHandler(mpih)
 		call allocateBuffer(1001,2,mpih)
-        prefix = 'Debye_curve'
-        dir = 'data/'//trim(prefix)
-        filename = 'J3.bin'
-        thefile = MPIWriteSetup(mpih,dir,filename)
+        thefile = MPIWriteSetup(mpih,'data/'//trim(dir),filename)
 
 		do i=1,mpih%sendcnt
 			A = (/ vT(mpih%displc(mpih%my_rank)+i), 0.0_mp /)
 			call buildPM1D(d,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=0.05_mp)
-			dir = trim(prefix)//'/'//trim(adjustl(mpih%rank_str))
-			call buildRecord(r,d%nt,1,d%L,d%ng,trim(dir),20)
+			call buildRecord(r,d%nt,1,d%L,d%ng,trim(dir)//'/'//trim(adjustl(mpih%rank_str)),20)
 
 			call buildSpecies(d%p(1),-1.0_mp,1.0_mp)
-		    call init_random_seed
+		    call init_random_seed(input=input)
 			call Debye_initialize(d,N,Q)
 
 			call forwardsweep(d,r,Null_input,Null_source,Debye,J)
@@ -52,7 +55,8 @@ contains
                                 MPI_STATUS_IGNORE, mpih%ierr)
             call MPI_FILE_SYNC(thefile,mpih%ierr)
 
-            if( idx.eq.mpih%displc(mpih%my_rank)+i ) then
+            if( sensitivity .and.                                           &
+                idx.eq.mpih%displc(mpih%my_rank)+i ) then
 				call buildAdjoint(adj,d)
 				call adj%m%setMesh(d%m%rho_back)
 

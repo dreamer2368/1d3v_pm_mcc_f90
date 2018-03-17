@@ -10,3 +10,10 @@ adjoint_convergence/directory = 'debye_adj_test/dp'
 #Sampling parameter
 sensitivity_sampling/time = 10.0
 sensitivity_sampling/directory = 'debye_sampling'
+
+#QoI curve
+QoI_curve/time = 4.5
+QoI_curve/directory = 'debye_curve'
+QoI_curve/filename = 'J1.bin'
+QoI_curve/random_seed = 0
+QoI_curve/sensitivity = false
