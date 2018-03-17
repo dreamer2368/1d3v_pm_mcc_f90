@@ -15,8 +15,9 @@ contains
 		type(recordData) :: r
 		type(adjoint) :: adj
 		type(mpiHandler) :: mpih
-		real(mp) :: vT(1001)
-		integer :: N = 100000, Ng = 64
+		real(mp) ::  vT_min, vT_max, vT_target
+        real(mp), allocatable :: vT(:)
+		integer :: Nsample, N = 100000, Ng = 64
 		real(mp) :: L = 20.0_mp, Wp, Q = 2.0_mp
 		real(mp) :: dx
 		real(mp) :: Time
@@ -29,10 +30,14 @@ contains
         filename = getOption('QoI_curve/filename','J.bin')
         input = getOption('QoI_curve/random_seed',0)
         sensitivity = getOption('QoI_curve/sensitivity', .false.)
+        vT_target = getOption('QoI_curve/sensitivity_measurement_point',1.5_mp)
+        vT_min = getOption('QoI_curve/min_parameter_value',1.49_mp)
+        vT_max = getOption('QoI_curve/max_parameter_value',1.51_mp)
+        Nsample = getOption('QoI_curve/number_of_sample',1001)
 
-!		vT = (/ (3.0_mp*(i-1)/(1001-1)+0.5_mp,i=1,1001) /)
-		vT = (/ (0.02_mp*(i-1)/(1001-1)+1.49_mp,i=1,1001) /)
-        idx = MINLOC( ABS(vT-1.5_mp), DIM=1 )
+        allocate(vT(Nsample))
+		vT = (/ ((vT_max-vT_min)*(i-1)/(Nsample-1)+vT_min,i=1,Nsample) /)
+        idx = MINLOC( ABS(vT-vT_target), DIM=1 )
 
 		call buildMPIHandler(mpih)
 		call allocateBuffer(1001,2,mpih)
@@ -76,16 +81,7 @@ contains
                                                  ', J=',mpih%writebuf(2)
 		end do
 
-!		call gatherData(mpih)
-!
-!		if( mpih%my_rank.eq.mpih%size-1 ) then
-!			open(unit=301,file='data/Debye_characterization/Ak.bin',status='replace',form='unformatted',access='stream')
-!			open(unit=302,file='data/Debye_characterization/Jk.bin',status='replace',form='unformatted',access='stream')
-!		   write(301) mpih%recvbuf(:,1)
-!		   write(302) mpih%recvbuf(:,2)
-!		   close(301)
-!		   close(302)
-!		end if
+        deallocate(vT)
 
         call MPI_FILE_CLOSE(thefile, mpih%ierr)            
 

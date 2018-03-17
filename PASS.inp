@@ -17,3 +17,8 @@ QoI_curve/directory = 'debye_curve'
 QoI_curve/filename = 'J1.bin'
 QoI_curve/random_seed = 0
 QoI_curve/sensitivity = false
+QoI_curve/sensitivity_measurement_point = 1.5
+QoI_curve/min_parameter_value = 1.49
+QoI_curve/max_parameter_value = 1.51
+QoI_curve/number_of_sample = 1001
+
