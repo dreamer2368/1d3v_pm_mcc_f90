@@ -20,6 +20,8 @@ module modMPI
         procedure, pass(this) :: MPIWriteSetup
 	end type
 
+    type(mpiHandler) :: mpih
+
 contains
 
 	subroutine buildMPIHandler(this)

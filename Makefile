@@ -14,7 +14,7 @@ PNETCDFLIBS=
 
 LIBS    = 
 
-EXE = debye_curve
+EXE = exec
 F90SRC = main.f90 \
 		modInputHelper.f90 \
 		constants.f90 \
@@ -69,7 +69,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.f90
 $(OBJDIR)/random.o : $(OBJDIR)/constants.o
 $(OBJDIR)/MatrixVector.o : $(OBJDIR)/constants.o
 $(OBJDIR)/modMPI.o : $(OBJDIR)/constants.o
-$(OBJDIR)/modInputHelper.o : $(OBJDIR)/constants.o
+$(OBJDIR)/modInputHelper.o : $(OBJDIR)/modMPI.o
 $(OBJDIR)/modSpecies.o : $(OBJDIR)/constants.o
 $(OBJDIR)/modMesh.o : $(OBJDIR)/MatrixVector.o
 $(OBJDIR)/modAssign.o : $(OBJDIR)/modSpecies.o \

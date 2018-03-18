@@ -13,12 +13,15 @@ program main
     character(len=STRING_LENGTH), parameter :: PROJECT_NAME='PASS'
     character(len=STRING_LENGTH) :: filename
 
+    ! initiate MPI
+    call mpih%buildMPIHandler
+
 	! print to screen
-	print *, 'calling program main'
+    if( mpih%my_rank .eq. 0 )           &
+    	print *, 'calling program main'
 
     ! Parse options from the input file.
     filename = trim(PROJECT_NAME) // ".inp"
-    print *, filename
     call parseInputFile(filename)
     print_pm_output = getOption('print_simulation_detail',.false.)
 
@@ -39,7 +42,7 @@ program main
 !   call Landau_adjoint_sampling
 !   call twostream_adjoint_sampling
 !	call debye_shielding
-	call debye_characterization
+!	call debye_characterization
 !	call InjectionTest
 !	call MPITest
 !	call SensitivityInitializeTest
@@ -55,7 +58,9 @@ program main
 !    call MPI_write_test
 
 	! print to screen
-	print *, 'program main...done.'
+    if( mpih%my_rank .eq. 0) then
+	    print *, 'program main...done.'
+    end if
 
 contains
 

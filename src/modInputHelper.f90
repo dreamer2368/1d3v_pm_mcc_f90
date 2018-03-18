@@ -1,7 +1,7 @@
 module modInputHelper
 
   use, intrinsic :: iso_fortran_env, only : output_unit
-  use constants
+  use modMPI
 
   implicit none
 
@@ -184,89 +184,103 @@ subroutine parseInputFile(filename, commentMarker, separator)
   if (present(separator)) separator_ = separator
 
   ! Check if file exists.
-  open(unit = getFreeUnit(fileUnit), file = trim(filename), action = 'read',              &
-       status = 'old', iostat = istat)
-  if (istat /= 0) then
-     write(message, "(2A)") trim(filename), ": File not found or permission denied!"
-    write(output_unit,"(A)") message
-    flush(output_unit)
-     stop
+  if (mpih%my_rank == 0) then
+     open(unit = getFreeUnit(fileUnit), file = trim(filename), action = 'read',              &
+          status = 'old', iostat = istat)
+     if (istat /= 0) then
+        write(message, "(2A)") trim(filename), ": File not found or permission denied!"
+        write(output_unit,"(A)") message
+        flush(output_unit)
+        stop
+     end if
+     write(message,"(2A)") 'Input File name: ',trim(filename)
+     write(output_unit,"(A)") message
+     flush(output_unit)
   end if
+  call MPI_Bcast(istat, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
 
   ! Only the root process reads the input file.
-  dictSize = 0
-  do !... read once to find input dictionary size.
-     read(fileUnit, '(A)', iostat = istat) line
-     if (istat < 0) exit
-     call stripComments(line, commentMarker_) !... skip comments.
-     if (len_trim(line) == 0) cycle !... skip empty lines.
-     dictSize = dictSize + 1
-  end do
-  close(fileUnit)
+  if (mpih%my_rank == 0) then
+     dictSize = 0
+     do !... read once to find input dictionary size.
+        read(fileUnit, '(A)', iostat = istat) line
+        if (istat < 0) exit
+        call stripComments(line, commentMarker_) !... skip comments.
+        if (len_trim(line) == 0) cycle !... skip empty lines.
+        dictSize = dictSize + 1
+     end do
+     close(fileUnit)
+  end if
 
   ! Broadcast the input dictionary size to all processes.
-  if (dictSize == 0) then
+  if (mpih%my_rank == 0 .and. dictSize == 0) then
      write(message, "(2A)") trim(filename), ": File is empty or does not contain any input!"
-    write(output_unit,"(A)") message
-    flush(output_unit)
+     write(output_unit,"(A)") message
+     flush(output_unit)
      stop
   end if
+  call MPI_Bcast(dictSize, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
 
   ! Allocate memory to hold the dictionary.
   if ( allocated(dict) ) deallocate(dict)
   allocate(dict(dictSize), stat = istat)
-  if (istat /= 0) then
+  if (mpih%my_rank==0 .and. istat /= 0) then
      write(message, "(A)") "Insufficient memory: Could not allocate storage for input!"
-    write(output_unit,"(A)") message
-    flush(output_unit)
+     write(output_unit,"(A)") message
+     flush(output_unit)
      stop
   end if
 
   ! Again, only the root process reads the input file.
-  i = 0 ; lineNo = 0 ; istat = 0
-  open(unit = getFreeUnit(fileUnit), file = trim(filename),                               &
-       action = 'read', status = 'old')
-  do !... read again to fill input dictionary.
-
-     read(fileUnit, '(A)', iostat = istat) line
-     if (istat < 0) then
-        istat = 0
-        exit
-     end if
-     lineNo = lineNo + 1 !... need line number for reporting errors.
-    call stripComments(line, commentMarker_)
-    if (len_trim(line) == 0) cycle
-    i = i + 1
-
-    ! Parse in 'key <separator> value' format.
-    istat = split(line, dict(i)%key, dict(i)%val, separator_)
-
-    if (istat /= 0) then
-       write(message, "(2A,I0.0,A)") trim(filename), ": Failed to parse input on line ", &
-            lineNo, "!"
-       exit
-    end if
-
-    if (len_trim(dict(i)%key) == 0) then
-       istat = 1
-       write(message, "(2A,I0.0,A)") trim(filename), ": Empty parameter key on line ",   &
-            lineNo, "!"
-       exit
-    end if
-
-  end do
-  close(fileUnit)
-
-  ! Broadcast istat to collectively return on error.
+  if( mpih%my_rank == 0 ) then
+     i = 0 ; lineNo = 0 ; istat = 0
+     open(unit = getFreeUnit(fileUnit), file = trim(filename),                               &
+          action = 'read', status = 'old')
+     do !... read again to fill input dictionary.
+   
+        read(fileUnit, '(A)', iostat = istat) line
+        if (istat < 0) then
+           istat = 0
+           exit
+        end if
+        lineNo = lineNo + 1 !... need line number for reporting errors.
+       call stripComments(line, commentMarker_)
+       if (len_trim(line) == 0) cycle
+       i = i + 1
+   
+       ! Parse in 'key <separator> value' format.
+       istat = split(line, dict(i)%key, dict(i)%val, separator_)
+   
+       if (istat /= 0) then
+          write(message, "(2A,I0.0,A)") trim(filename), ": Failed to parse input on line ", &
+               lineNo, "!"
+          exit
+       end if
+   
+       if (len_trim(dict(i)%key) == 0) then
+          istat = 1
+          write(message, "(2A,I0.0,A)") trim(filename), ": Empty parameter key on line ",   &
+               lineNo, "!"
+          exit
+       end if
+   
+     end do
+     close(fileUnit)
+  end if
 
   ! Check if an error occurred.
-  if (istat /= 0) then
-    print *, 'error'
-    stop
+  if (mpih%my_rank==0 .and. istat /= 0) then
+     write(output_unit,"(A)") message
+     flush(output_unit)
+     stop
   end if
 
   ! Sort the dictionary and broadcast it to all processes.
   call sort()
+  do i = 1, dictSize
+     call MPI_Bcast(dict(i)%key, STRING_LENGTH, MPI_CHARACTER, 0, MPI_COMM_WORLD, ierror)
+     call MPI_Bcast(dict(i)%val, STRING_LENGTH, MPI_CHARACTER, 0, MPI_COMM_WORLD, ierror)
+  end do
 
 end subroutine parseInputFile
 
