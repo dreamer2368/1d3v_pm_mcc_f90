@@ -3,6 +3,9 @@ test1 = "string input"
 test2 = 1.2E-5
 test3 = 24
 
+#Print out simulation details
+print_simulation_detail = true
+
 #Adjoint convergence test time
 adjoint_convergence/time = 60.0
 adjoint_convergence/directory = 'debye_adj_test/dp'

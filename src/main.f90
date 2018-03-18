@@ -20,6 +20,7 @@ program main
     filename = trim(PROJECT_NAME) // ".inp"
     print *, filename
     call parseInputFile(filename)
+    print_pm_output = getOption('print_simulation_detail',.false.)
 
 !	call cross_section
 !	call Procassini
