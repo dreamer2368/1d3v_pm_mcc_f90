@@ -39,12 +39,15 @@ contains
 		vT = (/ ((vT_max-vT_min)*(i-1)/(Nsample-1)+vT_min,i=1,Nsample) /)
         idx = MINLOC( ABS(vT-vT_target), DIM=1 )
 
-		call buildMPIHandler(mpih)
 		call allocateBuffer(1001,2,mpih)
         thefile = MPIWriteSetup(mpih,'data/'//trim(dir),filename)
 
 		do i=1,mpih%sendcnt
 			A = (/ vT(mpih%displc(mpih%my_rank)+i), 0.0_mp /)
+            if( A(1).ge.2.5 ) then
+                Ng = 64*3
+                N = 3E5
+            end if
 			call buildPM1D(d,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=0.05_mp)
 			call buildRecord(r,d%nt,1,d%L,d%ng,trim(dir)//'/'//trim(adjustl(mpih%rank_str)),20)
 
@@ -84,8 +87,6 @@ contains
         deallocate(vT)
 
         call MPI_FILE_CLOSE(thefile, mpih%ierr)            
-
-		call destroyMPIHandler(mpih)
 	end subroutine
 
 	subroutine Debye_sensitivity
