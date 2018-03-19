@@ -42,7 +42,7 @@ program main
 !   call Landau_adjoint_sampling
 !   call twostream_adjoint_sampling
 !	call debye_shielding
-!	call debye_characterization
+	call debye_characterization
 !	call InjectionTest
 !	call MPITest
 !	call SensitivityInitializeTest
@@ -61,6 +61,8 @@ program main
     if( mpih%my_rank .eq. 0) then
 	    print *, 'program main...done.'
     end if
+
+    call mpih%destroyMPIHandler
 
 contains
 
