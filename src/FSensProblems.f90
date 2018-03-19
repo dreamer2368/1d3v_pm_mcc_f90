@@ -14,7 +14,6 @@ contains
 		type(PM1D) :: d
 		type(recordData) :: r
 		type(adjoint) :: adj
-		type(mpiHandler) :: mpih
 		real(mp) ::  vT_min, vT_max, vT_target
         real(mp), allocatable :: vT(:)
 		integer :: Nsample, N = 100000, Ng = 64
