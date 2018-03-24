@@ -10,6 +10,9 @@ module constants
 	complex(mp), parameter :: eye = (0.0_mp,1.0_mp)
     logical :: print_pm_output = .false.
 
+    !<< Basic simulation parameter >>
+    integer :: numberOfParticles
+
 contains
 
 end module

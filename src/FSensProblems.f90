@@ -43,7 +43,7 @@ contains
 
 		do i=1,mpih%sendcnt
 			A = (/ vT(mpih%displc(mpih%my_rank)+i), 0.0_mp /)
-            if( A(1).ge.2.5 ) then
+            if( A(1).ge.0.5 ) then
                 Ng = 64*3
                 N = 3E5
             end if
@@ -92,17 +92,22 @@ contains
 		type(PM1D) :: pm
 		type(FSens) :: fs
 		type(recordData) :: r, fsr
-		integer :: N=1E5, Ng=64
-		integer :: NInit=5E4, Ngv=32, NInject=5E4, NLimit=5E4
+		integer :: N, Ng
+		integer :: NInit=5E4, Ngv, NInject, NLimit
 		real(mp) :: L = 20.0_mp, Lv, Q = 2.0_mp
 		real(mp) :: dt=0.05_mp, dx
 		real(mp) :: Time = 30.0_mp, vT = 1.5_mp
 		real(mp) :: A(2), J, grad
 		character(len=100)::dir
 		A = (/ vT, 0.0_mp /)
+        N = getOption('number_of_particles',100000)
+        Ng = getOption('number_of_grids',64)
+        Ngv = Ng/2
+        NInject = getOption('number_of_injecting_particles',N/2)
+        NLimit = getOption('population_limit',N/2)
+        dir = getOption('base_directory','Debye_sensitivity')
 
 		call buildPM1D(pm,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt)
-		dir = 'Debye_sensitivity'
 		call buildRecord(r,pm%nt,1,pm%L,pm%ng,trim(dir),20)
 
 		call buildSpecies(pm%p(1),-1.0_mp,1.0_mp)
@@ -111,8 +116,7 @@ contains
 		Lv = vT*6.0_mp
 !		NInject = 5*N/pm%nt
 		call buildFSens(fs,pm,Lv,Ngv,NInject,NLimit)
-		dir = 'Debye_sensitivity/f_A'
-		call buildRecord(fsr,fs%nt,1,fs%L,fs%ng,trim(dir),20)
+		call buildRecord(fsr,fs%nt,1,fs%L,fs%ng,trim(dir)//'/f_A',20)
 		call Debye_sensitivity_init(fs,N,vT,'vT')
 !		call Debye_sensitivity_init_sync(fs,pm,vT,'vT')
 

@@ -127,8 +127,8 @@ contains
 	subroutine debye_shielding
 		type(PM1D) :: d
 		type(recordData) :: r
-		real(mp) :: n0 = 1.0e10, lambda0 = 1.0e-2, vT = 1.0_mp
-		integer :: N = 100000, Ng = 128
+		real(mp) :: n0 = 1.0e10, lambda0 = 1.0e-2, vT = 3.5_mp
+		integer :: N = 3E5, Ng = 64*3
 		real(mp) :: L = 20.0_mp, Wp, Q = 2.0_mp
 		real(mp) :: dt = 0.05_mp
 		real(mp) :: Time = 150.0_mp
