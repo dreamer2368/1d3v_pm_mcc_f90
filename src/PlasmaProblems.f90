@@ -143,7 +143,7 @@ contains
 
         allocate(A(Nparam))
         do i=1,Nparam
-            write(option,'(A,I02)') 'parameters_of_interest/',i
+            write(option,'(A,I3.3)') 'parameters_of_interest/',i
             A(i) = getOption(trim(option),0.0_mp)
         end do
 
