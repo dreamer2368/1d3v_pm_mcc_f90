@@ -103,7 +103,7 @@ contains
         N = getOption('number_of_particles',100000)
         Ng = getOption('number_of_grids',64)
         Ngv = Ng/2
-        NInject = getOption('number_of_injecting_particles',N/2)
+        NInject = getOption('number_of_injecting_particles',N/20)
         NLimit = getOption('population_limit',N/2)
         dir = getOption('base_directory','Debye_sensitivity')
 

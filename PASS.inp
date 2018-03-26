@@ -13,6 +13,9 @@ number_of_injecting_particles = 5E4
 population_limit = 5E4
 base_directory = 'Debye_sensitivity'
 
+parameters_of_interest/01 = 1.5
+parameters_of_interest/02 = 1.0e-17
+
 #Adjoint convergence test time
 adjoint_convergence/time = 60.0
 adjoint_convergence/directory = 'debye_adj_test/dp'

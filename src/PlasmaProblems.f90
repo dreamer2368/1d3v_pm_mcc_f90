@@ -3,6 +3,7 @@ module PlasmaProblems
 	use init
 	use timeStep
 	use modMPI
+    use modInputHelper
 
 	implicit none
 
@@ -127,18 +128,32 @@ contains
 	subroutine debye_shielding
 		type(PM1D) :: d
 		type(recordData) :: r
-		real(mp) :: n0 = 1.0e10, lambda0 = 1.0e-2, vT = 3.5_mp
-		integer :: N = 3E5, Ng = 64*3
+		real(mp) :: vT
+		integer :: i, N, Ng, Nparam
 		real(mp) :: L = 20.0_mp, Wp, Q = 2.0_mp
 		real(mp) :: dt = 0.05_mp
 		real(mp) :: Time = 150.0_mp
-		real(mp) :: A(2),J
+		real(mp) :: J
+        real(mp), allocatable :: A(:)
+        character(len=STRING_LENGTH) :: dir, option
+        N = getOption('number_of_particles',100000)
+        Ng = getOption('number_of_grids',64)
+        Nparam = getOption('number_of_parameters',2)
+        dir = getOption('base_directory','Debye')
 
-		A = (/ vT, lambda0 /)
+        allocate(A(Nparam))
+        do i=1,Nparam
+            write(option,'(A,I02)') 'parameters_of_interest/',i
+            A(i) = getOption(trim(option),0.0_mp)
+        end do
+
+        A(1) = A(1) + A(2)
+
 		call buildPM1D(d,Time,0.0_mp,Ng,1,pBC=0,mBC=0,order=1,A=A,L=L,dt=dt)
-		call buildRecord(r,d%nt,1,d%L,d%ng,'debye',10)
+		call buildRecord(r,d%nt,1,d%L,d%ng,trim(dir),10)
 
 		call buildSpecies(d%p(1),-1.0_mp,1.0_mp)
+        call init_random_seed
 		call Debye_initialize(d,N,Q)
 
 		call forwardsweep(d,r,Null_input,Null_source,Debye,J)
@@ -147,6 +162,8 @@ contains
 
 		call destroyRecord(r)
 		call destroyPM1D(d)
+
+        deallocate(A)
 	end subroutine
 
 end module
