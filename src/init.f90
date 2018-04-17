@@ -22,8 +22,8 @@ contains
 			SELECT CASE(input_str)
 				CASE('vT')
 					spwt0 = ( vp0(:,1)**2/vT/vT - 1.0_mp )/SQRT(2.0_mp*pi)/vT/vT*EXP( -vp0(:,1)**2/2.0_mp/vT/vT )	&
-!								*dpm%L*2.4_mp*dpm%Lv/N
-								*dpm%L*SQRT(2.0_mp*pi)*vT*vT/EXP( -vp0(:,1)**2/2.0_mp/vT/vT )/N
+								*dpm%L*2.4_mp*dpm%Lv/N
+!								*dpm%L*SQRT(2.0_mp*pi)*vT*vT/EXP( -vp0(:,1)**2/2.0_mp/vT/vT )/N
 					rho_back = 0.0_mp
 				CASE('Q')
 					spwt0 = 0.0_mp

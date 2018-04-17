@@ -76,19 +76,19 @@ contains
 
 				!InjectSource+Remeshing
 !				call dpm%Redistribute(dpm%p(i),dpm%a(i))
-				call dpm%InjectSource(dpm%p(i),dpm%j)
+!				call dpm%InjectSource(dpm%p(i),dpm%j)
 				call CPU_TIME(time1)
 				dr%cpt_temp(9) = dr%cpt_temp(9) + (time1-time2)
 
-				call dpm%Redistribute_temp(dpm%p(i))
+!				call dpm%Redistribute_temp(dpm%p(i))
 
 				!Weight updating
             !Synchronized
 !				call dpm%updateWeight(dpm%p(i),this%a(i),dpm%f_A,dpm%j)
             !Asynchronous
-!				dpm%f_A = 0.0_mp
-!				call dpm%numberDensity(dpm%p(i),dpm%a(i),dpm%f_A)
-!				call dpm%updateWeight(dpm%p(i),dpm%a(i),dpm%f_A,dpm%j)
+				dpm%f_A = 0.0_mp
+				call dpm%numberDensity(dpm%p(i),dpm%a(i),dpm%f_A)
+				call dpm%updateWeight(dpm%p(i),dpm%a(i),dpm%f_A,dpm%j)
 				call CPU_TIME(time2)
 				dr%cpt_temp(10) = dr%cpt_temp(10) + (time2-time1)
 			end do
@@ -97,19 +97,19 @@ contains
 			grad_hist(k) = grad
 			call dr%recordPlasma(dpm, k)
 
-!			if( (dr%mod.eq.1) .or. (mod(k,dr%mod).eq.0) ) then
-!				kr = merge(k,k/dr%mod,dr%mod.eq.1)
-!				write(kstr,*) kr
-!				open(unit=305,file='data/'//dr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
-!						status='replace',form='unformatted',access='stream')
-!				call dpm%FSensDistribution(dpm%p(1),this%a(1))
-!				write(305) dpm%f_A
-!				close(305)
+			if( (dr%mod.eq.1) .or. (mod(k,dr%mod).eq.0) ) then
+				kr = merge(k,k/dr%mod,dr%mod.eq.1)
+				write(kstr,*) kr
+				open(unit=305,file='data/'//dr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
+						status='replace',form='unformatted',access='stream')
+				call dpm%FSensDistribution(dpm%p(1),this%a(1))
+				write(305) dpm%f_A
+				close(305)
 !				open(unit=305,file='data/'//dr%dir//'/j_'//trim(adjustl(kstr))//'.bin',	&
 !						status='replace',form='unformatted',access='stream')
 !				write(305) dpm%j
 !				close(305)
-!			end if
+			end if
 		end do
 		open(unit=305,file='data/'//dr%dir//'/grad_hist.bin',	&
 					status='replace',form='unformatted',access='stream')

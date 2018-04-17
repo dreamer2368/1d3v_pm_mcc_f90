@@ -9,6 +9,8 @@ rank = comm.Get_rank()
 
 dir1 = '../data/Debye'
 dir2 = '../data/Debye_perturbed2'
+filename = 'wasserstein.N1000.bin'
+Nw = 1000
 
 if( rank == 0 ):    
     params = open(dir1+'/record','r')
@@ -38,7 +40,6 @@ T = np.linspace(0.0,150.0,Nr+1)
 dx = L/Ng
 xg = np.arange(Ng)*dx + 0.5*dx
 
-Nw = 100
 idxT = int(Np/Nw)
 Nw = len(range(Np)[::idxT])
 
@@ -55,10 +56,14 @@ def loadAndMeasure(i,W):
 
     x0 = np.transpose([xp0[0::idxT],vp0[0::idxT,0]])
     x1 = np.transpose([xp1[0::idxT],vp1[0::idxT,0]])
-    return W.measure(x0,x1)
+
+    dxp = np.minimum( abs(xp0-xp1), L-abs(xp0-xp1) )
+    dL = np.sum( np.sqrt( dxp**2 + (vp1[:,0]-vp0[:,0])**2 ) )/Np
+    dW = W.measure(x0,x1)
+#    print 'dL: ',dL,', dW: ',dW
+    return dW
 
 amode = MPI.MODE_WRONLY | MPI.MODE_CREATE
-filename = 'wasserstein.bin'
 fh = MPI.File.Open(comm,filename,amode)
 dW = loadAndMeasure(rank,W)
 fh.Write_at_all(8*rank,dW)

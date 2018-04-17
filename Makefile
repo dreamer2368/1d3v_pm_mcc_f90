@@ -14,7 +14,7 @@ PNETCDFLIBS=
 
 LIBS    = 
 
-EXE = debye
+EXE = debye_sensitivity
 F90SRC = main.f90 \
 		modInputHelper.f90 \
 		constants.f90 \
