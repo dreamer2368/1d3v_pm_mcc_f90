@@ -132,10 +132,11 @@ contains
 		integer :: i, N, Ng, Nparam
 		real(mp) :: L = 20.0_mp, Wp, Q = 2.0_mp
 		real(mp) :: dt = 0.05_mp
-		real(mp) :: Time = 150.0_mp
+		real(mp) :: Time
 		real(mp) :: J
         real(mp), allocatable :: A(:)
         character(len=STRING_LENGTH) :: dir, option
+        Time = getOption('simulation_time',150.0_mp)
         N = getOption('number_of_particles',100000)
         Ng = getOption('number_of_grids',64)
         Nparam = getOption('number_of_parameters',2)
