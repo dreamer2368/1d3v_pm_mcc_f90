@@ -193,7 +193,7 @@ contains
 		end do
 	end subroutine
 
-	subroutine DSTPoisson_setup(N,L,W)
+	subroutine FFTPoisson_setup(N,L,W)
 		integer, intent(in) :: N
 		real(mp), intent(in) :: L
 		complex(mp), intent(out) :: W(N)
@@ -212,7 +212,7 @@ contains
         W(1) = 1.0_mp
 	end subroutine
 
-	subroutine DSTPoisson(x,rhs,W)
+	subroutine FFTPoisson(x,rhs,W)
 		real(mp), intent(in) :: rhs(:)
 		complex(mp), intent(in) :: W(:)
 		real(mp), intent(out) :: x(size(rhs))

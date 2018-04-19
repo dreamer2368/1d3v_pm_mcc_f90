@@ -46,7 +46,8 @@ contains
 		select case (this%BCindex)
 			case(0)						!periodic
 				this%dx = L/ng
-                this%solveMesh=>solveMesh_periodic
+!                this%solveMesh=>solveMesh_periodic
+                this%solveMesh=>solveMesh_FFT
                 this%solveMesh_Adj=>solveMesh_Adj_periodic
 			case(1)						!Dirichlet-Dirichlet
 				this%dx = L/(ng-1)
@@ -69,7 +70,7 @@ contains
 		this%rho_back = 0.0_mp
 
         allocate(this%W(ng))
-		call DSTPoisson_setup(this%ng,this%L,this%W)
+		call FFTPoisson_setup(this%ng,this%L,this%W)
 	end subroutine
 
 	subroutine setMesh(this,rho_back)
@@ -137,6 +138,15 @@ contains
 		call solve_tridiag(co1,co2,co3,rhs,phi1,this%ng-1)
 		this%phi(2:this%ng) = phi1
 		this%phi(1) = 0.0_mp
+	end subroutine
+
+	subroutine solveMesh_FFT(this,eps)
+		class(mesh), intent(inout) :: this
+		real(mp), intent(in) :: eps
+		real(mp), dimension(this%ng) :: rhs
+
+		rhs = -( this%rho + this%rho_back )/eps
+	    call FFTPoisson(this%phi,rhs,this%W)
 	end subroutine
 
 	!================   Adjoint Mesh solver   ======================================

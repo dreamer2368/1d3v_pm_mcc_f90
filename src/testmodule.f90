@@ -29,8 +29,8 @@ contains
                                 + 16.0_mp*SIN(2.0_mp*pi* 4.0_mp * xg/L) &
                                 + 25.0_mp*SIN(2.0_mp*pi* 5.0_mp * xg/L) )
 
-	    call DSTPoisson_setup(Ng,L,W)
-	    call DSTPoisson(y,rhs,W)
+	    call FFTPoisson_setup(Ng,L,W)
+	    call FFTPoisson(y,rhs,W)
 
         print *, y
         print *, ysol
