@@ -4,7 +4,7 @@ module MatrixVector
 
 	implicit none
 
-!	include 'fftw3.f'
+	include 'fftw3.f'
 
 contains
 
@@ -197,35 +197,43 @@ contains
 		integer, intent(in) :: N
 		real(mp), intent(in) :: L
 		complex(mp), intent(out) :: W(N)
-		integer :: k
+		integer :: i,wi
 		complex(mp) :: wx
 
-		wx = pi*eye/L
-		do k=1,N
-			W(k) = (wx*(k-0.5_mp))**2
-		end do
+		wx = 2.0_mp*pi*eye/L
+        do i=0,N-1
+            if( i.le.N/2 ) then
+                wi = i 
+            else
+                wi = - ( N-i )
+            end if
+            W(i+1) = + (wx*wi)**2.0_mp
+        end do
+        W(1) = 1.0_mp
 	end subroutine
 
 	subroutine DSTPoisson(x,rhs,W)
 		real(mp), intent(in) :: rhs(:)
 		complex(mp), intent(in) :: W(:)
 		real(mp), intent(out) :: x(size(rhs))
-		real(mp) :: rhsFFT(size(rhs)), xFFT(size(rhs))
+		complex(mp), dimension(size(rhs)) :: rhsFFT, xFFT, rhsb, xb
 		integer(mp) :: plan
 		integer :: N
 		N = size(rhs)
 
-!		call dfftw_plan_r2r_1d(plan,N,rhs,rhsFFT,FFTW_RODFT11,FFTW_ESTIMATE)
-!		call dfftw_execute_r2r(plan,rhs,rhsFFT)
-!		call dfftw_destroy_plan(plan)
+        rhsb = rhs
+		call dfftw_plan_dft_1d(plan,N,rhsb,rhsFFT,FFTW_FORWARD,FFTW_ESTIMATE)
+		call dfftw_execute_dft(plan,rhsb,rhsFFT)
+		call dfftw_destroy_plan(plan)
 
-!		xFFT = rhsFFT/REALPART(W)
+		xFFT = rhsFFT/W
+        xFFT(1) = (0.0_mp,0.0_mp)
 
-!		call dfftw_plan_r2r_1d(plan,N,xFFT,x,FFTW_RODFT11,FFTW_ESTIMATE)
-!		call dfftw_execute_r2r(plan,xFFT,x)
-!		call dfftw_destroy_plan(plan)
+		call dfftw_plan_dft_1d(plan,N,xFFT,xb,FFTW_BACKWARD,FFTW_ESTIMATE)
+		call dfftw_execute_dft(plan,xFFT,xb)
+		call dfftw_destroy_plan(plan)
 
-!		x = x/2/N
+		x = REALPART(xb)*1.0_mp/N
 	end subroutine
 
 end module

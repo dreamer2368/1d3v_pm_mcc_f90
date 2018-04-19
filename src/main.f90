@@ -46,7 +46,7 @@ program main
 !	call InjectionTest
 !	call MPITest
 !	call SensitivityInitializeTest
-	call Debye_sensitivity
+!	call Debye_sensitivity
 !	call forYeoh
 !	call RedistributionTest
 !	call updateWeightTest
@@ -56,6 +56,7 @@ program main
 !	call debye_sampling
 !	call redistribute_temp_test
 !    call MPI_write_test
+    call FFTtest
 
 	! print to screen
     if( mpih%my_rank .eq. 0) then

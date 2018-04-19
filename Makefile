@@ -6,15 +6,15 @@ SRCDIR = src
 OBJDIR = obj
 MODDIR = mod
 
-FFTWLIBS=~/bin/FFTW/lib/libfftw3.a
+FFTWLIBS=/g/g92/chung28/Programs/FFTW/lib/libfftw3.a
 VECLIBSMACOSX=
 LAPACKLIB=-L/opt/local/lib/lapack-3.5.0 -llapack -lblas
 BLASLIB=/opt/local/lib/lapack-3.5.0/librefblas.a
 PNETCDFLIBS=
 
-LIBS    = 
+LIBS    = $(FFTWLIBS)
 
-EXE = debye_sensitivity
+EXE = exec
 F90SRC = main.f90 \
 		modInputHelper.f90 \
 		constants.f90 \

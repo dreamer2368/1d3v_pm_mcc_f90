@@ -9,6 +9,33 @@ module testmodule
 
 contains
 
+    subroutine FFTtest
+        integer, parameter :: Ng=64
+        integer :: i
+        real(mp) :: xg(Ng), L
+        real(mp) :: y(Ng), rhs(Ng)
+        real(mp) :: ysol(Ng)
+		complex(mp) :: W(Ng)
+
+        L = 1.0
+        xg = (/ ((i-0.5_mp)*L/Ng, i=1,Ng) /)
+        ysol = SIN(2.0_mp*pi*xg/L) &
+                + SIN(2.0_mp*pi* 2.0_mp * xg/L) &
+                + SIN(2.0_mp*pi* 4.0_mp * xg/L) &
+                + SIN(2.0_mp*pi* 5.0_mp * xg/L)
+
+        rhs = -4.0_mp*pi*pi/L/L*( SIN(2.0_mp*pi*xg/L) &
+                                + 4.0_mp*SIN(2.0_mp*pi* 2.0_mp * xg/L) &
+                                + 16.0_mp*SIN(2.0_mp*pi* 4.0_mp * xg/L) &
+                                + 25.0_mp*SIN(2.0_mp*pi* 5.0_mp * xg/L) )
+
+	    call DSTPoisson_setup(Ng,L,W)
+	    call DSTPoisson(y,rhs,W)
+
+        print *, y
+        print *, ysol
+    end subroutine
+
 	subroutine redistribute_temp_test
 		type(PM1D) :: pm
 		type(FSens) :: fs
