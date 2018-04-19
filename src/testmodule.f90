@@ -712,7 +712,7 @@ contains
 		call pm%applyBC(pm%p(1),pm%m,pm%dt,pm%A0(1))
 		pm%m%rho = 0.0_mp
 		call pm%a(1)%chargeAssign(pm%p(i),pm%m)
-		call solveMesh(pm%m,pm%eps0)
+		call pm%m%solveMesh(pm%eps0)
 		pm%m%E = - multiplyD(pm%m%phi,pm%m%dx,pm%m%BCindex)
 		call pm%a(1)%forceAssign(pm%p(1), pm%m)
 		call accelSpecies(pm%p(1),pm%dt)
@@ -729,7 +729,7 @@ contains
 		adj%p(1)%Ep = adj%p(1)%qs/pm%p(1)%ms*adj%p(1)%vp(:,1)
 		call Adj_forceAssign_E(pm%a(1),adj%p(1)%Ep,adj%m%E)
 		!adj%m%E = -2.0_mp*adj%m%dx*weight*pm%m%E
-		call solveMesh_Adj(adj%m,pm%eps0)
+		call adj%m%solveMesh_Adj(pm%eps0)
 
 		dxp1 = 0.0_mp
 		dxp2 = 0.0_mp
@@ -755,7 +755,7 @@ contains
 		call pm%applyBC(pm%p(1),pm%m,pm%dt,pm%A0(1))
 		pm%m%rho = 0.0_mp
 		call pm%a(1)%chargeAssign(pm%p(i),pm%m)
-		call solveMesh(pm%m,pm%eps0)
+		call pm%m%solveMesh(pm%eps0)
 		pm%m%E = - multiplyD(pm%m%phi,pm%m%dx,pm%m%BCindex)
 		call forceAssign(pm%a(1), pm%p(1), pm%m)
 		call accelSpecies(pm%p(1),pm%dt)
@@ -1061,7 +1061,7 @@ contains
 !		call buildMesh(m,1.0_mp,N,1)
 !		call setMesh(m,rho_back)
 !		m%rho = rho
-!		call solveMesh(m,1.0_mp)
+!		call m%solveMesh(1.0_mp)
 !
 !		call system('mkdir -p data/test_DD_poisson')
 !		open(unit=301,file='data/test_DD_poisson/xg.bin',status='replace',form='unformatted',access='stream')

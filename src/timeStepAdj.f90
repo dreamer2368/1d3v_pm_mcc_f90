@@ -1,6 +1,7 @@
 module timeStepAdj
 
 	use timeStep
+    use modTarget
 
 	implicit none
 
@@ -55,7 +56,7 @@ contains
 			adj%m%E = adj%m%E + adj%dm%E
 
 			!======= dPhi_g, dRho_g =============
-			call solveMesh_Adj(adj%m,pm%eps0)
+			call adj%m%solveMesh_Adj(pm%eps0)
 
 			!======= dx_p =============
 			do i=1,adj%n

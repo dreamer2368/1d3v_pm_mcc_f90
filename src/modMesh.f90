@@ -13,13 +13,25 @@ module modMesh
 		real(mp), allocatable :: rho(:)
 		real(mp), allocatable :: rho_back(:)				!1D sheath: surface charge
 		real(mp), allocatable :: phi(:)
+
+        complex(mp), allocatable :: W(:)
+
+		procedure(MeshSolver), pass(this), pointer :: solveMesh=>solveMesh_periodic
+		procedure(MeshSolver), pass(this), pointer :: solveMesh_Adj=>solveMesh_Adj_periodic
 	contains
 		procedure, pass(this) :: buildMesh
 		procedure, pass(this) :: setMesh
 		procedure, pass(this) :: destroyMesh
-		procedure, pass(this) :: solveMesh
-		procedure, pass(this) :: solveMesh_Adj
 	end type
+
+	abstract interface
+		subroutine MeshSolver(this,eps)
+			use constants
+            import mesh
+            class(mesh), intent(inout) :: this
+            real(mp), intent(in) :: eps
+		end subroutine
+	end interface
 
 contains
 
@@ -34,10 +46,16 @@ contains
 		select case (this%BCindex)
 			case(0)						!periodic
 				this%dx = L/ng
+                this%solveMesh=>solveMesh_periodic
+                this%solveMesh_Adj=>solveMesh_Adj_periodic
 			case(1)						!Dirichlet-Dirichlet
 				this%dx = L/(ng-1)
+                this%solveMesh=>solveMesh_D_D
+                this%solveMesh_Adj=>solveMesh_Adj_periodic
 			case(2)						!Dirichlet-Neumann
 				this%dx = L/(ng-1)
+                this%solveMesh=>solveMesh_D_N
+                this%solveMesh_Adj=>solveMesh_Adj_periodic
 		end select
 
 		allocate(this%E(ng))
@@ -50,7 +68,8 @@ contains
 		this%rho = 0.0_mp
 		this%rho_back = 0.0_mp
 
-!		call DSTPoisson_setup(this%ng,this%L,this%W)
+        allocate(this%W(ng))
+		call DSTPoisson_setup(this%ng,this%L,this%W)
 	end subroutine
 
 	subroutine setMesh(this,rho_back)
@@ -67,26 +86,14 @@ contains
 		deallocate(this%rho)
 		deallocate(this%rho_back)
 		deallocate(this%phi)
+
+        deallocate(this%W)
 	end subroutine
 
 !===========Mesh Solver===============================================
 
-	subroutine solveMesh(this,eps)
-		class(mesh), intent(inout) :: this
-		real(mp), intent(in) :: eps
-
-		select case(this%BCindex)
-			case(0)
-				call solveMesh_periodic(this,eps)
-			case(1)
-				call solveMesh_D_D(this,eps)
-			case(2)
-				call solveMesh_D_N(this,eps)
-		end select
-	end subroutine
-
 	subroutine solveMesh_periodic(this,eps)
-		type(mesh), intent(inout) :: this
+		class(mesh), intent(inout) :: this
 		real(mp), intent(in) :: eps
 		real(mp), dimension(this%ng-1) :: rhs, phi1
 
@@ -97,7 +104,7 @@ contains
 	end subroutine
 
 	subroutine solveMesh_D_D(this,eps)
-		type(mesh), intent(inout) :: this
+		class(mesh), intent(inout) :: this
 		real(mp), intent(in) :: eps
 		real(mp), dimension(this%ng-1) :: rhs, phi1, co1, co2, co3
 		co1 = 1.0_mp/this%dx/this%dx
@@ -115,7 +122,7 @@ contains
 	end subroutine
 
 	subroutine solveMesh_D_N(this,eps)						!D(i=1), N(i=N)
-		type(mesh), intent(inout) :: this
+		class(mesh), intent(inout) :: this
 		real(mp), intent(in) :: eps
 		real(mp), dimension(this%ng-1) :: rhs, phi1, co1, co2, co3
 		co1 = 1.0_mp/this%dx/this%dx
@@ -133,22 +140,9 @@ contains
 	end subroutine
 
 	!================   Adjoint Mesh solver   ======================================
-	subroutine solveMesh_Adj(this,eps)
-		class(mesh), intent(inout) :: this
-		real(mp), intent(in) :: eps
-
-		select case(this%BCindex)
-			case(0)
-				call solveMesh_Adj_periodic(this,eps)
-	!		case(1)
-	!			call solveMesh_D_D(this,eps)
-	!		case(2)
-	!			call solveMesh_D_N(this,eps)
-		end select
-	end subroutine
 
 	subroutine solveMesh_Adj_periodic(m,eps)
-		type(mesh), intent(inout) :: m
+		class(mesh), intent(inout) :: m
 		real(mp), intent(in) :: eps
 		real(mp) :: rhs(m%ng), rho1(m%ng-1)
 

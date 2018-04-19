@@ -25,17 +25,17 @@ F90SRC = main.f90 \
 		modAssign.f90 \
 		modRecord.f90 \
 		modPM1D.f90 \
+		modAdj.f90 \
 		random.f90 \
 		ArMCC.f90 \
 		init.f90 \
 		modBC.f90 \
+		modQoI.f90 \
 		modTarget.f90 \
 		modSource.f90 \
 		timeStep.f90 \
 		timeStepAdj.f90 \
 		timeStepFSens.f90 \
-		modAdj.f90 \
-		modQoI.f90 \
 		testmodule.f90 \
 		modFSens.f90 \
 		PlasmaProblems.f90 \
@@ -99,17 +99,25 @@ $(OBJDIR)/timeStep.o : $(OBJDIR)/modTarget.o \
 						$(OBJDIR)/ArMCC.o \
 						$(OBJDIR)/modAdj.o \
 						$(OBJDIR)/modQoI.o
-$(OBJDIR)/timeStepAdj.o : $(OBJDIR)/timeStep.o
-$(OBJDIR)/timeStepFSens.o : $(OBJDIR)/timeStep.o
+$(OBJDIR)/timeStepAdj.o : $(OBJDIR)/timeStep.o \
+							$(OBJDIR)/modTarget.o
+$(OBJDIR)/timeStepFSens.o : $(OBJDIR)/timeStep.o \
+							$(OBJDIR)/modFSens.o
 $(OBJDIR)/testmodule.o : $(OBJDIR)/init.o \
 							$(OBJDIR)/timeStep.o \
 							$(OBJDIR)/timeStepAdj.o \
 							$(OBJDIR)/timeStepFSens.o \
 							$(OBJDIR)/modMPI.o
 $(OBJDIR)/PlasmaProblems.o : $(OBJDIR)/init.o \
+								$(OBJDIR)/modSource.o \
+								$(OBJDIR)/modTarget.o \
 								$(OBJDIR)/timeStep.o \
 								$(OBJDIR)/modMPI.o \
 								$(OBJDIR)/modInputHelper.o
+$(OBJDIR)/MCCProblems.o : $(OBJDIR)/init.o \
+								$(OBJDIR)/modTarget.o \
+								$(OBJDIR)/modMPI.o \
+								$(OBJDIR)/timeStep.o
 $(OBJDIR)/AdjointProblems.o : $(OBJDIR)/init.o \
 								$(OBJDIR)/timeStepAdj.o \
 								$(OBJDIR)/modMPI.o \
@@ -124,6 +132,7 @@ $(OBJDIR)/main.o : $(OBJDIR)/testmodule.o \
 					$(OBJDIR)/AdjointProblems.o \
 					$(OBJDIR)/MCCProblems.o \
 					$(OBJDIR)/FSensProblems.o \
+					$(OBJDIR)/modMPI.o \
 					$(OBJDIR)/modInputHelper.o
 
 clean:

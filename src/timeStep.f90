@@ -1,11 +1,9 @@
 module timeStep
 
-	use modSource
-	use modTarget
-	use modFSens
+	use modSource, only: source, Null_source
+	use modTarget, only: control, Null_input
 	use modRecord
 	use ArMCC
-	use modAdj
 	use modQoI
 
 	implicit none

@@ -2,6 +2,8 @@ module PlasmaProblems
 
 	use init
 	use timeStep
+    use modSource
+    use modTarget
 	use modMPI
     use modInputHelper
 

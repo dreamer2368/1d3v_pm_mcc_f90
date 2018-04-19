@@ -2,6 +2,7 @@ module MCCProblems
 
 	use init
 	use timeStep
+    use modTarget
 	use modMPI
 
 	implicit none
