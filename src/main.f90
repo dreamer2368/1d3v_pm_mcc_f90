@@ -58,6 +58,7 @@ program main
 !	call redistribute_temp_test
 !    call MPI_write_test
 !    call FFTtest
+!    call Landau_Jtheta
 
 	! print to screen
     if( mpih%my_rank .eq. 0) then

@@ -16,27 +16,28 @@ contains
 		type(recordData) :: r
 		type(mpiHandler) :: mpih
 		integer, parameter :: N = 1, Np = 3E5, Ng = 64
-        integer, parameter :: Nsample = 1001, seed = 1
+        integer, parameter :: Nsample = 1001, seed = 3
 		real(mp), parameter :: vT = 1.0_mp, L = 4.0_mp, dt = 0.1_mp
         real(mp) :: fk(Nsample)
 		real(mp) :: dx
 		real(mp) :: Time = 20.0_mp
 		real(mp) :: A(2),J
 		integer :: i, thefile
-		character(len=100) :: prefix,dir,filename
+		character(len=100) :: seed_str,prefix,dir,filename
 		fk = (/ (0.2_mp*(i-1)/(Nsample-1)-0.1_mp,i=1,Nsample) /)
 
 		call buildMPIHandler(mpih)
 		call allocateBuffer(Nsample,2,mpih)
 
-        prefix = 'Landau_Jtheta'
+        write(seed_str,'(I1)') seed
+        prefix = 'Landau_Jtheta'//trim(seed_str)
         dir = 'data/'//trim(prefix)
-        filename = 'Jtheta.bin'
+        filename = 'Jtheta'//trim(seed_str)//'.bin'
         thefile = mpih%MPIWriteSetup(dir,filename)
 
 		do i=1,mpih%sendcnt
 			A = (/ 0.1_mp, fk(mpih%displc(mpih%my_rank)+i) /)
-		    call buildPM1D(pm,Time,0.0_mp,Ng,N,0,0,1,dt=dt,L=L,A=A)
+		    call buildPM1D(pm,Time+0.1_mp,Time,Ng,N,0,0,1,dt=dt,L=L,A=A)
 			dir = trim(prefix)//'/'//trim(adjustl(mpih%rank_str))
 			call buildRecord(r,pm%nt,N,pm%L,Ng,trim(dir),20)
 			call set_null_discharge(r)
@@ -52,6 +53,7 @@ contains
 
 			call destroyRecord(r)
 			call destroyPM1D(pm)
+            print *, 'theta=',A(2),', J=',J
 		end do
 
         call MPI_FILE_CLOSE(thefile, mpih%ierr)            

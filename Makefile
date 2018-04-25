@@ -14,7 +14,7 @@ PNETCDFLIBS=
 
 LIBS    = $(FFTWLIBS)
 
-EXE = exec
+EXE = landau_Jtheta3
 F90SRC = main.f90 \
 		modInputHelper.f90 \
 		constants.f90 \
