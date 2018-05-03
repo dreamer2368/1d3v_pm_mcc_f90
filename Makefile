@@ -6,7 +6,7 @@ SRCDIR = src
 OBJDIR = obj
 MODDIR = mod
 
-FFTWLIBS=/g/g92/chung28/Programs/FFTW/lib/libfftw3.a
+FFTWLIBS=/home/schung58/Programs/FFTW/lib/libfftw3.a
 VECLIBSMACOSX=
 LAPACKLIB=-L/opt/local/lib/lapack-3.5.0 -llapack -lblas
 BLASLIB=/opt/local/lib/lapack-3.5.0/librefblas.a
@@ -14,7 +14,7 @@ PNETCDFLIBS=
 
 LIBS    = $(FFTWLIBS)
 
-EXE = landau_Jtheta3
+EXE = debye
 F90SRC = main.f90 \
 		modInputHelper.f90 \
 		constants.f90 \

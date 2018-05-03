@@ -4,17 +4,19 @@ test2 = 1.2E-5
 test3 = 24
 
 #Print out simulation details
-print_simulation_detail = true
+print_simulation_detail = false
 
 #Base simulation parameters
-simulation_time = 150.0
-number_of_particles = 1E5
+simulation_time = 500.0
+number_of_particles = 1000000
 number_of_grids = 64
 number_of_injecting_particles = 5E4
 population_limit = 5E4
-base_directory = 'Debye'
+#base_directory = 'N1E6/Debye'
+base_directory = 'N1E6/Debye_perturbed'
 
 parameters_of_interest/001 = 1.5
+#parameters_of_interest/002 = 0.0
 parameters_of_interest/002 = 1.0e-9
 
 #Adjoint convergence test time
