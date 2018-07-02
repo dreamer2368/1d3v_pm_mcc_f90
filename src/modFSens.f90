@@ -2,13 +2,20 @@ module modFSens
 
 	use modBC
 	use modRecord
+    use modAssign
+    use modInputHelper
 
 	implicit none
+
+    integer, parameter :: COLLOCATED = 492, NONCOLLOCATED = 493, INJECTION = 494
 
 	type, extends(PM1D) :: FSens
 		real(mp) :: Lv, dv
 		integer :: ngv
-		real(mp), allocatable :: j(:,:), f_A(:,:)
+		real(mp), allocatable :: J(:,:), n_A(:,:), Dvf(:,:)     !For source term
+		real(mp), allocatable :: f_A(:,:)                       !For remapping procedure
+
+        integer :: scheme                                       !COLLOCATED, NONCOLLOCATED, INJECTION        
 
 		integer :: NInject										!Number of injecting particle per direction
 		real(mp), allocatable :: xp_inject(:), vp_inject(:,:), frac_inject(:,:,:)
@@ -20,12 +27,11 @@ module modFSens
 	contains
 		procedure, pass(dpm) :: buildFSens
 		procedure, pass(this) :: destroyFSens
-		procedure, pass(this) :: FSensDistribution
-		procedure, pass(this) :: FSensDistribution_sync
+		procedure, pass(this) :: FDistribution
+		procedure, pass(this) :: FVelocityGradient
 		procedure, pass(dpm) :: FSensSourceTerm
 		procedure, pass(this) :: InjectSource
 		procedure, pass(this) :: Redistribute
-		procedure, pass(this) :: Redistribute_temp
 		procedure, pass(this) :: numberDensity
 		procedure, pass(this) :: updateWeight
 	end type
@@ -53,15 +59,30 @@ contains
 		dpm%Lv = Lv
 		dpm%ngv = Ngv
 		dpm%dv = Lv/Ngv
-		allocate(dpm%j(pm%ng,2*Ngv+1))
+		allocate(dpm%J(pm%ng,2*Ngv+1))
 		allocate(dpm%f_A(pm%ng,2*Ngv+1))
-		dpm%j = 0.0_mp
+		allocate(dpm%n_A(pm%ng,2*Ngv+1))
+		allocate(dpm%Dvf(pm%ng,2*Ngv+1))
+		dpm%J = 0.0_mp
+		dpm%n_A = 0.0_mp
 		dpm%f_A = 0.0_mp
+		dpm%Dvf = 0.0_mp
 
-		call createDistribution(dpm,dpm%NInject,dpm%xp_inject,dpm%vp_inject,	&
-										dpm%g_inject,dpm%gv_inject,dpm%frac_inject)
-		call createDistribution(dpm,dpm%NLimit,dpm%xp_remesh,dpm%vp_remesh,	&
-										dpm%g_remesh,dpm%gv_remesh,dpm%frac_remesh)
+        select case( getOption('sensitivity_pdf/discretization','non-collocated') )
+            case('collocated')
+                dpm%scheme = COLLOCATED
+            case('non-collocated')
+                dpm%scheme = NONCOLLOCATED
+            case('injection')
+                dpm%scheme = INJECTION
+        end select
+
+        if( dpm%scheme.eq.INJECTION ) then
+    		call createDistribution(dpm,dpm%NInject,dpm%xp_inject,dpm%vp_inject,	&
+	    									dpm%g_inject,dpm%gv_inject,dpm%frac_inject)
+	    	call createDistribution(dpm,dpm%NLimit,dpm%xp_remesh,dpm%vp_remesh,	    &
+		    								dpm%g_remesh,dpm%gv_remesh,dpm%frac_remesh)
+        end if
 	end subroutine
 
 	subroutine destroyFSens(this)
@@ -69,24 +90,27 @@ contains
 		integer :: i
 
 		call destroyPM1D(this)
-		deallocate(this%j)
+		deallocate(this%J)
+		deallocate(this%n_A)
 		deallocate(this%f_A)
-		deallocate(this%xp_inject)
-		deallocate(this%vp_inject)
-		deallocate(this%g_inject)
-		deallocate(this%gv_inject)
-		deallocate(this%frac_inject)
-		deallocate(this%xp_remesh)
-		deallocate(this%vp_remesh)
-		deallocate(this%g_remesh)
-		deallocate(this%gv_remesh)
-		deallocate(this%frac_remesh)
+		deallocate(this%Dvf)
+        if( this%scheme.eq.INJECTION ) then
+    		deallocate(this%xp_inject)
+    		deallocate(this%vp_inject)
+    		deallocate(this%g_inject)
+    		deallocate(this%gv_inject)
+    		deallocate(this%frac_inject)
+    		deallocate(this%xp_remesh)
+    		deallocate(this%vp_remesh)
+    		deallocate(this%g_remesh)
+    		deallocate(this%gv_remesh)
+    		deallocate(this%frac_remesh)
+        end if
 	end subroutine
 
-	subroutine FSensSourceTerm(dpm,qs,ms,f,E,nk,fsr)							!Take v-derivative, Multiply dE
+	subroutine FSensSourceTerm(dpm,qs,ms,nk,fsr)							!Take v-derivative, Multiply dE
 		class(FSens), intent(inout) :: dpm
-		real(mp), intent(inout) :: f(dpm%m%ng,2*dpm%ngv+1)
-		real(mp), intent(in) :: qs,ms,E(dpm%m%ng)
+		real(mp), intent(in) :: qs,ms
 		integer, intent(in), optional :: nk
 		type(recordData), intent(in), optional :: fsr
 		integer :: ng,ngv,kr,i
@@ -99,52 +123,27 @@ contains
 		dx = dpm%m%dx
 		dv = dpm%dv
 
-		!Gradient in v direction
-!		do i=1,ng
-!			dpm%j(i,2:2*ngv) = ( f(i,3:2*ngv+1)-f(i,1:2*ngv-1) )/2.0_mp/dv
-!		end do
-!		dpm%j(:,1) = 0.0_mp
-!		dpm%j(:,2*ngv+1) = 0.0_mp
-		Dvf(:,2:2*ngv) = ( f(:,3:2*ngv+1)-f(:,1:2*ngv-1) )/2.0_mp/dv
-		Dvf(:,1) = 0.0_mp
-		Dvf(:,2*ngv+1) = 0.0_mp
-		dpm%j=Dvf
-
-!		if( present(nk) ) then
-!			if( (fsr%mod.eq.1) .or. (mod(nk,fsr%mod).eq.0) ) then
-!				kr = merge(nk,nk/fsr%mod,fsr%mod.eq.1)
-!				write(kstr,*) kr
-!				open(unit=305,file='data/'//fsr%dir//'/Dvf_'//trim(adjustl(kstr))//'.bin',	&
-!						status='replace',form='unformatted',access='stream')
-!				write(305) this%j
-!				close(305)
-!			end if
-!		end if
-
-		!Multiply E_A, E
-		!v_T,Q
+		!Multiply E_A
 		E_temp = qs/ms*dpm%m%E
-		!qp
-!		E_temp = qs/ms*dpm%m%E + 1.0_mp/ms*E
 		do i=1,2*ngv+1
-			dpm%j(:,i) = dpm%j(:,i)*E_temp
-		end do
+			dpm%J(:,i) = dpm%Dvf(:,i)*E_temp 
+        end do
 
 		!Multiply dt
-		dpm%j = -dpm%j*dpm%dt
+		dpm%J = -dpm%J*dpm%dt
 	end subroutine
 
-	subroutine InjectSource(this,p,f)
+	subroutine InjectSource(this,p,J)
 		class(FSens), intent(inout) :: this
 		type(species), intent(inout) :: p
-		real(mp), intent(in), dimension(this%m%ng,2*this%ngv+1) :: f
+		real(mp), intent(in), dimension(this%m%ng,2*this%ngv+1) :: J
 		real(mp) :: spwt0(this%NInject)
 		logical, dimension(this%NInject) :: IsNonTrivial
 		real(mp) :: maxspwt
 		integer :: N0
 		real(mp), allocatable :: v0(:,:)
 
-		call SourceAssign(f,this%L,this%Lv,this%g_inject,this%gv_inject,this%frac_inject,spwt0)
+		call SourceAssign(J,this%L,this%Lv,this%g_inject,this%gv_inject,this%frac_inject,spwt0)
 		maxspwt = MAXVAL(ABS(spwt0))
 		IsNonTrivial = (ABS(spwt0).ge.maxspwt*1e-8)
 		N0 = COUNT(IsNonTrivial)
@@ -156,8 +155,8 @@ contains
 		deallocate(v0)
 	end subroutine
 
-	subroutine SourceAssign(f,Lx,Lv,g,gv,frac,spwt0)
-		real(mp), intent(in) :: f(:,:)
+	subroutine SourceAssign(J,Lx,Lv,g,gv,frac,spwt0)
+		real(mp), intent(in) :: J(:,:)
 		real(mp), intent(in) :: Lx,Lv
 		integer, intent(in) :: g(:,:), gv(:,:)
 		real(mp), intent(in) :: frac(:,:,:)
@@ -166,7 +165,7 @@ contains
 		N = size(g,2)
 
 		do k=1,N
-			spwt0(k) = SUM( f(g(:,k),gv(:,k))*frac(:,:,k) )*Lx*2.0_mp*Lv/N
+			spwt0(k) = SUM( J(g(:,k),gv(:,k))*frac(:,:,k) )*Lx*2.0_mp*Lv/N
 		end do
 	end subroutine
 
@@ -226,7 +225,7 @@ contains
 		end do
 	end subroutine
 
-	subroutine FSensDistribution(this,p,a)
+	subroutine FDistribution(this,p,a)
 		class(FSens), intent(inout) :: this
 		type(species), intent(in) :: p
 		type(pmAssign), intent(in) :: a
@@ -250,24 +249,38 @@ contains
 		this%f_A(:,2*this%ngv+1) = this%f_A(:,2*this%ngv+1)*2.0_mp
 	end subroutine
 
-	subroutine Redistribute(this,p,a)
-		class(FSens), intent(inout) :: this
-		type(species), intent(inout) :: p
-		type(pmAssign), intent(in) :: a
-		real(mp) :: spwt0(this%NLimit)
-		integer :: i
-		if( p%np.ge.3*this%NLimit ) then
-			call this%FSensDistribution(p,a)
-			call SourceAssign(this%f_A,this%L,this%Lv,this%g_remesh,this%gv_remesh,this%frac_remesh,spwt0)
-			call p%setSpecies(this%NLimit,this%xp_remesh,this%vp_remesh,spwt0)
-		end if
-	end subroutine
-
-	subroutine numberDensity(this,p,a,N_A)
+	subroutine FVelocityGradient(this,p,a)
 		class(FSens), intent(inout) :: this
 		type(species), intent(in) :: p
 		type(pmAssign), intent(in) :: a
-		real(mp), dimension(this%m%ng, 2*this%ngv+1), intent(inout) :: N_A
+		integer :: i,k, g(a%order+1), gv(3)
+		real(mp) :: vp, fracv(3)
+
+		!DvF to phase space
+		this%Dvf = 0.0_mp
+		do k = 1, p%np
+			vp = p%vp(k,1)
+            call assign_TSC_derivative(vp,this%dv,gv,fracv)	!for velocity derivative interpolation
+            where( abs(gv)>this%ngv )
+                gv = 0
+                fracv = 0.0_mp
+            elsewhere
+                gv = gv + this%ngv + 1
+            end where
+			g = a%g(:,k)
+
+            do i=1,3
+			    this%Dvf(g,gv(i)) = this%Dvf(g,gv(i)) + p%spwt(k)/this%m%dx/this%dv*a%frac(:,k)*fracv(i)
+            end do
+		end do
+		this%Dvf(:,1) = this%Dvf(:,1)*2.0_mp
+		this%Dvf(:,2*this%ngv+1) = this%Dvf(:,2*this%ngv+1)*2.0_mp
+	end subroutine
+
+	subroutine numberDensity(this,p,a)
+		class(FSens), intent(inout) :: this
+		type(species), intent(in) :: p
+		type(pmAssign), intent(in) :: a
 		real(mp), dimension(this%m%ng,2*this%ngv+3) :: n_temp
 		integer :: i,k, g(a%order+1), g_v(2)
 		real(mp) :: frac(2,2)
@@ -285,8 +298,6 @@ contains
 			vgl = FLOOR(vp/this%dv) + this%ngv+2
 			vgr = vgl+1
 			if( vgl<1 .or. vgr>2*this%ngv+3 )	then
-!				this%gv(:,k) = this%ngv
-!				this%frac(:,:,k) = 0.0_mp
 				cycle
 			end if
 			g = g_x(:,k)
@@ -295,26 +306,14 @@ contains
 			frac(:,1) = (1.0_mp-h)*frac_x(:,k)
 			frac(:,2) = h*frac_x(:,k)
 			n_temp(g,g_v) = n_temp(g,g_v) + frac/this%m%dx/this%dv
-
-!			this%gv(:,k) = g_v-1
-!			this%frac(:,:,k) = frac
-!			if( vgl.eq.1 ) then
-!				this%frac(:,1,k) = 0.0_mp
-!				this%gv(1,k) = this%ngv+2
-!			end if
-!			if( vgr.eq.2*this%ngv+3 ) then
-!				this%frac(:,2,k) = 0.0_mp
-!				this%gv(2,k) = this%ngv+2
-!			end if
 		end do
-		N_A = N_A + n_temp(:,2:2*this%ngv+2)
+        this%n_A = n_temp(:,2:2*this%ngv+2)
 	end subroutine
 
-	subroutine updateWeight(this,p,a,n_A,j)
+	subroutine updateWeight(this,p,a)
 		class(FSens), intent(inout) :: this
 		type(species), intent(inout) :: p
 		type(pmAssign), intent(in) :: a
-		real(mp), dimension(this%m%ng,2*this%ngv+1), intent(in) :: n_A, j
 		integer :: i,k, g(a%order+1), g_v(2)
 		real(mp) :: frac(2,2)
 		integer :: vgl, vgr, k_temp
@@ -337,13 +336,11 @@ contains
 			h = vp/this%dv - FLOOR(vp/this%dv)
 			frac(:,1) = (1.0_mp-h)*frac_x(:,k)
 			frac(:,2) = h*frac_x(:,k)
-			p%spwt(k) = p%spwt(k) + SUM( j(g,g_v)*frac/n_A(g,g_v) )
-!			g=g_x(:,k)
-!			p%spwt(k) = p%spwt(k) + SUM( j(g,this%gv(:,k))*this%frac(:,:,k)/n_A(g,this%gv(:,k)) )
+			p%spwt(k) = p%spwt(k) + SUM( this%J(g,g_v)*frac/this%n_A(g,g_v) )
 		end do
 	end subroutine
 
-	subroutine FSensDistribution_sync(this,p,a)
+	subroutine FDistribution_sync(this,p,a)
 		class(FSens), intent(inout) :: this
 		type(species), intent(in) :: p
 		type(pmAssign), intent(in) :: a
@@ -369,11 +366,11 @@ contains
 			n_temp(g,gv) = n_temp(g,gv) + frac/this%m%dx/this%dv
 			f_temp(g,gv) = f_temp(g,gv) + p%spwt(k)*frac/this%m%dx/this%dv
 		end do
-		this%f_A = n_temp(:,2:2*this%ngv+2)
-		this%j = f_temp(:,2:2*this%ngv+2)
+		this%n_A = n_temp(:,2:2*this%ngv+2)
+		this%f_A = f_temp(:,2:2*this%ngv+2)
 	end subroutine
 
-	subroutine Redistribute_temp(this,p)
+	subroutine Redistribute(this,p)
 		class(FSens), intent(inout) :: this
 		type(species), intent(inout) :: p
 		real(mp), dimension(this%NLimit) :: spwt0

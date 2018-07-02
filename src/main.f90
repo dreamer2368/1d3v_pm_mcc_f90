@@ -42,12 +42,12 @@ program main
 !	call random_test
 !   call Landau_adjoint_sampling
 !   call twostream_adjoint_sampling
-	call debye_shielding
+!	call debye_shielding
 !	call debye_characterization
 !	call InjectionTest
 !	call MPITest
 !	call SensitivityInitializeTest
-!	call Debye_sensitivity
+	call Debye_sensitivity
 !	call forYeoh
 !	call RedistributionTest
 !	call updateWeightTest

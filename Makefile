@@ -6,7 +6,7 @@ SRCDIR = src
 OBJDIR = obj
 MODDIR = mod
 
-FFTWLIBS=/home/schung58/Programs/FFTW/lib/libfftw3.a
+FFTWLIBS=/g/g92/chung28/Programs/fftw-3.3.8/lib/libfftw3.a
 VECLIBSMACOSX=
 LAPACKLIB=-L/opt/local/lib/lapack-3.5.0 -llapack -lblas
 BLASLIB=/opt/local/lib/lapack-3.5.0/librefblas.a
@@ -14,7 +14,7 @@ PNETCDFLIBS=
 
 LIBS    = $(FFTWLIBS)
 
-EXE = debye
+EXE = exec
 F90SRC = main.f90 \
 		modInputHelper.f90 \
 		constants.f90 \
@@ -86,7 +86,8 @@ $(OBJDIR)/modRecord.o : $(OBJDIR)/modPM1D.o
 $(OBJDIR)/modAdj.o : $(OBJDIR)/modPM1D.o
 $(OBJDIR)/modQoI.o : $(OBJDIR)/modAdj.o
 $(OBJDIR)/modFSens.o : $(OBJDIR)/modBC.o \
-						$(OBJDIR)/modRecord.o
+						$(OBJDIR)/modRecord.o \
+						$(OBJDIR)/modInputHelper.o
 $(OBJDIR)/init.o : $(OBJDIR)/modFSens.o
 $(OBJDIR)/modTarget.o : $(OBJDIR)/modAdj.o \
 						$(OBJDIR)/random.o

@@ -56,7 +56,7 @@ contains
 		call fs%buildFSens(pm,Lv,Ng/2,NInject,NLimit)
 		call fs%p(1)%buildSpecies(1.0_mp,1.0_mp)
 		call fs%p(1)%setSpecies(NLimit,pm%p(1)%xp,pm%p(1)%vp,pm%p(1)%spwt)
-		call Redistribute_temp(fs,fs%p(1))
+		call Redistribute(fs,fs%p(1))
 
 		open(unit=301,file='data/redistribution/xp0.bin',status='replace',form='unformatted',access='stream')
 		open(unit=302,file='data/redistribution/vp0.bin',status='replace',form='unformatted',access='stream')
@@ -175,7 +175,7 @@ contains
 			fs%a(1)%frac(:,k) = frac
 		end do
 
-		call fs%FSensDistribution(fs%p(1),fs%a(1))
+		call fs%FDistribution(fs%p(1),fs%a(1))
 
 		open(unit=300,file='data/updateWeightTest/record.bin',status='replace',form='unformatted',access='stream')
 		open(unit=301,file='data/updateWeightTest/xp.bin',status='replace',form='unformatted',access='stream')
@@ -193,13 +193,13 @@ contains
 		close(303)
 		close(304)
 
-		j = -1.0_mp
+		fs%J = -1.0_mp
 
-		call fs%updateWeight(fs%p(1),fs%a(1),fs%f_A,j)
+		call fs%updateWeight(fs%p(1),fs%a(1))
 		open(unit=304,file='data/updateWeightTest/n_A.bin',status='replace',form='unformatted',access='stream')
 		write(304) fs%f_A
 		close(304)
-		call fs%FSensDistribution(fs%p(1),fs%a(1))
+		call fs%FDistribution(fs%p(1),fs%a(1))
 
 		open(unit=304,file='data/updateWeightTest/f_A_after.bin',status='replace',form='unformatted',access='stream')
 		write(304) fs%f_A
@@ -244,7 +244,7 @@ contains
 			fs%a(1)%frac(:,k) = frac
 		end do
 
-		call fs%FSensDistribution(fs%p(1),fs%a(1))
+		call fs%FDistribution(fs%p(1),fs%a(1))
 
 		open(unit=300,file='data/RedistributionTest/record.bin',status='replace',form='unformatted',access='stream')
 		open(unit=301,file='data/RedistributionTest/xp.bin',status='replace',form='unformatted',access='stream')
@@ -262,8 +262,8 @@ contains
 		close(303)
 		close(304)
 
-		call fs%Redistribute(fs%p(1),fs%a(1))
-		call fs%FSensDistribution(fs%p(1),fs%a(1))
+		call fs%Redistribute(fs%p(1))
+		call fs%FDistribution(fs%p(1),fs%a(1))
 
 		open(unit=301,file='data/RedistributionTest/xp_rdst.bin',status='replace',form='unformatted',access='stream')
 		open(unit=302,file='data/RedistributionTest/vp_rdst.bin',status='replace',form='unformatted',access='stream')
@@ -314,8 +314,8 @@ contains
 			fs%a(1)%frac(:,k) = frac
 		end do
 		fs%m%E = 1.0_mp
-		call fs%FSensDistribution(pm%p(1),pm%a(1))
-		call fs%FSensSourceTerm(pm%p(1)%qs,pm%p(1)%ms,fs%f_A,pm%m%E)
+		call fs%FVelocityGradient(pm%p(1),pm%a(1))
+		call fs%FSensSourceTerm(pm%p(1)%qs,pm%p(1)%ms)
 
 		open(unit=301,file='data/SensitivityInitTest/xp.bin',status='replace',form='unformatted',access='stream')
 		open(unit=302,file='data/SensitivityInitTest/vp.bin',status='replace',form='unformatted',access='stream')
@@ -389,8 +389,8 @@ contains
 			pm%a(1)%frac(:,k) = frac
 		end do
 
-		call fs%FSensDistribution(pm%p(1),pm%a(1))
-		call fs%FSensSourceTerm(pm%p(1)%qs,pm%p(1)%ms,fs%f_A,pm%m%E)
+		call fs%FVelocityGradient(pm%p(1),pm%a(1))
+		call fs%FSensSourceTerm(pm%p(1)%qs,pm%p(1)%ms)
 
 		open(unit=300,file='data/InjectionTest/record.bin',status='replace',form='unformatted',access='stream')
 		open(unit=301,file='data/InjectionTest/xp.bin',status='replace',form='unformatted',access='stream')
@@ -426,7 +426,7 @@ contains
 			fs%a(1)%g(:,k) = g
 			fs%a(1)%frac(:,k) = frac
 		end do
-		call fs%FSensDistribution(fs%p(1),fs%a(1))
+		call fs%FDistribution(fs%p(1),fs%a(1))
 
 		open(unit=301,file='data/InjectionTest/xp_inject.bin',status='replace',form='unformatted',access='stream')
 		open(unit=302,file='data/InjectionTest/vp_inject.bin',status='replace',form='unformatted',access='stream')

@@ -134,6 +134,33 @@ contains
 		frac = (/ fracl, frac0, fracr /)
 	end subroutine
 
+	subroutine assign_TSC_derivative(vp,dv,gv,fracv)	!for velocity derivative interpolation
+		real(mp), intent(in) :: vp, dv
+		integer, intent(out) :: gv(3)
+		real(mp), intent(out) :: fracv(3)
+		integer :: i, np
+		integer :: g0		!nearest grid point
+		integer :: gl		!left grid point
+		integer :: gr		!right grid point
+		real(mp) :: fracl		!fraction for left grid point
+		real(mp) :: frac0		!fraction for nearest grid point
+		real(mp) :: fracr		!fraction for right grid point
+		real(mp) :: h			!distance from nearest grid point
+
+		!assignment matrix
+		g0 = FLOOR(vp/dv + 0.5_mp)
+		gl = g0-1
+		gr = g0+1
+		h = vp/dv - g0
+
+		frac0 = - 2.0_mp*h/dv
+		fracl = (0.5_mp+h)/dv
+		fracr = -(0.5_mp-h)/dv
+
+		gv = (/gl,g0,gr/)
+		fracv = (/ fracl, frac0, fracr /)
+	end subroutine
+
 	subroutine chargeAssign(this,p,m)
 		class(pmAssign), intent(inout) :: this
 		type(species), intent(inout) :: p

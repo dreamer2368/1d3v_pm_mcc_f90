@@ -5,6 +5,33 @@ module timeStepFSens
 
 	implicit none
 
+	abstract interface
+		subroutine updateSensitivity(dpm,pm,PtrControl,PtrSource,k,r)
+            use modFSens
+			use modPM1D
+            use modRecord
+            use modSource, only: source, Null_source
+            use modTarget, only: control, Null_input
+            type(FSens), intent(inout) :: dpm
+			type(PM1D), intent(in) :: pm
+            type(recordData), intent(inout) :: r
+            procedure(control), pointer :: PtrControl=>NULL()
+            procedure(source), pointer :: PtrSource=>NULL()
+			integer, intent(in) :: k
+		end subroutine
+	end interface
+
+    abstract interface
+        subroutine integrateG(dpm,pm,r)
+            use modFSens
+            use modPM1D
+            use modRecord
+            type(FSens), intent(inout) :: dpm
+            type(PM1D), intent(in) :: pm
+            type(recordData), intent(inout) :: r
+        end subroutine
+    end interface
+
 contains
 !===============Forward, continuum Sensitivity
 
@@ -22,16 +49,29 @@ contains
 		real(mp) :: time1, time2
 		procedure(control), pointer :: PtrControl=>NULL()
 		procedure(source), pointer :: PtrSource=>NULL()
+        procedure(updateSensitivity), pointer :: PtrUpdate=>NULL()
+        procedure(integrateG), pointer :: PtrIntegrateG=>NULL()
 		if( PRESENT(inputControl) ) then
-                        PtrControl=>inputControl
-                else
-                        PtrControl=>Null_input
-                end if
+           PtrControl=>inputControl
+        else
+           PtrControl=>Null_input
+        end if
 		if( PRESENT(inputSource) ) then
-                        PtrSource=>inputSource
-                else 
-                        PtrSource=>Null_source
-                end if       
+           PtrSource=>inputSource
+        else 
+           PtrSource=>Null_source
+        end if      
+        select case(dpm%scheme)
+            case(COLLOCATED)
+                PtrUpdate=>updateSensitivityCollocated
+                PtrIntegrateG=>integrateGCollocated
+            case(NONCOLLOCATED)
+                PtrUpdate=>updateSensitivityNonCollocated
+                PtrIntegrateG=>integrateGNonCollocated
+            case(INJECTION)
+                PtrUpdate=>updateSensitivityNonCollocated
+                PtrIntegrateG=>integrateGInjection
+        end select 
 		J = 0.0_mp
 		grad = 0.0_mp
 		J_hist = 0.0_mp
@@ -55,55 +95,23 @@ contains
 !		close(305)
 		do k=1,this%nt
 			call updatePlasma(this,PtrControl,PtrSource,k,r)
+
 			call inputQoI(this,k,J)
 			J_hist(k) = J
 			call r%recordPlasma(this, k)									!record for n=1~Nt
 
-			call updateSensitivity(dpm,this,PtrControl,PtrSource,k,dr)
-
-			do i=1,dpm%n
-				!For Synchronized weight-updating
-!				dpm%p(i)%xp=this%p(i)%xp
-!				dpm%p(i)%vp=this%p(i)%vp
-
-				call CPU_TIME(time1)
-				call dpm%FSensDistribution(this%p(i),this%a(i))
-				!Synchronized
-!				call dpm%FSensSourceTerm(this%p(i)%qs,this%p(i)%ms,dpm%j,this%m%E)
-				!Asynchronous
-				call dpm%FSensSourceTerm(this%p(i)%qs,this%p(i)%ms,dpm%f_A,this%m%E)
-				call CPU_TIME(time2)
-				dr%cpt_temp(8) = dr%cpt_temp(8) + (time2-time1)
-
-				!InjectSource+Remeshing
-!				call dpm%Redistribute(dpm%p(i),dpm%a(i))
-!				call dpm%InjectSource(dpm%p(i),dpm%j)
-				call CPU_TIME(time1)
-				dr%cpt_temp(9) = dr%cpt_temp(9) + (time1-time2)
-
-!				call dpm%Redistribute_temp(dpm%p(i))
-
-				!Weight updating
-            !Synchronized
-!				call dpm%updateWeight(dpm%p(i),this%a(i),dpm%f_A,dpm%j)
-            !Asynchronous
-				dpm%f_A = 0.0_mp
-				call dpm%numberDensity(dpm%p(i),dpm%a(i),dpm%f_A)
-				call dpm%updateWeight(dpm%p(i),dpm%a(i),dpm%f_A,dpm%j)
-				call CPU_TIME(time2)
-				dr%cpt_temp(10) = dr%cpt_temp(10) + (time2-time1)
-			end do
-
-			call inputQoI(dpm,k,grad)
-			grad_hist(k) = grad
-			call dr%recordPlasma(dpm, k)
+			call PtrUpdate(dpm,this,PtrControl,PtrSource,k,dr)
 
 			if( (dr%mod.eq.1) .or. (mod(k,dr%mod).eq.0) ) then
 				kr = merge(k,k/dr%mod,dr%mod.eq.1)
 				write(kstr,*) kr
 				open(unit=305,file='data/'//dr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
 						status='replace',form='unformatted',access='stream')
-				call dpm%FSensDistribution(dpm%p(1),this%a(1))
+                if( dpm%scheme.eq.COLLOCATED ) then
+				    call dpm%FDistribution(dpm%p(1),this%a(1))
+                else
+				    call dpm%FDistribution(dpm%p(1),dpm%a(1))
+                end if
 				write(305) dpm%f_A
 				close(305)
 !				open(unit=305,file='data/'//dr%dir//'/j_'//trim(adjustl(kstr))//'.bin',	&
@@ -111,6 +119,12 @@ contains
 !				write(305) dpm%j
 !				close(305)
 			end if
+
+            call PtrIntegrateG(dpm,this,dr)
+
+			call inputQoI(dpm,k,grad)
+			grad_hist(k) = grad
+			call dr%recordPlasma(dpm, k)
 		end do
 		open(unit=305,file='data/'//dr%dir//'/grad_hist.bin',	&
 					status='replace',form='unformatted',access='stream')
@@ -167,12 +181,14 @@ contains
 		end do
 	end subroutine
 
-	subroutine updateSensitivity(dpm,pm,PtrControl,PtrSource,k,r)
+!==========================updateSensitivity procedures===========================
+
+	subroutine updateSensitivityNonCollocated(dpm,pm,PtrControl,PtrSource,k,r)
 		type(FSens), intent(inout) :: dpm
 		type(PM1D), intent(in) :: pm
 		procedure(control), pointer :: PtrControl
 		procedure(source), pointer :: PtrSource
-		type(recordData), intent(inout), optional :: r
+		type(recordData), intent(inout) :: r
 		integer, intent(in) :: k
 		real(mp) :: rhs(dpm%ng-1), phi1(dpm%ng-1)
 		real(mp) :: dt, L
@@ -243,12 +259,12 @@ contains
 !		end if
 	end subroutine
 
-	subroutine updateSensitivity_sync(dpm,pm,PtrControl,PtrSource,k,r)
+	subroutine updateSensitivityCollocated(dpm,pm,PtrControl,PtrSource,k,r)
 		type(FSens), intent(inout) :: dpm
 		type(PM1D), intent(in) :: pm
 		procedure(control), pointer :: PtrControl
 		procedure(source), pointer :: PtrSource
-		type(recordData), intent(inout), optional :: r
+		type(recordData), intent(inout) :: r
 		integer, intent(in) :: k
 		real(mp) :: rhs(dpm%ng-1), phi1(dpm%ng-1)
 		real(mp) :: dt, L
@@ -310,5 +326,83 @@ contains
 		call CPU_TIME(time2)
 		r%cpt_temp(7) = r%cpt_temp(7) + (time2-time1)/r%mod
 	end subroutine
+
+!=======================integrateG procedure============================
+
+    subroutine integrateGNonCollocated(dpm,pm,r)
+        type(FSens), intent(inout) :: dpm
+        type(PM1D), intent(in) :: pm
+        type(recordData), intent(inout) :: r
+        integer :: i
+        real(mp) :: time1, time2
+
+		do i=1,dpm%n
+			call CPU_TIME(time1)
+			call dpm%FVelocityGradient(pm%p(i),pm%a(i))
+			call dpm%FSensSourceTerm(pm%p(i)%qs,pm%p(i)%ms)
+			call CPU_TIME(time2)
+			r%cpt_temp(8) = r%cpt_temp(8) + (time2-time1)
+
+			call CPU_TIME(time1)
+			r%cpt_temp(9) = r%cpt_temp(9) + (time1-time2)
+
+			call dpm%numberDensity(dpm%p(i),dpm%a(i))
+			call dpm%updateWeight(dpm%p(i),dpm%a(i))
+			call CPU_TIME(time2)
+			r%cpt_temp(10) = r%cpt_temp(10) + (time2-time1)
+		end do
+    end subroutine
+
+    subroutine integrateGInjection(dpm,pm,r)
+        type(FSens), intent(inout) :: dpm
+        type(PM1D), intent(in) :: pm
+        type(recordData), intent(inout) :: r
+        integer :: i
+        real(mp) :: time1, time2
+
+        do i=1,dpm%n
+			call CPU_TIME(time1)
+			call dpm%FVelocityGradient(pm%p(i),pm%a(i))
+			call dpm%FSensSourceTerm(pm%p(i)%qs,pm%p(i)%ms)
+			call CPU_TIME(time2)
+			r%cpt_temp(8) = r%cpt_temp(8) + (time2-time1)
+
+			!InjectSource+Remeshing
+			call dpm%InjectSource(dpm%p(i),dpm%J)
+			call CPU_TIME(time1)
+			r%cpt_temp(9) = r%cpt_temp(9) + (time1-time2)
+
+			call dpm%Redistribute(dpm%p(i))
+			call CPU_TIME(time2)
+			r%cpt_temp(10) = r%cpt_temp(10) + (time2-time1)
+		end do
+    end subroutine
+
+    subroutine integrateGCollocated(dpm,pm,r)
+        type(FSens), intent(inout) :: dpm
+        type(PM1D), intent(in) :: pm
+        type(recordData), intent(inout) :: r
+        integer :: i
+        real(mp) :: time1, time2
+
+		do i=1,dpm%n
+			dpm%p(i)%xp=pm%p(i)%xp
+			dpm%p(i)%vp=pm%p(i)%vp
+
+			call CPU_TIME(time1)
+			call dpm%FVelocityGradient(pm%p(i),pm%a(i))
+			call dpm%FSensSourceTerm(pm%p(i)%qs,pm%p(i)%ms)
+			call CPU_TIME(time2)
+			r%cpt_temp(8) = r%cpt_temp(8) + (time2-time1)
+
+			call CPU_TIME(time1)
+			r%cpt_temp(9) = r%cpt_temp(9) + (time1-time2)
+
+			call dpm%numberDensity(dpm%p(i),pm%a(i))
+			call dpm%updateWeight(dpm%p(i),pm%a(i))
+			call CPU_TIME(time2)
+			r%cpt_temp(10) = r%cpt_temp(10) + (time2-time1)
+		end do
+    end subroutine
 
 end module
