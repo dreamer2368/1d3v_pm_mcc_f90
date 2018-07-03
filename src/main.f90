@@ -47,7 +47,7 @@ program main
 !	call InjectionTest
 !	call MPITest
 !	call SensitivityInitializeTest
-	call Debye_sensitivity
+!	call Debye_sensitivity
 !	call forYeoh
 !	call RedistributionTest
 !	call updateWeightTest
@@ -59,6 +59,7 @@ program main
 !    call MPI_write_test
 !    call FFTtest
 !    call Landau_Jtheta
+    call sheath_edge
 
 	! print to screen
     if( mpih%my_rank .eq. 0) then

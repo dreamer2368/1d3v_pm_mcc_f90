@@ -233,33 +233,27 @@ contains
 		call this%m%setMesh(rho_back*(/ ( 1, i=1,this%m%ng) /))
 	end subroutine
 
-	subroutine sheath_initialize(this,Ne,Ni,Te,Ti,Kb,n0)
+	subroutine sheath_initialize(this,Ne,Ni,tau,mu)
 		type(PM1D), intent(inout) :: this
 		integer, intent(in) :: Ne, Ni
-		real(mp), intent(in) :: Te, Ti, Kb, n0
+		real(mp), intent(in) :: tau, mu
 		real(mp) :: Vth_e, Vth_i
 		real(mp) :: xpe(Ne), vpe(Ne,3), spwt_e(Ne), xpi(Ni), vpi(Ni,3), spwt_i(Ni)
-		integer :: i,nseed,clock
-		integer, allocatable :: seed(:)
+        integer :: i
 
-		call RANDOM_SEED(size=nseed)
-		allocate(seed(nseed))
-		call SYSTEM_CLOCK(COUNT=clock)
-		seed = clock + 127*(/ ( i, i=1,nseed ) /)
-		call RANDOM_SEED(put=seed)
 		call RANDOM_NUMBER(xpe)
 		call RANDOM_NUMBER(xpi)
 		xpe = xpe*this%L
 		xpi = xpi*this%L
 
-		Vth_e = sqrt(2.0_mp*Kb*Te/this%p(1)%ms)
-		Vth_i = sqrt(2.0_mp*Kb*Ti/this%p(2)%ms)
+		Vth_e = 1.0_mp
+		Vth_i = sqrt(1.0_mp/mu/tau)
 		print *, 'Vth_e: ',Vth_e,', Vth_i: ',Vth_i
-		vpe = Vth_e/sqrt(2.0_mp)*randn(Ne,3)
-		vpi = Vth_i/sqrt(2.0_mp)*randn(Ni,3)
+		vpe = Vth_e*randn(Ne,3)
+		vpi = Vth_i*randn(Ni,3)
 
-		spwt_e = n0*this%L/Ne
-		spwt_i = n0*this%L/Ni
+		spwt_e = this%L/Ne
+		spwt_i = this%L/Ni
 
 		call this%p(1)%setSpecies(Ne,xpe,vpe,spwt_e)
 		call this%p(2)%setSpecies(Ni,xpi,vpi,spwt_i)
