@@ -59,7 +59,8 @@ program main
 !    call MPI_write_test
 !    call FFTtest
 !    call Landau_Jtheta
-    call sheath_edge
+!    call sheath_edge
+    call sheath_Jcurve
 
 	! print to screen
     if( mpih%my_rank .eq. 0) then

@@ -126,4 +126,14 @@ contains
 		end if
 	end subroutine
 
+!=================== sheath potential =============================
+
+    subroutine PhiAtWall(pm,k,J)
+        class(PM1D), intent(in) :: pm
+		integer, intent(in) :: k
+		real(mp), intent(inout) :: J
+        
+        J = J + 1.0_mp/pm%nt*( -pm%m%phi(pm%ng) )
+    end subroutine
+
 end module

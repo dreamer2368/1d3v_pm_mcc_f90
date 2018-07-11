@@ -14,7 +14,7 @@ PNETCDFLIBS=
 
 LIBS    = $(FFTWLIBS)
 
-EXE = exec
+EXE = sheath_Jcurve
 F90SRC = main.f90 \
 		modInputHelper.f90 \
 		constants.f90 \
