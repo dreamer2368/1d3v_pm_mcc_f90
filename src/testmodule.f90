@@ -797,6 +797,52 @@ contains
 		call destroyPM1D(reflux)
 	end subroutine
 
+	subroutine test_refluxing_boundary2
+		type(PM1D) :: reflux
+		type(recordData) :: r
+		integer, parameter :: Ng=64, N=1E4, order=1
+		real(mp), parameter :: Ti=20, Tf = 40, L=2.0_mp, v=1.0_mp
+		real(mp) :: xp0(N), vp0(N,3), spwt0(N) = L/N, rho_back(Ng), qe, me
+		integer :: i,k
+
+		call buildPM1D(reflux,Tf,Ti,Ng,1,pBC=3,mBC=2,order=order,A=(/ 1.0_mp, 1.0_mp /),L=L, dt = 0.1_mp)
+		call buildRecord(r,reflux%nt,1,reflux%L,Ng,'test_reflux',1)
+
+        call init_random_seed
+        call RANDOM_NUMBER(xp0)
+        call RANDOM_NUMBER(vp0)
+		xp0 = reflux%L*xp0
+		vp0 = v*randn(N,3)
+		rho_back = 0.0_mp
+		qe = -(0.1_mp)**2/(N/reflux%L)
+		me = -qe
+		rho_back(Ng) = -qe
+		call buildSpecies(reflux%p(1),qe,me)
+		call setSpecies(reflux%p(1),N,xp0,vp0,spwt0)
+		call setMesh(reflux%m,rho_back)
+
+        do k=1,reflux%nt
+		    do i=1,reflux%n
+			    call reflux%p(i)%moveSpecies(reflux%dt)
+		    end do
+
+	    	do i=1,reflux%n
+		    	call reflux%applyBC(reflux%p(i),reflux%m,reflux%dt,reflux%A0(i))
+	    	end do
+
+!    		reflux%m%rho = 0.0_mp
+!    		do i=1, reflux%n
+!    			call reflux%a(i)%chargeAssign(reflux%p(i),reflux%m)
+!    		end do
+
+	    	call recordPlasma(r,reflux,k)
+        end do
+		call printPlasma(r)
+
+		call destroyRecord(r)
+		call destroyPM1D(reflux)
+	end subroutine
+
 !	subroutine test_anewvel_Ar
 !		integer, parameter :: N = 10000
 !		real(mp) :: input(3) = (/ 0.0_mp, 1.0_mp, 0.0_mp /)

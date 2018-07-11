@@ -32,10 +32,10 @@ npsum1 = 1; npsum2 = 1;
 dx = L/(Ng-1);
 xg = dx*(0:Ng-1);
 
-%video clip
-writerObj = VideoWriter('field.avi');
-writerObj.FrameRate = 20;
-open(writerObj);
+% %video clip
+% writerObj = VideoWriter('field.avi');
+% writerObj.FrameRate = 20;
+% open(writerObj);
 
 for i=1:Nt
     figure(2)
@@ -48,21 +48,23 @@ for i=1:Nt
     set(gca,'fontsize',25);
     
     
-    %videoclip
-    frame = getframe(gcf);
-    writeVideo(writerObj,frame);
+%     %videoclip
+%     frame = getframe(gcf);
+%     writeVideo(writerObj,frame);
+
+    drawnow;
 %     pause();
 end
 
-% videoclip close
-close(writerObj);
+% % videoclip close
+% close(writerObj);
 
 %%
 close all
 dx = L/(Ng-1);
 xg = dx*(0:Ng-1);
 
-i=floor(1);
+for i=1:Nt;
     fileID = fopen(strcat('xp/',num2str(i),'_1.bin'));
     xp_e = fread(fileID,Np(1,i+1),'double');
     fileID = fopen(strcat('vp/',num2str(i),'_1.bin'));
@@ -78,8 +80,17 @@ i=floor(1);
     
     figure(2)
     histogram(vp_e);
+        
+    figure(3)
+    histogram(xp_e);
+    
+%     figure(4)
+%     plot(xg,rho(:,i),'-k');
     
     fclose('all');
+    
+    pause();
+end
 
 %%
 close all

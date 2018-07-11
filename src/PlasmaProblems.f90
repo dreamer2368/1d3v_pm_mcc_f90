@@ -174,8 +174,8 @@ contains
 	subroutine sheath_edge
 		type(PM1D) :: sheath
 		type(recordData) :: r
-		integer, parameter :: Ne = 1E5, Ni = 1E5, Ng = 64
-        real(mp), parameter :: tau = 1.0_mp, mu = 1836.0_mp, Z = 1.0_mp
+		integer, parameter :: Ne = 1E5, Ni = 1E5, Ng = 128
+        real(mp), parameter :: tau = 1.0_mp, mu = 100.0_mp, Z = 1.0_mp
         real(mp) :: L, dt, dx
 		real(mp) :: ve0, vi0, Time_f
 		real(mp) :: A(4)
@@ -190,14 +190,16 @@ contains
 		Time_f = 1.0_mp*L/vi0
 
 		A = (/ ve0, vi0, 0.2_mp, 1.0_mp*Ni /)
+!		A = (/ 0.1_mp, ve0, vi0, 1.0_mp*Ni /)
 		call buildPM1D(sheath,Time_f,0.0_mp,Ng,2,pBC=2,mBC=2,order=1,A=A,L=L,dt=dt)
 		call buildRecord(r,sheath%nt,2,sheath%L,sheath%ng,'Sheath',10)
 
 		call buildSpecies(sheath%p(1),-1.0_mp,1.0_mp)
 		call buildSpecies(sheath%p(2),Z,mu)
 
+        call init_random_seed
 		call sheath_initialize(sheath,Ne,Ni,tau,mu)
-		call forwardsweep(sheath,r,Null_input,PartialUniform_Rayleigh2)
+		call forwardsweep(sheath,r,Null_input,PartialUniform_Maxwellian2)
 
 		call printPlasma(r)
 

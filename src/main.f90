@@ -28,7 +28,7 @@ program main
 
 !	call cross_section
 !	call Procassini
-!	call test_refluxing_boundary
+!	call test_refluxing_boundary2
 !	call test_anewvel_Ar
 !	call test_mcc_electron
 !	call test_mcc_Argon

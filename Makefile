@@ -6,7 +6,7 @@ SRCDIR = src
 OBJDIR = obj
 MODDIR = mod
 
-FFTWLIBS=/g/g92/chung28/Programs/fftw-3.3.8/lib/libfftw3.a
+FFTWLIBS=/Users/Kevin/bin/FFTW/lib/libfftw3.a
 VECLIBSMACOSX=
 LAPACKLIB=-L/opt/local/lib/lapack-3.5.0 -llapack -lblas
 BLASLIB=/opt/local/lib/lapack-3.5.0/librefblas.a
