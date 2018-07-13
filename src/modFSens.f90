@@ -83,6 +83,7 @@ contains
 	    	call createDistribution(dpm,dpm%NLimit,dpm%xp_remesh,dpm%vp_remesh,	    &
 		    								dpm%g_remesh,dpm%gv_remesh,dpm%frac_remesh)
         end if
+print *, 'error1'
 	end subroutine
 
 	subroutine destroyFSens(this)

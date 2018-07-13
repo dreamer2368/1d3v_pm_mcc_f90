@@ -1,5 +1,6 @@
 module modBC
 
+    use modVelocityProfile
 	use modSpecies
 	use modMesh
 	use random
@@ -13,6 +14,19 @@ module modBC
 			type(species), intent(inout) :: p
 			type(mesh), intent(inout) :: m
 			real(mp), intent(in) :: dt, A0
+		end subroutine
+	end interface
+
+	abstract interface
+		subroutine applySensBC(p,m,dt,Lv,Nadd,inputVP)
+            use modSpecies
+            use modMesh
+            use modVelocityProfile
+			type(species), intent(inout) :: p
+			type(mesh), intent(inout) :: m
+			real(mp), intent(in) :: dt, Lv
+            integer, intent(in) ::  Nadd
+            procedure(velocityProfile) :: inputVP
 		end subroutine
 	end interface
 
@@ -171,5 +185,75 @@ contains
 			end if			
 		end do
 	end subroutine
+
+!=================== sensitivity particle BC ===============================
+
+    subroutine uniformParticleCustomRefluxing(p,m,dt,Lv,Nadd,inputVP)
+        type(species), intent(inout) :: p
+        type(mesh), intent(inout) :: m
+        real(mp), intent(in) :: dt, Lv
+        integer, intent(in) :: Nadd
+        procedure(velocityProfile) :: inputVP
+
+        integer :: Ninside, NxMax, NaddReal
+        real(mp) :: leftFlux, rightFlux
+        real(mp), allocatable :: xp(:), vp(:,:), spwt(:)
+        logical, dimension(p%np) :: left, right, inside
+
+        integer :: k, ksum, i
+        real(mp) :: dxp, dvp
+
+        NxMax = FLOOR(SQRT(2.0_mp*Nadd))
+        NaddReal = NxMax*(NxMax+1)/2
+
+        ! Out flux
+        left = p%xp.le.0.0_mp
+        right = p%xp.ge.m%L
+        leftFlux = SUM( PACK(p%spwt, left) )
+        rightFlux = SUM( PACK(p%spwt, right) )
+        inside = .not.(left.or.right)
+        Ninside = COUNT(inside)
+
+        ! allocate new particle array
+        allocate(xp(Ninside+2*NaddReal))
+        allocate(vp(Ninside+2*NaddReal,3))
+        allocate(spwt(Ninside+2*NaddReal))
+        vp = 0.0_mp
+
+        ! particle inside domain
+        xp(1:Ninside) = PACK( p%xp, inside )
+        vp(1:Ninside,1) = PACK( p%vp(:,1), inside )
+        spwt(1:Ninside) = PACK( p%spwt, inside )
+
+        dxp = Lv*dt/NxMax
+        dvp = Lv/NxMax
+
+        ! influx particles from left boundary
+        ksum = Ninside
+        do k=1,NxMax
+            xp(ksum+1:ksum+k) = (/ (i*dxp,i=1,k) /)
+            vp(ksum+1:ksum+k,1) = k*dvp
+            ksum = ksum + k
+        end do
+        spwt(Ninside+1:Ninside+NaddReal) = leftFlux*inputVP(vp(Ninside+1:Ninside+NaddReal,1))         &
+                                            /SUM(inputVP(vp(Ninside+1:Ninside+NaddReal,1)))
+
+        ! influx particles from right boundary
+        ksum = Ninside+NaddReal
+        do k=1,NxMax
+            xp(ksum+1:ksum+k) = (/ (m%L-i*dxp,i=1,k) /)
+            vp(ksum+1:ksum+k,1) = -k*dvp
+            ksum = ksum + k
+        end do
+        spwt(Ninside+NaddReal+1:Ninside+2*NaddReal) = rightFlux*inputVP(vp(Ninside+NaddReal+1:Ninside+2*NaddReal,1))         &
+                                                        /SUM(inputVP(vp(Ninside+NaddReal+1:Ninside+2*NaddReal,1)))
+
+        call p%setSpecies(Ninside+2*NaddReal,xp,vp,spwt)
+
+        ! deallocate particle array
+        deallocate(xp)
+        deallocate(vp)
+        deallocate(spwt)
+    end subroutine
 
 end module

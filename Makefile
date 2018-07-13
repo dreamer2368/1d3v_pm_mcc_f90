@@ -20,6 +20,7 @@ F90SRC = main.f90 \
 		constants.f90 \
 		modMPI.f90 \
 		MatrixVector.f90 \
+		modVelocityProfile.f90 \
 		modSpecies.f90 \
 		modMesh.f90 \
 		modAssign.f90 \
@@ -70,12 +71,14 @@ $(OBJDIR)/random.o : $(OBJDIR)/constants.o
 $(OBJDIR)/MatrixVector.o : $(OBJDIR)/constants.o
 $(OBJDIR)/modMPI.o : $(OBJDIR)/constants.o
 $(OBJDIR)/modInputHelper.o : $(OBJDIR)/modMPI.o
+$(OBJDIR)/modVelocityProfile.o : $(OBJDIR)/constants.o
 $(OBJDIR)/modSpecies.o : $(OBJDIR)/constants.o
 $(OBJDIR)/modMesh.o : $(OBJDIR)/MatrixVector.o
 $(OBJDIR)/modAssign.o : $(OBJDIR)/modSpecies.o \
 						$(OBJDIR)/modMesh.o
 $(OBJDIR)/modBC.o : $(OBJDIR)/modSpecies.o \
 					$(OBJDIR)/modMesh.o \
+					$(OBJDIR)/modVelocityProfile.o \
 					$(OBJDIR)/random.o
 $(OBJDIR)/ArMCC.o : $(OBJDIR)/modSpecies.o \
 					$(OBJDIR)/random.o

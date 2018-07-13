@@ -9,6 +9,78 @@ module testmodule
 
 contains
 
+    subroutine customFluxTest
+		type(PM1D) :: pm
+        type(FSens) :: fs
+		type(recordData) :: r
+		integer, parameter :: Ng=64, N=1E4, order=1
+		real(mp), parameter :: Ti=20, Tf = 40, L=2.0_mp, v=1.0_mp, Lv=5.0_mp
+		real(mp) :: xp0(N), vp0(N,3), spwt0(N), rho_back(Ng), qe, me
+		integer :: g(2)
+		real(mp) :: frac(2)
+		integer :: i,k,j
+        character(len=256) :: kstr
+
+		call buildPM1D(pm,Tf,Ti,Ng,1,pBC=3,mBC=2,order=order,A=(/ 1.0_mp, 1.0_mp /),L=L, dt = 0.1_mp)
+		call buildRecord(r,pm%nt,1,pm%L,Ng,'test_custom_reflux',1)
+
+        call init_random_seed
+        call RANDOM_NUMBER(xp0)
+        call RANDOM_NUMBER(vp0)
+		xp0 = pm%L*xp0
+		vp0 = v*randn(N,3)
+        spwt0 = L/N
+		rho_back = 0.0_mp
+		qe = -(0.1_mp)**2/(N/pm%L)
+		me = -qe
+		rho_back(Ng) = -qe
+		call buildSpecies(pm%p(1),qe,me)
+		call setSpecies(pm%p(1),N,xp0,vp0,spwt0)
+		call setMesh(pm%m,rho_back)
+
+		call fs%buildFSens(pm,Lv,Ng/2,N,N)
+
+        do k=1,pm%nt
+		    do i=1,pm%n
+			    call pm%p(i)%moveSpecies(pm%dt)
+		    end do
+
+	    	do i=1,pm%n
+                call uniformParticleCustomRefluxing(pm%p(i),pm%m,pm%dt,5.0_mp*v,1000,GaussianProfile)
+!		    	call pm%applyBC(pm%p(i),pm%m,pm%dt,5.0_mp*v,1E2)
+	    	end do
+
+!    		pm%m%rho = 0.0_mp
+!    		do i=1, pm%n
+!    			call pm%a(i)%chargeAssign(pm%p(i),pm%m)
+!    		end do
+
+    		!X-direction Interpolation
+		    ALLOCATE(fs%a(1)%g(2,pm%p(1)%np))
+		    ALLOCATE(fs%a(1)%frac(2,pm%p(1)%np))
+    		do j=1,pm%p(1)%np
+    			CALL fs%a(1)%assignMatrix(pm%p(1)%xp(j),pm%m%dx,g,frac)
+    			CALL fs%a(1)%adjustGrid(fs%m%ng,g,frac)
+    			fs%a(1)%g(:,j) = g
+    			fs%a(1)%frac(:,j) = frac
+    		end do
+
+    		call fs%FDistribution(pm%p(1),fs%a(1))
+
+			write(kstr,*) k
+    		open(unit=304,file='data/test_custom_reflux/f_A/'//trim(adjustl(kstr))//'.bin',         &
+                        status='replace',form='unformatted',access='stream')
+    		write(304) fs%f_A
+    		close(304)
+
+	    	call recordPlasma(r,pm,k)
+        end do
+		call printPlasma(r)
+
+		call destroyRecord(r)
+		call destroyPM1D(pm)
+    end subroutine
+
     subroutine FFTtest
         integer, parameter :: Ng=64
         integer :: i
