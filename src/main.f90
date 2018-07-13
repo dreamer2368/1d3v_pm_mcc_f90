@@ -61,6 +61,7 @@ program main
 !    call Landau_Jtheta
 !    call sheath_edge
     call customFluxTest
+!    call sheath_Jcurve
 
 	! print to screen
     if( mpih%my_rank .eq. 0) then

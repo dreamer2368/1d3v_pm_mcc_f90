@@ -207,4 +207,64 @@ contains
 		call destroyPM1D(sheath)
 	end subroutine
 
+	subroutine sheath_Jcurve
+		type(PM1D) :: sheath
+		type(recordData) :: r
+		real(mp) ::  tau_min, tau_max
+        real(mp), allocatable :: tau(:)
+		integer :: Nsample, N = 1E5, Ng = 128
+		real(mp) :: L = 10.0_mp, Ls = 0.3_mp, mu = 100.0_mp, Z = 1.0_mp
+		real(mp) :: dx
+		real(mp) :: Time
+		real(mp) :: A(4),J
+		integer :: i, thefile, idx, input
+		character(len=100):: dir, filename
+        Time = getOption('QoI_curve/time',300.0_mp)
+        dir = getOption('QoI_curve/directory','Sheath_curve')
+        filename = getOption('QoI_curve/filename','J.bin')
+        input = getOption('QoI_curve/random_seed',0)
+        tau_min = getOption('QoI_curve/min_parameter_value',1.0_mp)
+        tau_max = getOption('QoI_curve/max_parameter_value',3.0_mp)
+        Nsample = getOption('QoI_curve/number_of_sample',1001)
+
+        allocate(tau(Nsample))
+		tau = (/ ((tau_max-tau_min)*(i-1)/(Nsample-1)+tau_min,i=1,Nsample) /)
+
+		call allocateBuffer(Nsample,2,mpih)
+        thefile = MPIWriteSetup(mpih,'data/'//trim(dir),filename)
+
+		do i=1,mpih%sendcnt
+		    A = (/ 1.0_mp, sqrt(1.0_mp/mu/tau(mpih%displc(mpih%my_rank)+i)), Ls, 1.0_mp*N /)
+		    call buildPM1D(sheath,Time,0.0_mp,Ng,2,pBC=2,mBC=2,order=1,A=A,L=L,dt=0.1_mp)
+		    call buildRecord(r,sheath%nt,2,sheath%L,sheath%ng,                                      &
+                            trim(dir)//'/'//trim(adjustl(mpih%rank_str)),20)
+
+		    call buildSpecies(sheath%p(1),-1.0_mp,1.0_mp)
+		    call buildSpecies(sheath%p(2),Z,mu)
+		    call init_random_seed(input=input)
+		    call sheath_initialize(sheath,N,N,tau(mpih%displc(mpih%my_rank)+i),mu)
+
+		    call forwardsweep(sheath,r,Null_input,PartialUniform_Rayleigh2,PhiAtWall,J)
+
+			mpih%writebuf = (/tau(mpih%displc(mpih%my_rank)+i),J/)
+
+            call MPI_FILE_WRITE(thefile, mpih%writebuf, 2, MPI_DOUBLE, & 
+                                MPI_STATUS_IGNORE, mpih%ierr)
+            call MPI_FILE_SYNC(thefile,mpih%ierr)
+
+			call destroyRecord(r)
+			call destroyPM1D(sheath)
+
+            print ('(A,I5,A,I5,A,F8.3,A,F8.3)'), 'Rank-',mpih%my_rank,      &
+                                                 ' Sample-',i,              &
+                                                 ', tau=',mpih%writebuf(1),  &
+                                                 ', J=',mpih%writebuf(2)
+		end do
+
+        deallocate(tau)
+
+        call MPI_FILE_CLOSE(thefile, mpih%ierr)            
+	end subroutine
+
+
 end module
