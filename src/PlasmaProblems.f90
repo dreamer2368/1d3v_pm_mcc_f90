@@ -181,15 +181,15 @@ contains
 		real(mp) :: A(4)
 		integer :: i
 
-		L = 20.0_mp
+		L = 25.0_mp
 
 		dt = 0.1_mp
 
         ve0 = 1.0_mp
 		vi0 = sqrt(1.0_mp/mu/tau)
-		Time_f = 1.0_mp*L/vi0
+		Time_f = 1200.0_mp
 
-		A = (/ ve0, vi0, 0.2_mp, 1.0_mp*Ni /)
+		A = (/ ve0, vi0, 0.5_mp/1.4_mp, 1.0_mp*Ni /)
 !		A = (/ 0.1_mp, ve0, vi0, 1.0_mp*Ni /)
 		call buildPM1D(sheath,Time_f,0.0_mp,Ng,2,pBC=2,mBC=2,order=1,A=A,L=L,dt=dt)
 		call buildRecord(r,sheath%nt,2,sheath%L,sheath%ng,'Sheath',10)
@@ -199,7 +199,7 @@ contains
 
         call init_random_seed
 		call sheath_initialize(sheath,Ne,Ni,tau,mu)
-		call forwardsweep(sheath,r,Null_input,PartialUniform_Maxwellian2)
+		call forwardsweep(sheath,r,Null_input,PartialUniform_Rayleigh2)
 
 		call printPlasma(r)
 
