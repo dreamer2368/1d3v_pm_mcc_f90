@@ -500,10 +500,12 @@ contains
         deallocate(spwt)
     end subroutine
 
-    subroutine ionBoundarySensitivityToTau(p,m,dt,vT,mu,tau,ionFlux)
+    subroutine ionBoundarySensitivityToTau(p,m,dt,vT,mu,tau,ionFluxL,sensitivityFluxR)
         type(species), intent(inout) :: p
         type(mesh), intent(inout) :: m
-        real(mp), intent(in) :: dt, vT, mu, tau, ionFlux
+        real(mp), intent(in) :: dt, vT, mu, tau, ionFluxL
+        real(mp), intent(out) :: sensitivityFluxR
+        
 
         integer :: Ninside, Nadd, NxMaxL, NxMaxR, NaddReal
         real(mp) :: leftFlux, rightFlux
@@ -565,7 +567,7 @@ contains
         Z2 = SUM(vp(Ninside+1:Ninside+Nadd,1)**2*EXP( -vp(Ninside+1:Ninside+Nadd,1)**2/2.0_mp/vT/vT ))
         spwt(Ninside+1:Ninside+Nadd) = leftFlux*EXP( -vp(Ninside+1:Ninside+Nadd,1)**2/2.0_mp/vT/vT )         &
                                             /SUM(EXP( -vp(Ninside+1:Ninside+Nadd,1)**2/2.0_mp/vT/vT ))       &
-                                     + ionFlux/tau*EXP( -vp(Ninside+1:Ninside+Nadd,1)**2/2.0_mp/vT/vT )      &
+                                     + ionFluxL/tau*EXP( -vp(Ninside+1:Ninside+Nadd,1)**2/2.0_mp/vT/vT )      &
                                               *( 1.0_mp/Z1 - vp(Ninside+1:Ninside+Nadd,1)**2/Z2 )
 
         ! influx particles from right boundary
@@ -574,6 +576,7 @@ contains
         spwt(Ninside+Nadd+1:Ninside+NaddReal) = 0.0_mp
 
 		m%rho_back(m%ng) = m%rho_back(m%ng) + rightFlux*p%qs
+        sensitivityFluxR = rightFlux
 
         call p%setSpecies(Ninside+NaddReal,xp,vp,spwt)
 

@@ -242,9 +242,12 @@ contains
 			if( vgl<1 .or. vgr>2*this%ngv+1 )	cycle
 			g = a%g(:,k)
 			h = vp/this%dv - FLOOR(vp/this%dv)
-			this%f_A(g,vgl) = this%f_A(g,vgl) + (1.0_mp-h)*p%spwt(k)/this%m%dx/this%dv*a%frac(:,k)
-			this%f_A(g,vgr) = this%f_A(g,vgr) + h*p%spwt(k)/this%m%dx/this%dv*a%frac(:,k)
+			this%f_A(g,vgl) = this%f_A(g,vgl) + (1.0_mp-h)*p%spwt(k)*a%frac(:,k)/this%dv/this%m%dx
+			this%f_A(g,vgr) = this%f_A(g,vgr) + h*p%spwt(k)*a%frac(:,k)/this%dv/this%m%dx
 		end do
+        if( a%mBCidx .ne. 0 ) then
+            this%f_A((/1,a%ng/),:) = this%f_A((/1,a%ng/),:)*2.0_mp
+        end if
 		this%f_A(:,1) = this%f_A(:,1)*2.0_mp
 		this%f_A(:,2*this%ngv+1) = this%f_A(:,2*this%ngv+1)*2.0_mp
 	end subroutine
@@ -270,9 +273,12 @@ contains
 			g = a%g(:,k)
 
             do i=1,3
-			    this%Dvf(g,gv(i)) = this%Dvf(g,gv(i)) + p%spwt(k)/this%m%dx/this%dv*a%frac(:,k)*fracv(i)
+			    this%Dvf(g,gv(i)) = this%Dvf(g,gv(i)) + p%spwt(k)*a%frac(:,k)*fracv(i)/this%dv/this%m%dx
             end do
 		end do
+        if( a%mBCidx .ne. 0 ) then
+            this%Dvf((/1,a%ng/),:) = this%Dvf((/1,a%ng/),:)*2.0_mp
+        end if
 		this%Dvf(:,1) = this%Dvf(:,1)*2.0_mp
 		this%Dvf(:,2*this%ngv+1) = this%Dvf(:,2*this%ngv+1)*2.0_mp
 	end subroutine
@@ -307,6 +313,9 @@ contains
 			frac(:,2) = h*frac_x(:,k)
 			n_temp(g,g_v) = n_temp(g,g_v) + frac/this%m%dx/this%dv
 		end do
+        if( a%mBCidx .ne. 0 ) then
+            n_temp((/1,a%ng/),:) = n_temp((/1,a%ng/),:)*2.0_mp
+        end if
         this%n_A = n_temp(:,2:2*this%ngv+2)
 	end subroutine
 
@@ -366,11 +375,15 @@ contains
 			n_temp(g,gv) = n_temp(g,gv) + frac/this%m%dx/this%dv
 			f_temp(g,gv) = f_temp(g,gv) + p%spwt(k)*frac/this%m%dx/this%dv
 		end do
+        if( a%mBCidx .ne. 0 ) then
+            n_temp((/1,a%ng/),:) = n_temp((/1,a%ng/),:)*2.0_mp
+            f_temp((/1,a%ng/),:) = f_temp((/1,a%ng/),:)*2.0_mp
+        end if
 		this%n_A = n_temp(:,2:2*this%ngv+2)
 		this%f_A = f_temp(:,2:2*this%ngv+2)
 	end subroutine
 
-	subroutine Redistribute(this,p)
+	subroutine Redistribute(this,p)  !periodic BC only!!
 		class(FSens), intent(inout) :: this
 		type(species), intent(inout) :: p
 		real(mp), dimension(this%NLimit) :: spwt0

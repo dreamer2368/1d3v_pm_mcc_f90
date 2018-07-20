@@ -14,6 +14,7 @@ module modMesh
 		real(mp), allocatable :: rho_back(:)				!1D sheath: surface charge
 		real(mp), allocatable :: phi(:)
 
+!        real(mp), allocatable :: quadratureWeight(:)
         complex(mp), allocatable :: W(:)
 
 		procedure(MeshSolver), pass(this), pointer :: solveMesh=>solveMesh_periodic
@@ -43,6 +44,12 @@ contains
 		this%L = L
 		this%ng = ng
 		this%BCindex = BC
+
+		allocate(this%E(ng))
+		allocate(this%phi(ng))
+		allocate(this%rho(ng))
+		allocate(this%rho_back(ng))
+
 		select case (this%BCindex)
 			case(0)						!periodic
 				this%dx = L/ng
@@ -58,11 +65,6 @@ contains
                 this%solveMesh=>solveMesh_D_N
                 this%solveMesh_Adj=>solveMesh_Adj_periodic
 		end select
-
-		allocate(this%E(ng))
-		allocate(this%phi(ng))
-		allocate(this%rho(ng))
-		allocate(this%rho_back(ng))
 
 		this%E = 0.0_mp
 		this%phi = 0.0_mp

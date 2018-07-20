@@ -62,9 +62,9 @@ contains
 			case(0)	!periodic
 				this%adjustGrid=>adjustGrid_periodic
 			case(1)	!Dirichlet-Dirichlet
-				this%adjustGrid=>adjustGrid_absorbing
+				this%adjustGrid=>adjustGrid_bounded
 			case(2)	!Dirichlet-Neumann
-				this%adjustGrid=>adjustGrid_absorbing
+				this%adjustGrid=>adjustGrid_bounded
 		end select
 
 		allocate(this%g(1,1))
@@ -165,9 +165,12 @@ contains
 		class(pmAssign), intent(inout) :: this
 		type(species), intent(inout) :: p
 		type(mesh), intent(inout) :: m
+        real(mp) :: rho(m%ng)
 		integer :: g(this%order+1)
 		real(mp) :: frac(this%order+1)
 		integer :: i,ip
+
+        rho = 0.0_mp
 
 		DEALLOCATE(this%g)
 		DEALLOCATE(this%frac)
@@ -179,8 +182,14 @@ contains
 			CALL this%adjustGrid(m%ng,g,frac)
 			this%g(:,i) = g
 			this%frac(:,i) = frac
-			m%rho( g ) = m%rho( g ) + p%spwt(i)*p%qs/m%dx*frac
+			rho( g ) = rho( g ) + p%spwt(i)*frac
 		end do
+        rho = rho*p%qs/m%dx
+        if( this%mBCidx .ne. 0 ) then
+            rho( (/1,m%ng/) ) = 2.0_mp*rho( (/1,m%ng/) )
+        end if
+
+        m%rho = m%rho + rho
 	end subroutine
 
 	subroutine forceAssign(this,p,m)
@@ -195,7 +204,7 @@ contains
 		end do
 	end subroutine
 
-!======================= Adjoint assignment ==========================================================
+!======================= Adjoint assignment (periodic only) ===============================================
 
 	subroutine Adj_chargeAssign(this,p,m,rhos,xps)
 		class(pmAssign), intent(inout) :: this
@@ -271,10 +280,18 @@ contains
 		end if
 	end subroutine
 
-	subroutine adjustGrid_absorbing(ng,g,frac)
+	subroutine adjustGrid_bounded(ng,g,frac)
 		integer, intent(in) :: ng
 		integer, intent(inout) :: g(:)
 		real(mp), intent(inout) :: frac(:)
+
+        WHERE( g<1 )
+            g = ng/2
+            frac = 0.0_mp
+        ELSEWHERE( g>ng )
+            g = ng/2
+            frac = 0.0_mp
+        END WHERE
 
 		if( MINVAL(g)<1 .or. MAXVAL(g)>ng ) then
 			print *, MINVAL(g), MAXVAL(g), frac
@@ -282,13 +299,13 @@ contains
 			stop
 		end if
 
-		!adjustment for boundary : charge/(dx/2)
-		if( g(1).eq.1 ) then
-			frac(1) = frac(1)*2.0_mp
-		end if
-		if( g(2).eq.ng ) then
-			frac(2) = frac(2)*2.0_mp
-		end if
+		!adjustment for boundary : charge/(dx/2) ====> Obsolete! now quadrature weight is explicitly added in charge assignment.
+!		if( g(1).eq.1 ) then
+!			frac(1) = frac(1)*2.0_mp
+!		end if
+!		if( g(2).eq.ng ) then
+!			frac(2) = frac(2)*2.0_mp
+!		end if
 	end subroutine
 
 end module

@@ -65,7 +65,7 @@ contains
         real(mp), parameter :: tau = 1.0_mp, mu = 100.0_mp, Z = 1.0_mp
         real(mp) :: L, dt, dx
 		real(mp) :: ve0, vi0, Time_f
-        real(mp) :: ionFluxL, ionFluxR
+        real(mp) :: ionFluxL, ionFluxR, sensitivityFluxR
 		real(mp) :: A(4)
 
         real(mp), allocatable :: S(:,:,:), Dvf(:,:,:), nA(:,:,:)
@@ -117,7 +117,7 @@ contains
 		call r%recordPlasma(pm, k)									!record for n=1~Nt
 		do k=1,pm%nt
     		call PtrControl(pm,k,'xp')
-    
+
     		call PtrSource(pm)
     
     		do i=1,pm%n
@@ -163,7 +163,7 @@ contains
 !print *, 'sensitivity flux (uniform): ', -dt/SQRT(8.0_mp*pi*mu*tau**3)
 
             call uniformParticleRefluxingAbsorbing2(fs%p(1),fs%m,dt,1.0_mp)
-            call ionBoundarySensitivityToTau(fs%p(2),fs%m,dt,SQRT(1.0_mp/tau/mu),mu,tau,ionFluxL)
+            call ionBoundarySensitivityToTau(fs%p(2),fs%m,dt,SQRT(1.0_mp/tau/mu),mu,tau,ionFluxL,sensitivityFluxR)
 
     		fs%m%rho = 0.0_mp
             do i=1,fs%n
@@ -211,6 +211,9 @@ contains
         
         		!Multiply dt
         		S = -S*dt
+
+                !Source sensitivity
+
             end do
         
 !    		call fs%FDistribution(fs%p(2),fs%a(2))
