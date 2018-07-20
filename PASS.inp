@@ -12,7 +12,7 @@ number_of_particles = 100000
 number_of_grids = 64
 number_of_injecting_particles = 5E4
 population_limit = 5E4
-base_directory = 'Debye-sensitivity'
+#base_directory = 'Debye-sensitivity'
 #base_directory = 'N1E6/Debye'
 #base_directory = 'N1E6/Debye_perturbed'
 

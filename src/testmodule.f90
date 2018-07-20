@@ -9,13 +9,242 @@ module testmodule
 
 contains
 
+    subroutine testVelocityGradient
+        type(species) :: p
+        type(mesh) :: m
+        type(pmAssign) :: a
+
+        integer, parameter :: N = 1E7, Ng = 128
+        real(mp), parameter :: L = 10.0_mp, Xs = 5.0_mp, Ls = 3.0_mp
+
+        real(mp) :: xp(N), vp(N,3), spwt(N), temp(3*N)
+        integer :: i
+
+        call p%buildSpecies(-1.0_mp,1.0_mp)
+
+        temp = randn(3*N) + Xs
+        temp(1:COUNT(temp.le.Xs+Ls)) = PACK(temp,temp.le.Xs+Ls)
+
+        xp = temp(1:N)
+        vp = 0.0_mp
+        spwt = 1.0_mp/N
+        call p%setSpecies(N,xp,vp,spwt)
+
+        call m%buildMesh(L,Ng,1)
+
+        call a%buildAssign(Ng,2,1)
+		DEALLOCATE(a%g)
+		DEALLOCATE(a%frac)
+		a%np = p%np
+		ALLOCATE(a%g(a%order+1,p%np))
+		ALLOCATE(a%frac(a%order+1,p%np))
+
+		do i=1,p%np
+	        call assign_TSC_derivative(p%xp(i),m%dx,a%g(:,i),a%frac(:,i))	!for velocity derivative interpolation
+			m%rho( a%g(:,i) ) = m%rho( a%g(:,i) ) + p%spwt(i)/m%dx*a%frac(:,i)
+		end do
+
+		call system('mkdir -p data/testVelocityGradient')
+		open(unit=302,file='data/testVelocityGradient/rho.bin',status='replace',form='unformatted',access='stream')
+	    write(302) m%rho
+        close(302)
+
+        call p%destroySpecies
+        call m%destroyMesh
+        call a%destroyAssign
+    end subroutine
+
+	subroutine Sheath_sensitivity
+        use modTarget
+        use modSource
+		type(PM1D) :: pm
+		type(FSens) :: fs
+		type(recordData) :: r, fsr
+		integer, parameter :: Ne = 1E5, Ni = 1E5, Ng = 64
+		integer :: NInit=5E4, Ngv, NInject, NLimit
+        real(mp), parameter :: tau = 1.0_mp, mu = 100.0_mp, Z = 1.0_mp
+        real(mp) :: L, dt, dx
+		real(mp) :: ve0, vi0, Time_f
+        real(mp) :: ionFluxL, ionFluxR
+		real(mp) :: A(4)
+
+        real(mp), allocatable :: S(:,:,:), Dvf(:,:,:), nA(:,:,:)
+        real(mp) :: E_temp(Ng), vp, Lv(2), dv(2), fracv2(2), fracv3(3)
+        integer :: g(2), gv2(2), gv3(3)
+
+		integer :: i,j,k,ii, kr
+		character(len=100)::dir, kstr
+		procedure(control), pointer :: PtrControl=>NULL()
+		procedure(source), pointer :: PtrSource=>NULL()
+
+		L = 25.0_mp
+
+		dt = 0.1_mp
+
+        ve0 = 1.0_mp
+		vi0 = sqrt(1.0_mp/mu/tau)
+		Time_f = 200.0_mp
+        Ngv = Ng/4
+        NInject = getOption('number_of_injecting_particles',Ne/20)
+        NLimit = getOption('population_limit',Ne/2)
+        dir = getOption('base_directory','Sheath_sensitivity')
+
+		A = (/ ve0, vi0, 0.5_mp/1.4_mp, 1.0_mp*Ni /)
+		call buildPM1D(pm,Time_f,0.0_mp,Ng,2,pBC=2,mBC=2,order=1,A=A,L=L,dt=dt)
+		call buildRecord(r,pm%nt,2,pm%L,pm%ng,trim(dir),10)
+
+		call buildSpecies(pm%p(1),-1.0_mp,1.0_mp)
+		call buildSpecies(pm%p(2),Z,mu)
+
+        call init_random_seed
+		call sheath_initialize(pm,Ne,Ni,tau,mu)
+
+		Lv = (/ 5.0_mp, 0.5_mp /)
+        dv = Lv/Ngv
+		call buildFSens(fs,pm,Lv(2),Ngv,NInject,NLimit)
+		call buildRecord(fsr,fs%nt,2,fs%L,fs%ng,trim(dir)//'/f_A',10)
+		call sheath_DerivativeToTau_initialize(fs,Ne,Ni,tau,mu)
+
+        allocate(S(Ng,2*Ngv+1,2))
+        allocate(Dvf(Ng,2*Ngv+1,2))
+        allocate(nA(Ng,2*Ngv+1,2))
+    
+		k=0
+        PtrControl=>Null_input
+        PtrSource=>PartialUniform_Rayleigh2
+
+		!Time stepping
+		call r%recordPlasma(pm, k)									!record for n=1~Nt
+		do k=1,pm%nt
+    		call PtrControl(pm,k,'xp')
+    
+    		call PtrSource(pm)
+    
+    		do i=1,pm%n
+    			call pm%p(i)%moveSpecies(dt)
+    		end do
+    
+            ionFluxL = SUM(PACK(pm%p(2)%spwt,pm%p(2)%xp.le.0.0_mp))
+            ionFluxR = SUM(PACK(pm%p(2)%spwt,pm%p(2)%xp.ge.pm%m%L))
+    		do i=1,pm%n
+    			call pm%applyBC(pm%p(i),pm%m,pm%dt,pm%A0(i))
+    		end do
+    
+    		!charge assignment
+    		pm%m%rho = 0.0_mp
+    		do i=1, pm%n
+    			call pm%a(i)%chargeAssign(pm%p(i),pm%m)
+    		end do
+    
+    		call PtrControl(pm,k,'rho_back')
+    		call pm%m%solveMesh(pm%eps0)
+    
+    		!Electric field : -D*phi
+    		pm%m%E = - multiplyD(pm%m%phi,pm%m%dx,pm%m%BCindex)
+    
+    		!Force assignment : mat'*E
+    		do i=1, pm%n
+    			call pm%a(i)%forceAssign(pm%p(i), pm%m)
+    		end do
+    
+    		do i=1, pm%n
+    			call pm%p(i)%accelSpecies(dt)
+    		end do
+
+			call r%recordPlasma(pm, k)									!record for n=1~Nt
+
+    		do i=1,fs%n
+	    		call fs%p(i)%moveSpecies(dt)
+	    	end do
+
+!print *, 'ion flux: ', ionFluxL
+!print *, 'ion flux (uniform): ', dt/SQRT(2.0_mp*pi*mu*tau)
+!print *, 'sensitivity flux: ', SUM(PACK(fs%p(2)%spwt, fs%p(2)%xp.le.0.0_mp))
+!print *, 'sensitivity flux (uniform): ', -dt/SQRT(8.0_mp*pi*mu*tau**3)
+
+            call uniformParticleRefluxingAbsorbing2(fs%p(1),fs%m,dt,1.0_mp)
+            call ionBoundarySensitivityToTau(fs%p(2),fs%m,dt,SQRT(1.0_mp/tau/mu),mu,tau,ionFluxL)
+
+    		fs%m%rho = 0.0_mp
+            do i=1,fs%n
+                call fs%a(i)%chargeAssign(fs%p(i),fs%m)
+            end do
+
+	    	call fs%m%solveMesh(fs%eps0)
+
+	    	!Electric field : E_A = -D*phi_A
+		    fs%m%E = - multiplyD(fs%m%phi,fs%m%dx,fs%m%BCindex)
+
+    		do i=1, fs%n
+    			call fs%a(i)%forceAssign(fs%p(i), pm%m)
+    		end do
+    
+    		do i=1, fs%n
+    			call fs%p(i)%accelSpecies(dt)
+    		end do
+
+            Dvf = 0.0_mp
+            do i=1, fs%n
+        		do j = 1, pm%p(i)%np
+        			vp = pm%p(i)%vp(j,1)
+                    call assign_TSC_derivative(vp,dv(i),gv3,fracv3)	!for velocity derivative interpolation
+                    where( abs(gv3)>Ngv )
+                        gv3 = 0
+                        fracv3 = 0.0_mp
+                    elsewhere
+                        gv3 = gv3 + Ngv + 1
+                    end where
+        			g = pm%a(i)%g(:,j)
+        
+                    do ii=1,3
+        			    Dvf(g,gv3(ii),i) = Dvf(g,gv3(ii),i) + pm%p(i)%spwt(j)/pm%m%dx/dv(i)*pm%a(i)%frac(:,j)*fracv3(ii)
+                    end do
+        		end do
+        		Dvf(:,1,:) = Dvf(:,1,:)*2.0_mp
+        		Dvf(:,2*Ngv+1,:) = Dvf(:,2*Ngv+1,:)*2.0_mp
+
+        		!Multiply E_A
+        		E_temp = fs%p(i)%qs/fs%p(i)%ms*fs%m%E
+        		do j=1,2*Ngv+1
+        			S(:,j,i) = Dvf(:,j,i)*E_temp 
+                end do
+        
+        		!Multiply dt
+        		S = -S*dt
+            end do
+        
+!    		call fs%FDistribution(fs%p(2),fs%a(2))
+
+		    if( (fsr%mod.eq.1) .or. (mod(k,fsr%mod).eq.0) ) then
+			    kr = merge(k,k/fsr%mod,fsr%mod.eq.1)
+		    	write(kstr,*) kr
+    	    	open(unit=304,file='data/'//trim(dir)//'/f_A/distribution/'//trim(adjustl(kstr))//'.bin',         &
+                         status='replace',form='unformatted',access='stream')
+!    	    	write(304) fs%f_A
+    	    	write(304) S
+    	    	close(304)
+            end if
+
+			call fsr%recordPlasma(fs, k)									!record for n=1~Nt
+		end do
+
+		call printPlasma(r)
+		call printPlasma(fsr)
+
+		call destroyPM1D(pm)
+		call destroyRecord(r)
+		call destroyFSens(fs)
+		call destroyRecord(fsr)
+	end subroutine
+
     subroutine customFluxTest
 		type(PM1D) :: pm
         type(FSens) :: fs
 		type(recordData) :: r
-		integer, parameter :: Ng=64, N=1E4, order=1
-		real(mp), parameter :: Ti=20, Tf = 40, L=2.0_mp, v=1.0_mp, Lv=5.0_mp
-		real(mp) :: xp0(N), vp0(N,3), spwt0(N), rho_back(Ng), qe, me
+		integer, parameter :: Ng=64, N=1E5, order=1
+		real(mp), parameter :: Ti=20, Tf = 100, L=2.0_mp, Lv=5.0_mp
+		real(mp) :: xp0(N), vp0(N,3), spwt0(N), rho_back(Ng), qe=-1.0_mp, me=1.0_mp
+        real(mp) :: v, mu=1.0_mp, tau=1.0_mp, Z1,Z2, ionFluxL
 		integer :: g(2)
 		real(mp) :: frac(2)
 		integer :: i,k,j
@@ -25,28 +254,38 @@ contains
 		call buildRecord(r,pm%nt,1,pm%L,Ng,'test_custom_reflux',1)
 
         call init_random_seed
-        call RANDOM_NUMBER(xp0)
-        call RANDOM_NUMBER(vp0)
-		xp0 = pm%L*xp0
-		vp0 = v*randn(N,3)
-        spwt0 = L/N
-		rho_back = 0.0_mp
-		qe = -(0.1_mp)**2/(N/pm%L)
-		me = -qe
-		rho_back(Ng) = -qe
 		call buildSpecies(pm%p(1),qe,me)
-		call setSpecies(pm%p(1),N,xp0,vp0,spwt0)
-		call setMesh(pm%m,rho_back)
+
+		call RANDOM_NUMBER(xp0)
+		xp0 = xp0*pm%L
+
+		v = sqrt(1.0_mp/mu/tau)
+		call RANDOM_NUMBER(vp0)
+		vp0 = 5.5_mp*v*(2.0_mp*vp0-1.0_mp)
+
+        Z1 = SUM( EXP( -mu*tau*vp0(:,1)**2/2.0_mp ) )
+        Z2 = SUM( vp0(:,1)**2*EXP( -mu*tau*vp0(:,1)**2/2.0_mp ) )
+		spwt0 = pm%L/2.0_mp/tau*(1.0_mp/Z1 - vp0(:,1)**2/Z2)*EXP( -mu*tau*vp0(:,1)**2/2.0_mp )
+
+		call pm%p(1)%setSpecies(N,xp0,vp0,spwt0)
+
+		call pm%m%setMesh((/ (0.0_mp, i=1,pm%m%ng) /))
 
 		call fs%buildFSens(pm,Lv,Ng/2,N,N)
+        ionFluxL = pm%dt/SQRT(2.0_mp*pi*mu*tau)
 
         do k=1,pm%nt
 		    do i=1,pm%n
 			    call pm%p(i)%moveSpecies(pm%dt)
 		    end do
 
+print *, 'sensitivity flux: ', SUM(PACK(pm%p(1)%spwt, pm%p(1)%xp.le.0.0_mp))
+print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
+
 	    	do i=1,pm%n
-                call uniformParticleCustomRefluxing(pm%p(i),pm%m,pm%dt,5.0_mp*v,1000,GaussianProfile)
+                call testIonBoundarySensitivity(pm%p(i),pm%m,pm%dt,SQRT(1.0_mp/tau/mu),mu,tau,ionFluxL)
+!                call uniformParticleRefluxingRefluxing(pm%p(i),pm%m,pm%dt,v)
+!                call uniformParticleCustomRefluxing(pm%p(i),pm%m,pm%dt,5.0_mp*v,10000,GaussianProfile)
 !		    	call pm%applyBC(pm%p(i),pm%m,pm%dt,5.0_mp*v,1E2)
 	    	end do
 

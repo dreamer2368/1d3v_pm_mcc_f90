@@ -64,6 +64,9 @@ contains
 			allocate(character(len=0) :: this%dir)
 			this%dir = ''
 		end if
+        if( print_pm_output ) then
+    		print *, 'Directory: ','data/'//trim(this%dir)
+        end if
 
 		call system('mkdir -p data/'//this%dir//'/xp')
 		call system('mkdir -p data/'//this%dir//'/vp')

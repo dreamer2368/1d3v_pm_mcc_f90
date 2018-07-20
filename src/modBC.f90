@@ -231,7 +231,7 @@ contains
         ! influx particles from left boundary
         ksum = Ninside
         do k=1,NxMax
-            xp(ksum+1:ksum+k) = (/ (i*dxp,i=1,k) /)
+            xp(ksum+1:ksum+k) = (/ ((i-0.5_mp)*dxp,i=1,k) /)
             vp(ksum+1:ksum+k,1) = k*dvp
             ksum = ksum + k
         end do
@@ -241,7 +241,7 @@ contains
         ! influx particles from right boundary
         ksum = Ninside+NaddReal
         do k=1,NxMax
-            xp(ksum+1:ksum+k) = (/ (m%L-i*dxp,i=1,k) /)
+            xp(ksum+1:ksum+k) = (/ (m%L-(i-0.5_mp)*dxp,i=1,k) /)
             vp(ksum+1:ksum+k,1) = -k*dvp
             ksum = ksum + k
         end do
@@ -251,6 +251,430 @@ contains
         call p%setSpecies(Ninside+2*NaddReal,xp,vp,spwt)
 
         ! deallocate particle array
+        deallocate(xp)
+        deallocate(vp)
+        deallocate(spwt)
+    end subroutine
+
+    subroutine uniformParticleRefluxingAbsorbing(p,m,dt,vT)
+        type(species), intent(inout) :: p
+        type(mesh), intent(inout) :: m
+        real(mp), intent(in) :: dt, vT
+
+        integer :: Ninside, Nadd, NxMaxL, NxMaxR, NaddReal
+        real(mp) :: leftFlux, rightFlux
+        real(mp), allocatable :: xp(:), vp(:,:), spwt(:)
+        logical, dimension(p%np) :: left, right, inside
+
+        integer :: k, ksum, i
+        real(mp) :: dxp, dvp
+
+        ! Out flux
+        left = p%xp.le.0.0_mp
+        right = p%xp.ge.m%L
+        leftFlux = SUM( PACK(p%spwt, left) )
+        rightFlux = SUM( PACK(p%spwt, right) )
+        inside = .not.(left.or.right)
+        Ninside = COUNT(inside)
+
+        Nadd = COUNT(left)
+        NxMaxL = FLOOR(SQRT(2.0_mp*Nadd))
+        Nadd = COUNT(right)
+        NxMaxR = FLOOR(SQRT(2.0_mp*Nadd))
+        NaddReal = NxMaxL*(NxMaxL+1)/2 + NxMaxR*(NxMaxR+1)/2
+
+        ! allocate new particle array
+        allocate(xp(Ninside+NaddReal))
+        allocate(vp(Ninside+NaddReal,3))
+        allocate(spwt(Ninside+NaddReal))
+        vp = 0.0_mp
+
+        ! particle inside domain
+        xp(1:Ninside) = PACK( p%xp, inside )
+        vp(1:Ninside,1) = PACK( p%vp(:,1), inside )
+        spwt(1:Ninside) = PACK( p%spwt, inside )
+
+
+        ! influx particles from left boundary
+        dxp = 5.0_mp*vT*dt/NxMaxL
+        dvp = 5.0_mp*vT/NxMaxL
+
+        ksum = Ninside
+        Nadd = NxMaxL*(NxMaxL+1)/2
+        do k=1,NxMaxL
+            xp(ksum+1:ksum+k) = (/ ((i-0.5_mp)*dxp,i=1,k) /)
+            vp(ksum+1:ksum+k,1) = k*dvp
+            ksum = ksum + k
+        end do
+        spwt(Ninside+1:Ninside+Nadd) = leftFlux*EXP( -vp(Ninside+1:Ninside+Nadd,1)**2/2.0_mp/vT/vT )         &
+                                            /SUM(EXP( -vp(Ninside+1:Ninside+Nadd,1)**2/2.0_mp/vT/vT ))
+
+        ! influx particles from right boundary
+        dxp = 5.0_mp*vT*dt/NxMaxR
+        dvp = 5.0_mp*vT/NxMaxR
+
+        ksum = Ninside+Nadd
+        do k=1,NxMaxR
+            xp(ksum+1:ksum+k) = (/ (m%L-(i-0.5_mp)*dxp,i=1,k) /)
+            vp(ksum+1:ksum+k,1) = -k*dvp
+            ksum = ksum + k
+        end do
+        spwt(Ninside+Nadd+1:Ninside+NaddReal) = 0.0_mp
+
+		m%rho_back(m%ng) = m%rho_back(m%ng) + rightFlux*p%qs
+
+        call p%setSpecies(Ninside+NaddReal,xp,vp,spwt)
+
+        ! deallocate particle array
+        deallocate(xp)
+        deallocate(vp)
+        deallocate(spwt)
+    end subroutine
+
+    subroutine uniformParticleRefluxingAbsorbing2(p,m,dt,vT)
+        type(species), intent(inout) :: p
+        type(mesh), intent(inout) :: m
+        real(mp), intent(in) :: dt, vT
+
+        integer :: Ninside, Nadd, NxMaxL, NxMaxR, NaddReal
+        real(mp) :: leftFlux, rightFlux
+        real(mp), allocatable :: xp(:), vp(:,:), spwt(:), xpL(:), xpR(:), vpL(:), vpR(:)
+        logical, allocatable :: influxL(:), influxR(:)
+        logical, dimension(p%np) :: left, right, inside
+
+        integer :: k, ksum, i
+        real(mp) :: dxp, dvp
+
+        ! Out flux
+        left = p%xp.le.0.0_mp
+        right = p%xp.ge.m%L
+        leftFlux = SUM( PACK(p%spwt, left) )
+        rightFlux = SUM( PACK(p%spwt, right) )
+        inside = .not.(left.or.right)
+        Ninside = COUNT(inside)
+
+        Nadd = COUNT(left)
+        allocate(xpL(2*Nadd))
+        allocate(vpL(2*Nadd))
+        allocate(influxL(2*Nadd))
+        call RANDOM_NUMBER(xpL)
+        call RANDOM_NUMBER(vpL)
+        xpL = 5.5_mp*vT*dt*xpL
+        vpL = 5.5_mp*vT*vpL
+        influxL = (xpL>0.0_mp) .and. (vpL>0.0_mp) .and. ( xpL/vpL.le.dt )
+
+        Nadd = COUNT(right)
+        allocate(xpR(2*Nadd))
+        allocate(vpR(2*Nadd))
+        allocate(influxR(2*Nadd))
+        call RANDOM_NUMBER(xpR)
+        call RANDOM_NUMBER(vpR)
+        xpR = m%L - 5.5_mp*vT*dt*xpR
+        vpR = - 5.5_mp*vT*vpR
+        influxR = (xpR<m%L) .and. (vpR<0.0_mp) .and. ( (xpR-m%L)/vpR.le.dt )
+
+        NaddReal = COUNT(influxL) + COUNT(influxR)
+
+        ! allocate new particle array
+        allocate(xp(Ninside+NaddReal))
+        allocate(vp(Ninside+NaddReal,3))
+        allocate(spwt(Ninside+NaddReal))
+        vp = 0.0_mp
+
+        ! particle inside domain
+        xp(1:Ninside) = PACK( p%xp, inside )
+        vp(1:Ninside,1) = PACK( p%vp(:,1), inside )
+        spwt(1:Ninside) = PACK( p%spwt, inside )
+
+
+        ! influx particles from left boundary
+        Nadd = COUNT(influxL)
+        xp(Ninside+1:Ninside+Nadd) = PACK( xpL, influxL )
+        vp(Ninside+1:Ninside+Nadd,1) = PACK( vpL, influxL )
+        spwt(Ninside+1:Ninside+Nadd) = leftFlux*EXP( -vp(Ninside+1:Ninside+Nadd,1)**2/2.0_mp/vT/vT )         &
+                                            /SUM(EXP( -vp(Ninside+1:Ninside+Nadd,1)**2/2.0_mp/vT/vT ))
+
+        ! influx particles from right boundary
+        xp(Ninside+Nadd+1:Ninside+NaddReal) = PACK( xpR, influxR )
+        vp(Ninside+Nadd+1:Ninside+NaddReal,1) = PACK( vpR, influxR )
+        spwt(Ninside+Nadd+1:Ninside+NaddReal) = 0.0_mp
+
+		m%rho_back(m%ng) = m%rho_back(m%ng) + rightFlux*p%qs
+
+        call p%setSpecies(Ninside+NaddReal,xp,vp,spwt)
+
+        ! deallocate particle array
+        deallocate(xpL)
+        deallocate(vpL)
+        deallocate(xpR)
+        deallocate(vpR)
+        deallocate(influxL)
+        deallocate(influxR)
+        deallocate(xp)
+        deallocate(vp)
+        deallocate(spwt)
+    end subroutine
+
+    subroutine uniformParticleRefluxingRefluxing(p,m,dt,vT)
+        type(species), intent(inout) :: p
+        type(mesh), intent(inout) :: m
+        real(mp), intent(in) :: dt, vT
+
+        integer :: Ninside, Nadd, NxMaxL, NxMaxR, NaddReal
+        real(mp) :: leftFlux, rightFlux
+        real(mp), allocatable :: xp(:), vp(:,:), spwt(:), xpL(:), xpR(:), vpL(:), vpR(:)
+        logical, allocatable :: influxL(:), influxR(:)
+        logical, dimension(p%np) :: left, right, inside
+
+        integer :: k, ksum, i
+        real(mp) :: dxp, dvp
+
+        ! Out flux
+        left = p%xp.le.0.0_mp
+        right = p%xp.ge.m%L
+        leftFlux = SUM( PACK(p%spwt, left) )
+        rightFlux = SUM( PACK(p%spwt, right) )
+        inside = .not.(left.or.right)
+        Ninside = COUNT(inside)
+
+        Nadd = COUNT(left)
+        allocate(xpL(2*Nadd))
+        allocate(vpL(2*Nadd))
+        allocate(influxL(2*Nadd))
+        call RANDOM_NUMBER(xpL)
+        call RANDOM_NUMBER(vpL)
+        xpL = 5.5_mp*vT*dt*xpL
+        vpL = 5.5_mp*vT*vpL
+        influxL = (xpL>0.0_mp) .and. (vpL>0.0_mp) .and. ( xpL/vpL.le.dt )
+
+        Nadd = COUNT(right)
+        allocate(xpR(2*Nadd))
+        allocate(vpR(2*Nadd))
+        allocate(influxR(2*Nadd))
+        call RANDOM_NUMBER(xpR)
+        call RANDOM_NUMBER(vpR)
+        xpR = m%L - 5.5_mp*vT*dt*xpR
+        vpR = - 5.5_mp*vT*vpR
+        influxR = (xpR<m%L) .and. (vpR<0.0_mp) .and. ( (xpR-m%L)/vpR.le.dt )
+
+        NaddReal = COUNT(influxL) + COUNT(influxR)
+
+        ! allocate new particle array
+        allocate(xp(Ninside+NaddReal))
+        allocate(vp(Ninside+NaddReal,3))
+        allocate(spwt(Ninside+NaddReal))
+        vp = 0.0_mp
+
+        ! particle inside domain
+        xp(1:Ninside) = PACK( p%xp, inside )
+        vp(1:Ninside,1) = PACK( p%vp(:,1), inside )
+        spwt(1:Ninside) = PACK( p%spwt, inside )
+
+
+        ! influx particles from left boundary
+        Nadd = COUNT(influxL)
+        xp(Ninside+1:Ninside+Nadd) = PACK( xpL, influxL )
+        vp(Ninside+1:Ninside+Nadd,1) = PACK( vpL, influxL )
+        spwt(Ninside+1:Ninside+Nadd) = leftFlux*EXP( -vp(Ninside+1:Ninside+Nadd,1)**2/2.0_mp/vT/vT )         &
+                                            /SUM(EXP( -vp(Ninside+1:Ninside+Nadd,1)**2/2.0_mp/vT/vT ))
+
+        ! influx particles from right boundary
+        xp(Ninside+Nadd+1:Ninside+NaddReal) = PACK( xpR, influxR )
+        vp(Ninside+Nadd+1:Ninside+NaddReal,1) = PACK( vpR, influxR )
+        spwt(Ninside+Nadd+1:Ninside+NaddReal) = 0.0_mp
+        spwt(Ninside+Nadd+1:Ninside+NaddReal) = rightFlux*EXP( -vp(Ninside+Nadd+1:Ninside+NaddReal,1)**2     &
+                                            /2.0_mp/vT/vT )/SUM(EXP( -vp(Ninside+Nadd+1:Ninside+NaddReal,1)**2        &
+                                            /2.0_mp/vT/vT ))
+
+        call p%setSpecies(Ninside+NaddReal,xp,vp,spwt)
+
+        ! deallocate particle array
+        deallocate(xpL)
+        deallocate(vpL)
+        deallocate(xpR)
+        deallocate(vpR)
+        deallocate(influxL)
+        deallocate(influxR)
+        deallocate(xp)
+        deallocate(vp)
+        deallocate(spwt)
+    end subroutine
+
+    subroutine ionBoundarySensitivityToTau(p,m,dt,vT,mu,tau,ionFlux)
+        type(species), intent(inout) :: p
+        type(mesh), intent(inout) :: m
+        real(mp), intent(in) :: dt, vT, mu, tau, ionFlux
+
+        integer :: Ninside, Nadd, NxMaxL, NxMaxR, NaddReal
+        real(mp) :: leftFlux, rightFlux
+        real(mp) :: Z1, Z2
+        real(mp), allocatable :: xp(:), vp(:,:), spwt(:), xpL(:), xpR(:), vpL(:), vpR(:)
+        logical, allocatable :: influxL(:), influxR(:)
+        logical, dimension(p%np) :: left, right, inside
+
+        integer :: k, ksum, i
+        real(mp) :: dxp, dvp
+
+        ! Out flux
+        left = p%xp.le.0.0_mp
+        right = p%xp.ge.m%L
+        leftFlux = SUM( PACK(p%spwt, left) )
+        rightFlux = SUM( PACK(p%spwt, right) )
+        inside = .not.(left.or.right)
+        Ninside = COUNT(inside)
+
+        Nadd = COUNT(left)
+        allocate(xpL(2*Nadd))
+        allocate(vpL(2*Nadd))
+        allocate(influxL(2*Nadd))
+        call RANDOM_NUMBER(xpL)
+        call RANDOM_NUMBER(vpL)
+        xpL = 5.5_mp*vT*dt*xpL
+        vpL = 5.5_mp*vT*vpL
+        influxL = (xpL>0.0_mp) .and. (vpL>0.0_mp) .and. ( xpL/vpL.le.dt )
+
+        Nadd = COUNT(right)
+        allocate(xpR(2*Nadd))
+        allocate(vpR(2*Nadd))
+        allocate(influxR(2*Nadd))
+        call RANDOM_NUMBER(xpR)
+        call RANDOM_NUMBER(vpR)
+        xpR = m%L - 5.5_mp*vT*dt*xpR
+        vpR = - 5.5_mp*vT*vpR
+        influxR = (xpR<m%L) .and. (vpR<0.0_mp) .and. ( (xpR-m%L)/vpR.le.dt )
+
+        NaddReal = COUNT(influxL) + COUNT(influxR)
+
+        ! allocate new particle array
+        allocate(xp(Ninside+NaddReal))
+        allocate(vp(Ninside+NaddReal,3))
+        allocate(spwt(Ninside+NaddReal))
+        vp = 0.0_mp
+
+        ! particle inside domain
+        xp(1:Ninside) = PACK( p%xp, inside )
+        vp(1:Ninside,1) = PACK( p%vp(:,1), inside )
+        spwt(1:Ninside) = PACK( p%spwt, inside )
+
+
+        ! influx particles from left boundary
+        Nadd = COUNT(influxL)
+        xp(Ninside+1:Ninside+Nadd) = PACK( xpL, influxL )
+        vp(Ninside+1:Ninside+Nadd,1) = PACK( vpL, influxL )
+        Z1 = SUM(EXP( -vp(Ninside+1:Ninside+Nadd,1)**2/2.0_mp/vT/vT ))
+        Z2 = SUM(vp(Ninside+1:Ninside+Nadd,1)**2*EXP( -vp(Ninside+1:Ninside+Nadd,1)**2/2.0_mp/vT/vT ))
+        spwt(Ninside+1:Ninside+Nadd) = leftFlux*EXP( -vp(Ninside+1:Ninside+Nadd,1)**2/2.0_mp/vT/vT )         &
+                                            /SUM(EXP( -vp(Ninside+1:Ninside+Nadd,1)**2/2.0_mp/vT/vT ))       &
+                                     + ionFlux/tau*EXP( -vp(Ninside+1:Ninside+Nadd,1)**2/2.0_mp/vT/vT )      &
+                                              *( 1.0_mp/Z1 - vp(Ninside+1:Ninside+Nadd,1)**2/Z2 )
+
+        ! influx particles from right boundary
+        xp(Ninside+Nadd+1:Ninside+NaddReal) = PACK( xpR, influxR )
+        vp(Ninside+Nadd+1:Ninside+NaddReal,1) = PACK( vpR, influxR )
+        spwt(Ninside+Nadd+1:Ninside+NaddReal) = 0.0_mp
+
+		m%rho_back(m%ng) = m%rho_back(m%ng) + rightFlux*p%qs
+
+        call p%setSpecies(Ninside+NaddReal,xp,vp,spwt)
+
+        ! deallocate particle array
+        deallocate(xpL)
+        deallocate(vpL)
+        deallocate(xpR)
+        deallocate(vpR)
+        deallocate(influxL)
+        deallocate(influxR)
+        deallocate(xp)
+        deallocate(vp)
+        deallocate(spwt)
+    end subroutine
+
+    subroutine testIonBoundarySensitivity(p,m,dt,vT,mu,tau,ionFlux)
+        type(species), intent(inout) :: p
+        type(mesh), intent(inout) :: m
+        real(mp), intent(in) :: dt, vT, mu, tau, ionFlux
+
+        integer :: Ninside, Nadd, NxMaxL, NxMaxR, NaddReal
+        real(mp) :: leftFlux, rightFlux
+        real(mp) :: Z1, Z2
+        real(mp), allocatable :: xp(:), vp(:,:), spwt(:), xpL(:), xpR(:), vpL(:), vpR(:)
+        logical, allocatable :: influxL(:), influxR(:)
+        logical, dimension(p%np) :: left, right, inside
+
+        integer :: k, ksum, i
+        real(mp) :: dxp, dvp
+
+        ! Out flux
+        left = p%xp.le.0.0_mp
+        right = p%xp.ge.m%L
+        leftFlux = SUM( PACK(p%spwt, left) )
+        rightFlux = SUM( PACK(p%spwt, right) )
+        inside = .not.(left.or.right)
+        Ninside = COUNT(inside)
+
+        Nadd = COUNT(left)
+        allocate(xpL(2*Nadd))
+        allocate(vpL(2*Nadd))
+        allocate(influxL(2*Nadd))
+        call RANDOM_NUMBER(xpL)
+        call RANDOM_NUMBER(vpL)
+        xpL = 5.5_mp*vT*dt*xpL
+        vpL = 5.5_mp*vT*vpL
+        influxL = (xpL>0.0_mp) .and. (vpL>0.0_mp) .and. ( xpL/vpL.le.dt )
+
+        Nadd = COUNT(right)
+        allocate(xpR(2*Nadd))
+        allocate(vpR(2*Nadd))
+        allocate(influxR(2*Nadd))
+        call RANDOM_NUMBER(xpR)
+        call RANDOM_NUMBER(vpR)
+        xpR = m%L - 5.5_mp*vT*dt*xpR
+        vpR = - 5.5_mp*vT*vpR
+        influxR = (xpR<m%L) .and. (vpR<0.0_mp) .and. ( (xpR-m%L)/vpR.le.dt )
+
+        NaddReal = COUNT(influxL) + COUNT(influxR)
+
+        ! allocate new particle array
+        allocate(xp(Ninside+NaddReal))
+        allocate(vp(Ninside+NaddReal,3))
+        allocate(spwt(Ninside+NaddReal))
+        vp = 0.0_mp
+
+        ! particle inside domain
+        xp(1:Ninside) = PACK( p%xp, inside )
+        vp(1:Ninside,1) = PACK( p%vp(:,1), inside )
+        spwt(1:Ninside) = PACK( p%spwt, inside )
+
+
+        ! influx particles from left boundary
+        Nadd = COUNT(influxL)
+        xp(Ninside+1:Ninside+Nadd) = PACK( xpL, influxL )
+        vp(Ninside+1:Ninside+Nadd,1) = PACK( vpL, influxL )
+        Z1 = SUM(EXP( -vp(Ninside+1:Ninside+Nadd,1)**2/2.0_mp/vT/vT ))
+        Z2 = SUM(vp(Ninside+1:Ninside+Nadd,1)**2*EXP( -vp(Ninside+1:Ninside+Nadd,1)**2/2.0_mp/vT/vT ))
+        spwt(Ninside+1:Ninside+Nadd) = leftFlux*EXP( -vp(Ninside+1:Ninside+Nadd,1)**2/2.0_mp/vT/vT )         &
+                                            /SUM(EXP( -vp(Ninside+1:Ninside+Nadd,1)**2/2.0_mp/vT/vT ))       &
+                                     + ionFlux/tau*EXP( -vp(Ninside+1:Ninside+Nadd,1)**2/2.0_mp/vT/vT )      &
+                                              *( 1.0_mp/Z1 - vp(Ninside+1:Ninside+Nadd,1)**2/Z2 )
+
+        ! influx particles from right boundary
+        xp(Ninside+Nadd+1:Ninside+NaddReal) = PACK( xpR, influxR )
+        vp(Ninside+Nadd+1:Ninside+NaddReal,1) = PACK( vpR, influxR )
+        Z1 = SUM(EXP( -vp(Ninside+Nadd+1:Ninside+NaddReal,1)**2/2.0_mp/vT/vT ))
+        Z2 = SUM(vp(Ninside+Nadd+1:Ninside+NaddReal,1)**2*EXP( -vp(Ninside+Nadd+1:Ninside+NaddReal,1)**2/2.0_mp/vT/vT ))
+        spwt(Ninside+Nadd+1:Ninside+NaddReal) = rightFlux*EXP( -vp(Ninside+Nadd+1:Ninside+NaddReal,1)**2/2.0_mp/vT/vT )/Z1      &
+                                     + ionFlux/tau*EXP( -vp(Ninside+Nadd+1:Ninside+NaddReal,1)**2/2.0_mp/vT/vT )      &
+                                              *( 1.0_mp/Z1 - vp(Ninside+Nadd+1:Ninside+NaddReal,1)**2/Z2 )
+
+        call p%setSpecies(Ninside+NaddReal,xp,vp,spwt)
+
+        ! deallocate particle array
+        deallocate(xpL)
+        deallocate(vpL)
+        deallocate(xpR)
+        deallocate(vpR)
+        deallocate(influxL)
+        deallocate(influxR)
         deallocate(xp)
         deallocate(vp)
         deallocate(spwt)

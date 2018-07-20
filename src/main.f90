@@ -60,8 +60,10 @@ program main
 !    call FFTtest
 !    call Landau_Jtheta
 !    call sheath_edge
-    call customFluxTest
+!    call customFluxTest
 !    call sheath_Jcurve
+!    call Sheath_sensitivity
+    call testVelocityGradient
 
 	! print to screen
     if( mpih%my_rank .eq. 0) then

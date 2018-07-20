@@ -234,7 +234,7 @@ contains
 	end subroutine
 
 	subroutine sheath_initialize(this,Ne,Ni,tau,mu)
-		type(PM1D), intent(inout) :: this
+		class(PM1D), intent(inout) :: this
 		integer, intent(in) :: Ne, Ni
 		real(mp), intent(in) :: tau, mu
 		real(mp) :: Vth_e, Vth_i
@@ -254,6 +254,40 @@ contains
 
 		spwt_e = this%L/Ne
 		spwt_i = this%L/Ni
+
+		call this%p(1)%setSpecies(Ne,xpe,vpe,spwt_e)
+		call this%p(2)%setSpecies(Ni,xpi,vpi,spwt_i)
+
+		call this%m%setMesh((/ (0.0_mp, i=1,this%m%ng) /))
+	end subroutine
+
+	subroutine sheath_DerivativeToTau_initialize(this,Ne,Ni,tau,mu)
+		class(FSens), intent(inout) :: this
+		integer, intent(in) :: Ne, Ni
+		real(mp), intent(in) :: tau, mu
+		real(mp) :: Vth_e, Vth_i
+        real(mp) :: Z1, Z2
+		real(mp) :: xpe(Ne), vpe(Ne,3), spwt_e(Ne), xpi(Ni), vpi(Ni,3), spwt_i(Ni)
+        integer :: i
+
+		call RANDOM_NUMBER(xpe)
+		call RANDOM_NUMBER(xpi)
+		xpe = xpe*this%L
+		xpi = xpi*this%L
+
+		Vth_e = 1.0_mp
+		Vth_i = sqrt(1.0_mp/mu/tau)
+		print *, 'Vth_e: ',Vth_e,', Vth_i: ',Vth_i
+		call RANDOM_NUMBER(vpe)
+		call RANDOM_NUMBER(vpi)
+		vpe = 5.5_mp*Vth_e*(2.0_mp*vpe-1.0_mp)
+		vpi = 5.5_mp*Vth_i*(2.0_mp*vpi-1.0_mp)
+
+		spwt_e = 0.0_mp
+
+        Z1 = SUM( EXP( -mu*tau*vpi(:,1)**2/2.0_mp ) )
+        Z2 = SUM( vpi(:,1)**2*EXP( -mu*tau*vpi(:,1)**2/2.0_mp ) )
+		spwt_i = this%L/2.0_mp/tau*(1.0_mp/Z1 - vpi(:,1)**2/Z2)*EXP( -mu*tau*vpi(:,1)**2/2.0_mp )
 
 		call this%p(1)%setSpecies(Ne,xpe,vpe,spwt_e)
 		call this%p(2)%setSpecies(Ni,xpi,vpi,spwt_i)
