@@ -133,7 +133,9 @@ contains
 		integer, intent(in) :: k
 		real(mp), intent(inout) :: J
         
-        J = J + 1.0_mp/pm%nt*( -pm%m%phi(pm%ng) )
+        if( k.ge.pm%nt/2 ) then
+            J = J + 1.0_mp/(pm%nt-pm%nt/2+1)*( -pm%m%phi(pm%ng) )
+        end if
     end subroutine
 
 end module
