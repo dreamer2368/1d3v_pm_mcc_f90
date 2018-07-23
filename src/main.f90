@@ -59,10 +59,10 @@ program main
 !    call MPI_write_test
 !    call FFTtest
 !    call Landau_Jtheta
-    call sheath_edge
+!    call sheath_edge
 !    call customFluxTest
 !    call sheath_Jcurve
-!    call Sheath_sensitivity
+    call Sheath_sensitivity
 !    call testVelocityGradient
 
 	! print to screen

@@ -57,10 +57,11 @@ contains
 	subroutine Sheath_sensitivity
         use modTarget
         use modSource
+        use modQoI
 		type(PM1D) :: pm
 		type(FSens) :: fs
 		type(recordData) :: r, fsr
-		integer, parameter :: Ne = 1E5, Ni = 1E5, Ng = 64
+		integer, parameter :: Ne = 1E5, Ni = 1E5, Ng = 128
 		integer :: NInit=5E4, Ngv, NInject, NLimit
         real(mp), parameter :: tau = 1.0_mp, mu = 100.0_mp, Z = 1.0_mp
         real(mp) :: L, dt, dx
@@ -72,10 +73,20 @@ contains
         real(mp) :: E_temp(Ng), vp, Lv(2), dv(2), fracv2(2), fracv3(3)
         integer :: g(2), gv2(2), gv3(3)
 
+        integer :: Ns
+        real(mp) :: Ls, fracS, Ze, Zi1, Zi2
+        real(mp), allocatable :: vg(:), Se(:,:), Si1(:,:), Si2(:,:)
+
+        type(species) :: tempSpecies(2)
+
+        real(mp) :: Jtemp, DJtemp
+        real(mp), allocatable :: Jhist(:), DJhist(:)
+
 		integer :: i,j,k,ii, kr
 		character(len=100)::dir, kstr
 		procedure(control), pointer :: PtrControl=>NULL()
 		procedure(source), pointer :: PtrSource=>NULL()
+		procedure(QoI), pointer :: PtrQoI=>NULL()
 
 		L = 25.0_mp
 
@@ -83,8 +94,8 @@ contains
 
         ve0 = 1.0_mp
 		vi0 = sqrt(1.0_mp/mu/tau)
-		Time_f = 200.0_mp
-        Ngv = Ng/4
+		Time_f = 1200.0_mp
+        Ngv = Ng/2
         NInject = getOption('number_of_injecting_particles',Ne/20)
         NLimit = getOption('population_limit',Ne/2)
         dir = getOption('base_directory','Sheath_sensitivity')
@@ -99,19 +110,60 @@ contains
         call init_random_seed
 		call sheath_initialize(pm,Ne,Ni,tau,mu)
 
-		Lv = (/ 5.0_mp, 0.5_mp /)
+		Lv = 5.0_mp*(/ ve0, vi0 /)
         dv = Lv/Ngv
 		call buildFSens(fs,pm,Lv(2),Ngv,NInject,NLimit)
 		call buildRecord(fsr,fs%nt,2,fs%L,fs%ng,trim(dir)//'/f_A',10)
 		call sheath_DerivativeToTau_initialize(fs,Ne,Ni,tau,mu)
 
+		call buildSpecies(tempSpecies(1),-1.0_mp,1.0_mp)
+		call buildSpecies(tempSpecies(2),Z,mu)
+
         allocate(S(Ng,2*Ngv+1,2))
         allocate(Dvf(Ng,2*Ngv+1,2))
         allocate(nA(Ng,2*Ngv+1,2))
+
+        !Source Term Profile
+        Ls = L*0.5_mp/1.4_mp
+        Ns = FLOOR( Ls/pm%m%dx + 0.5_mp ) + 1
+        fracS = Ls/pm%m%dx + 0.5_mp - ( Ns - 1 )
+
+        allocate(vg(2*Ngv+1))
+        vg = (/ ((i-Ngv-1)*dv(1),i=1,2*Ngv+1) /)
+        Ze = SUM(ABS(vg)/2.0_mp*EXP(-vg**2/2.0_mp))*dv(1)
+        allocate(Se(Ns,2*Ngv+1))
+        do i=1,Ns-1
+            Se(i,:) = 1.0_mp/Ls/Ze*ABS(vg)/2.0_mp*EXP(-vg**2/2.0_mp)
+        end do
+        Se(Ns,:) = fracS/Ls/Ze*ABS(vg)/2.0_mp*EXP(-vg**2/2.0_mp)
+        print *, 'Electron sensitivity source profile integral: ',                          &
+                 SUM(Se(2:Ns,:))*dv(1)*pm%m%dx + SUM(Se(1,:))*dv(1)*0.5_mp*pm%m%dx
+
+        vg = (/ ((i-Ngv-1)*dv(2),i=1,2*Ngv+1) /)
+        Zi1 = SUM( mu*tau*ABS(vg)/2.0_mp*EXP(-mu*tau*vg**2/2.0_mp) )*dv(2)
+        Zi2 = SUM( mu**2*tau**2*ABS(vg)**3/4.0_mp*EXP(-mu*tau*vg**2/2.0_mp) )*dv(2)
+        allocate(Si1(Ns,2*Ngv+1))
+        allocate(Si2(Ns,2*Ngv+1))
+        do i=1,Ns-1
+            Si1(i,:) = 1.0_mp/Ls/Zi1*mu*tau*ABS(vg)/2.0_mp*EXP(-mu*tau*vg**2/2.0_mp)
+            Si2(i,:) = 1.0_mp/Ls/Zi2*mu**2*tau**2*ABS(vg)**3/4.0_mp*EXP(-mu*tau*vg**2/2.0_mp)
+        end do
+        Si1(Ns,:) = fracS/Ls/Zi1*mu*tau*ABS(vg)/2.0_mp*EXP(-mu*tau*vg**2/2.0_mp)
+        Si2(Ns,:) = fracS/Ls/Zi2*mu**2*tau**2*ABS(vg)**3/4.0_mp*EXP(-mu*tau*vg**2/2.0_mp)
+        print *, 'Ion sensitivity source profile1 integral: ',                          &
+                 SUM(Si1(2:Ns,:))*dv(2)*pm%m%dx + SUM(Si1(1,:))*dv(2)*0.5_mp*pm%m%dx
+        print *, 'Ion sensitivity source profile2 integral: ',                          &
+                 SUM(Si2(2:Ns,:))*dv(2)*pm%m%dx + SUM(Si2(1,:))*dv(2)*0.5_mp*pm%m%dx
     
 		k=0
         PtrControl=>Null_input
         PtrSource=>PartialUniform_Rayleigh2
+
+        PtrQoI=>PhiAtWall
+        allocate(Jhist(pm%nt))
+        allocate(DJhist(pm%nt))
+        Jhist = 0.0_mp
+        DJhist = 0.0_mp
 
 		!Time stepping
 		call r%recordPlasma(pm, k)									!record for n=1~Nt
@@ -150,6 +202,9 @@ contains
     		do i=1, pm%n
     			call pm%p(i)%accelSpecies(dt)
     		end do
+
+			call PtrQoI(pm,k,Jtemp)
+            Jhist(k) = Jtemp
 
 			call r%recordPlasma(pm, k)									!record for n=1~Nt
 
@@ -205,34 +260,66 @@ contains
 
         		!Multiply E_A
         		E_temp = fs%p(i)%qs/fs%p(i)%ms*fs%m%E
+!        		E_temp = 1.0_mp
         		do j=1,2*Ngv+1
         			S(:,j,i) = Dvf(:,j,i)*E_temp 
                 end do
-        
-        		!Multiply dt
-        		S = -S*dt
+            end do
+        	!Multiply dt
+        	S = -S*dt
 
-                !Source sensitivity
+!            S = 0.0_mp
+            !Source sensitivity
+            S(1:Ns,:,1) = S(1:Ns,:,1) + sensitivityFluxR*Se
+            S(1:Ns,:,2) = S(1:Ns,:,2) + sensitivityFluxR*Si1 + ionFluxR/tau*( Si1 - Si2 )
 
+            do i=1,fs%n
+                fs%dv = dv(i)
+                fs%J = S(:,:,i)
+
+                call tempSpecies(i)%setSpecies(fs%p(i)%np,fs%p(i)%xp,fs%p(i)%vp,fs%p(i)%spwt)
+                tempSpecies(i)%spwt = 0.0_mp
+
+                call fs%numberDensity(fs%p(i),fs%a(i))
+                call fs%updateWeight(fs%p(i),fs%a(i))
+!                call fs%updateWeight(tempSpecies(i),fs%a(i))
             end do
         
-!    		call fs%FDistribution(fs%p(2),fs%a(2))
-
 		    if( (fsr%mod.eq.1) .or. (mod(k,fsr%mod).eq.0) ) then
 			    kr = merge(k,k/fsr%mod,fsr%mod.eq.1)
 		    	write(kstr,*) kr
     	    	open(unit=304,file='data/'//trim(dir)//'/f_A/distribution/'//trim(adjustl(kstr))//'.bin',         &
                          status='replace',form='unformatted',access='stream')
-!    	    	write(304) fs%f_A
-    	    	write(304) S
+                do i=1,fs%n
+                    fs%dv = dv(i)
+            		call fs%FDistribution(fs%p(i),fs%a(i))
+!            		call fs%FDistribution(tempSpecies(i),fs%a(i))
+        	    	write(304) fs%f_A
+                end do
+!    	    	write(304) S
     	    	close(304)
             end if
+
+			call PtrQoI(fs,k,DJtemp)
+            DJhist(k) = DJtemp
 
 			call fsr%recordPlasma(fs, k)									!record for n=1~Nt
 		end do
 
+		open(unit=305,file='data/'//fsr%dir//'/grad_hist.bin',	&
+					status='replace',form='unformatted',access='stream')
+		write(305) DJhist
+		close(305)
+		open(unit=305,file='data/'//r%dir//'/J_hist.bin',	&
+					status='replace',form='unformatted',access='stream')
+		write(305) Jhist
+		close(305)
+
 		call printPlasma(r)
 		call printPlasma(fsr)
+
+        call tempSpecies(1)%destroySpecies
+        call tempSpecies(2)%destroySpecies
 
 		call destroyPM1D(pm)
 		call destroyRecord(r)
