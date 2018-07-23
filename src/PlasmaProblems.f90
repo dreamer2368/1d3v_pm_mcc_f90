@@ -213,13 +213,13 @@ contains
 		real(mp) ::  tau_min, tau_max
         real(mp), allocatable :: tau(:)
 		integer :: Nsample, N = 1E5, Ng = 128
-		real(mp) :: L = 10.0_mp, Ls = 0.3_mp, mu = 100.0_mp, Z = 1.0_mp
+		real(mp), parameter :: L = 25.0_mp, Ls = 0.5_mp/1.4_mp, mu = 100.0_mp, Z = 1.0_mp
 		real(mp) :: dx
 		real(mp) :: Time
 		real(mp) :: A(4),J
 		integer :: i, thefile, idx, input
 		character(len=100):: dir, filename
-        Time = getOption('QoI_curve/time',300.0_mp)
+        Time = getOption('QoI_curve/time',1200.0_mp)
         dir = getOption('QoI_curve/directory','Sheath_curve')
         filename = getOption('QoI_curve/filename','J.bin')
         input = getOption('QoI_curve/random_seed',0)
