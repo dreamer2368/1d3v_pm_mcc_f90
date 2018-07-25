@@ -201,7 +201,7 @@ contains
 
 		call PtrControl(dpm,k,'xp')
 
-		call PtrSource(dpm)
+		call PtrSource(dpm,k)
 
 		call CPU_TIME(time1)
 		do i=1,dpm%n
@@ -280,7 +280,7 @@ contains
 
 		call PtrControl(dpm,k,'xp')
 
-		call PtrSource(dpm)
+		call PtrSource(dpm,k)
 
 		call CPU_TIME(time1)
 

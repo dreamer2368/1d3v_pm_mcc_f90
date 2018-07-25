@@ -121,7 +121,7 @@ contains
 
 		call PtrControl(this,k,'xp')
 
-		call PtrSource(this)
+		call PtrSource(this,k)
 
 		call CPU_TIME(time1)
 		do i=1,this%n

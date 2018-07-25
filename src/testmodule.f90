@@ -170,7 +170,7 @@ contains
 		do k=1,pm%nt
     		call PtrControl(pm,k,'xp')
 
-    		call PtrSource(pm)
+    		call PtrSource(pm,k)
     
     		do i=1,pm%n
     			call pm%p(i)%moveSpecies(dt)
