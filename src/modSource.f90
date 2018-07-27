@@ -138,11 +138,12 @@ contains
 		deallocate(spwt_add)
 	end subroutine
 
-	subroutine Modified_Rayleigh2(pm,k)
+	subroutine Modified_Maxwellian2(pm,k)
 		class(PM1D), intent(inout) :: pm
         integer, intent(in) :: k
 		integer :: Nadd, newN, i
 		real(mp), allocatable :: xp_add(:), vp_add(:,:), spwt_add(:)
+        real(mp) :: time, convectionVelocity, timeStart, timeEnd, Period
 
 		Nadd = floor(pm%A0(4)-pm%p(2)%np)
 		allocate(xp_add(Nadd))
@@ -152,11 +153,20 @@ contains
 		call RANDOM_NUMBER(xp_add)
 		xp_add = xp_add*pm%A0(3)*pm%L
 		spwt_add = pm%p(1)%spwt(1)
-		vp_add = pm%A0(1)*randr(Nadd,3)
+		vp_add = pm%A0(1)*randn(Nadd,3)
 		call pm%p(1)%appendSpecies(Nadd,xp_add,vp_add,spwt_add)
 
+        time = k*pm%dt
+        Period = 0.2_mp*pm%nt*pm%dt
+        timeStart = 0.1_mp*pm%nt*pm%dt
+        timeEnd = timeStart + 4.0_mp*Period
+        convectionVelocity = 0.0_mp
+        if( (time.ge.timeStart) .and. (time.le.timeEnd) ) then
+            convectionVelocity = 20.0_mp*pm%A0(2)*SIN( 2.0_mp*pi*(time-timeStart)/Period )
+        end if
+
 		spwt_add = pm%p(2)%spwt(1)
-		vp_add = pm%A0(2)*randr(Nadd,3)
+		vp_add = pm%A0(2)*randn(Nadd,3) + convectionVelocity
 		call pm%p(2)%appendSpecies(Nadd,xp_add,vp_add,spwt_add)
 
 		deallocate(xp_add)

@@ -52,7 +52,7 @@ contains
             call MPI_FILE_SYNC(thefile,mpih%ierr)
 
 			call destroyRecord(r)
-			call destroyPM1D(pm)
+            call destroyPM1D(pm)
             print *, 'theta=',A(2),', J=',J
 		end do
 
@@ -266,5 +266,84 @@ contains
         call MPI_FILE_CLOSE(thefile, mpih%ierr)            
 	end subroutine
 
+	subroutine modified_sheath
+		type(PM1D) :: sheath
+		type(recordData) :: r
+		integer, parameter :: Ne = 1E5, Ni = 1E5, Ng = 128
+        real(mp), parameter :: tau = 1.0_mp, mu = 100.0_mp, Z = 1.0_mp
+        real(mp) :: L, dt, dx
+		real(mp) :: ve0, vi0, Time_f
+
+        integer :: inputNe, inputNi
+        real(mp), allocatable :: xp_e(:), vp_e(:,:), spwt_e(:), xp_i(:), vp_i(:,:), spwt_i(:)
+        real(mp) :: rho_back(Ng)
+		character(len=100):: dir, filename
+
+		real(mp) :: A(4)
+		integer :: i
+
+        dir = 'modified_sheath'
+
+		L = 25.0_mp
+
+		dt = 0.1_mp
+
+        ve0 = 1.0_mp
+		vi0 = sqrt(1.0_mp/mu/tau)
+		Time_f = 300.0_mp
+
+		A = (/ ve0, vi0, 0.5_mp/1.4_mp, 1.0_mp*Ni /)
+!		A = (/ 0.1_mp, ve0, vi0, 1.0_mp*Ni /)
+		call buildPM1D(sheath,Time_f,0.0_mp,Ng,2,pBC=2,mBC=2,order=1,A=A,L=L,dt=dt)
+		call buildRecord(r,sheath%nt,2,sheath%L,sheath%ng,trim(dir),10)
+
+		call buildSpecies(sheath%p(1),-1.0_mp,1.0_mp)
+		call buildSpecies(sheath%p(2),Z,mu)
+
+        call init_random_seed
+
+        inputNe = 97162
+        inputNi = 99949
+        allocate(xp_e(inputNe))
+        allocate(vp_e(inputNe,3))
+        allocate(spwt_e(inputNe))
+        allocate(xp_i(inputNi))
+        allocate(vp_i(inputNi,3))
+        allocate(spwt_i(inputNi))
+        open(unit=305,file='data/'//trim(dir)//'/IC/xp_e.bin',form='unformatted',access='stream')
+        read(305) xp_e
+        close(305)
+        open(unit=305,file='data/'//trim(dir)//'/IC/vp_e.bin',form='unformatted',access='stream')
+        read(305) vp_e
+        close(305)
+        open(unit=305,file='data/'//trim(dir)//'/IC/xp_i.bin',form='unformatted',access='stream')
+        read(305) xp_i
+        close(305)
+        open(unit=305,file='data/'//trim(dir)//'/IC/vp_i.bin',form='unformatted',access='stream')
+        read(305) vp_i
+        close(305)
+        spwt_e = L/Ne
+        spwt_i = L/Ni
+
+		call sheath%p(1)%setSpecies(inputNe,xp_e,vp_e,spwt_e)
+		call sheath%p(2)%setSpecies(inputNi,xp_i,vp_i,spwt_i)
+
+        deallocate(xp_e)
+        deallocate(vp_e)
+        deallocate(spwt_e)
+        deallocate(xp_i)
+        deallocate(vp_i)
+        deallocate(spwt_i)
+
+        rho_back = 0.0_mp
+        rho_back(Ng) = - ( -inputNe*L/Ne + Z*inputNi*L/Ni )
+		call sheath%m%setMesh(rho_back)
+		call forwardsweep(sheath,r,Null_input,Modified_Maxwellian2)
+
+		call printPlasma(r)
+
+		call destroyRecord(r)
+		call destroyPM1D(sheath)
+	end subroutine
 
 end module
