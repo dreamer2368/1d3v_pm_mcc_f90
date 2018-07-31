@@ -6,6 +6,14 @@ module MatrixVector
 
 	include 'fftw3.f'
 
+	abstract interface
+		function func(x,y) result(f)
+			use constants
+            real(mp), intent(in) :: x(:), y(:)
+            real(mp) :: f(size(x))
+		end function
+	end interface
+
 contains
 
 	function multiplyD(x,dx,idx) result(y)						!Derivative with BC
@@ -235,5 +243,43 @@ contains
 
 		x = REALPART(xb)*1.0_mp/N
 	end subroutine
+
+!=============== Newton-Raphson Method for implicit nonlinear equation ===============
+
+    function NewtonRaphson(xmin,xmax,fun,dfun,y) result(x0)
+        real(mp), intent(in) :: xmin, xmax, y(:)
+        procedure(func) :: fun, dfun
+
+        real(mp), parameter :: tol=1.0E-15
+        integer, parameter :: iterMax = 1E5
+
+        real(mp), dimension(size(y)) :: x0, dx, f, df
+        logical, dimension(size(y)) :: outside
+        integer :: j
+
+        x0 = 0.5_mp*(xmin + xmax)
+        do j=1,iterMax
+            f = fun(x0,y)
+            df = dfun(x0,y)
+            dx = f/df
+            x0 = x0-dx
+            if( SUM(ABS(dx))/size(y).le.tol ) then
+                outside =  (xmin-x0)*(x0-xmax)<0.0_mp
+                if( COUNT(outside).ne.0 ) then
+                    print *, 'Newton-Raphson: jumped out of brackets.'
+                    print *, 'x0: ', PACK(x0,outside)
+                    print *, 'Average Dx: ', PACK(dx,outside)
+                    stop
+                else
+                    return
+                end if
+            end if
+        end do
+        print *, 'Newton-Raphson: exceeded max iteration.'
+        print *, 'Max Dx: ', MAXVAL(ABS(dx))
+        print *, 'Min Dx: ', MINVAL(ABS(dx))
+        print *, 'Average Dx: ',SUM(ABS(dx))/size(y)
+        print *, 'Tolerance: ',tol
+    end function
 
 end module
