@@ -59,12 +59,13 @@ program main
 !    call MPI_write_test
 !    call FFTtest
 !    call Landau_Jtheta
-!    call sheath_edge
+    call sheath_edge
 !    call customFluxTest
-    call sheath_Jcurve
+!    call sheath_Jcurve
 !    call Sheath_sensitivity
 !    call testVelocityGradient
-
+!    call modified_sheath
+!    call Shock
 
 	! print to screen
     if( mpih%my_rank .eq. 0) then

@@ -9,6 +9,217 @@ module testmodule
 
 contains
 
+	subroutine modified_sheath_sensitivity
+        use modTarget
+        use modSource
+        use modQoI
+		type(PM1D) :: pm
+		type(FSens) :: fs
+		type(recordData) :: r, fsr
+		integer, parameter :: Ne = 1E5, Ni = 1E5, Ng = 128
+		integer :: NInit=5E4, Ngv, NInject, NLimit
+        real(mp), parameter :: tau = 1.0_mp, mu = 100.0_mp, Z = 1.0_mp
+        real(mp) :: L, dt, dx
+        real(mp) :: Lv(2), dv(2)
+		real(mp) :: ve0, vi0, Time_f
+
+        integer :: inputNe, inputNi
+        real(mp), allocatable :: xp_e(:), vp_e(:,:), spwt_e(:), xp_i(:), vp_i(:,:), spwt_i(:)
+        real(mp) :: rho_back(Ng)
+		character(len=100):: dir, filename
+
+		real(mp) :: A(5)
+		integer :: i
+
+        dir = 'modified_sheath_sensitivity'
+
+		L = 25.0_mp
+
+		dt = 0.1_mp
+
+        ve0 = 1.0_mp
+		vi0 = sqrt(1.0_mp/mu/tau)
+		Time_f = 300.0_mp
+
+		A = (/ ve0, vi0, 0.5_mp/1.4_mp, 1.0_mp*Ni, 2.0_mp /)
+		call buildPM1D(pm,Time_f,0.0_mp,Ng,2,pBC=2,mBC=2,order=1,A=A,L=L,dt=dt)
+		call buildRecord(r,pm%nt,2,pm%L,pm%ng,trim(dir),10)
+
+		call buildSpecies(pm%p(1),-1.0_mp,1.0_mp)
+		call buildSpecies(pm%p(2),Z,mu)
+
+        call init_random_seed
+
+        inputNe = 99512
+        inputNi = 99965
+        allocate(xp_e(inputNe))
+        allocate(vp_e(inputNe,3))
+        allocate(spwt_e(inputNe))
+        allocate(xp_i(inputNi))
+        allocate(vp_i(inputNi,3))
+        allocate(spwt_i(inputNi))
+        open(unit=305,file='data/'//trim(dir)//'/IC/xp_e.bin',form='unformatted',access='stream')
+        read(305) xp_e
+        close(305)
+        open(unit=305,file='data/'//trim(dir)//'/IC/vp_e.bin',form='unformatted',access='stream')
+        read(305) vp_e
+        close(305)
+        open(unit=305,file='data/'//trim(dir)//'/IC/xp_i.bin',form='unformatted',access='stream')
+        read(305) xp_i
+        close(305)
+        open(unit=305,file='data/'//trim(dir)//'/IC/vp_i.bin',form='unformatted',access='stream')
+        read(305) vp_i
+        close(305)
+        spwt_e = L/Ne
+        spwt_i = L/Ni
+
+		call pm%p(1)%setSpecies(inputNe,xp_e,vp_e,spwt_e)
+		call pm%p(2)%setSpecies(inputNi,xp_i,vp_i,spwt_i)
+
+        deallocate(xp_e)
+        deallocate(vp_e)
+        deallocate(spwt_e)
+        deallocate(xp_i)
+        deallocate(vp_i)
+        deallocate(spwt_i)
+
+        rho_back = 0.0_mp
+        rho_back(Ng) = - ( -inputNe*L/Ne + Z*inputNi*L/Ni )
+		call pm%m%setMesh(rho_back)
+
+		Lv = 5.0_mp*(/ ve0, vi0 /)
+        dv = Lv/Ngv
+		call buildFSens(fs,pm,Lv(2),Ngv,NInject,NLimit)
+		call buildRecord(fsr,fs%nt,2,fs%L,fs%ng,trim(dir)//'/f_A',10)
+
+		call forwardsweep(pm,r,Null_input,Modified_Maxwellian2)
+
+		call printPlasma(r)
+
+		call destroyRecord(r)
+		call destroyPM1D(pm)
+	end subroutine
+
+	subroutine Shock
+        use modTarget
+        use modSource
+        use modQoI
+		type(PM1D) :: pm
+		type(recordData) :: r
+		integer, parameter :: Ne = 1E6, Ni = 1E6, Ng = 512
+        real(mp) :: xp0(Ne), vpe(Ne,3), vpi(Ni,3), spwt0(Ne), rho_back(Ng)
+        real(mp), parameter :: M = 2.0_mp, tau = 10000.0_mp, mu = 2000.0_mp, Z = 1.0_mp
+        real(mp) :: L, dt, dx
+		real(mp) :: ve0, vi0, Time_f, kh, wh, a
+		real(mp) :: A0(4)
+
+		integer :: i,j,k,ii, kr
+		character(len=100)::dir, kstr
+		procedure(control), pointer :: PtrControl=>NULL()
+		procedure(source), pointer :: PtrSource=>NULL()
+		procedure(QoI), pointer :: PtrQoI=>NULL()
+
+		L = 144.0_mp
+
+		dt = 0.1_mp
+
+        ve0 = 1.0_mp
+		vi0 = sqrt(1.0_mp/mu/tau)
+		Time_f = 3000.0_mp
+        dir = getOption('base_directory','IASW')
+
+		A0 = (/ ve0, vi0, 0.5_mp/1.4_mp, 1.0_mp*Ni /)
+		call buildPM1D(pm,Time_f,0.0_mp,Ng,2,pBC=0,mBC=0,order=1,A=A0,L=L,dt=dt)
+		call buildRecord(r,pm%nt,2,pm%L,pm%ng,trim(dir),50)
+
+		call buildSpecies(pm%p(1),-1.0_mp,1.0_mp)
+		call buildSpecies(pm%p(2),Z,mu)
+
+        call init_random_seed
+        kh = 2.0_mp*pi
+        wh = 9.7_mp*10.0_mp**(-4)
+        a = 0.4_mp
+        call RANDOM_NUMBER(xp0)
+        vpe = randn(Ne,3)
+        vpe(:,1) = vpe(:,1) + wh/kh*L*(1.0_mp+a*SIN(kh*xp0))
+        vpe = ve0*vpe
+        vpi = randn(Ni,3)
+        vpi(:,1) = vpi(:,1) + wh/kh*L*(1.0_mp+a*SIN(kh*xp0))
+        vpi = vi0*vpi
+        xp0 = L*NewtonRaphson(0.0_mp,1.0_mp,sinePerturbation,DsinePerturbation,xp0)
+        spwt0 = L/Ne
+        call pm%p(1)%setSpecies(Ne,xp0,vpe,spwt0)
+        call pm%p(2)%setSpecies(Ni,xp0,vpi,spwt0)
+        rho_back = 0.0_mp
+        call pm%m%setMesh(rho_back)
+    
+		k=0
+        PtrControl=>Null_input
+        PtrSource=>Null_source
+
+		!Time stepping
+		call r%recordPlasma(pm, k)									!record for n=1~Nt
+		do k=1,pm%nt
+    		call PtrControl(pm,k,'xp')
+
+    		call PtrSource(pm,k)
+    
+    		do i=1,pm%n
+    			call pm%p(i)%moveSpecies(dt)
+    		end do
+    
+    		do i=1,pm%n
+    			call pm%applyBC(pm%p(i),pm%m,pm%dt,pm%A0(i))
+    		end do
+    
+    		!charge assignment
+    		pm%m%rho = 0.0_mp
+    		do i=1, pm%n
+    			call pm%a(i)%chargeAssign(pm%p(i),pm%m)
+    		end do
+    
+    		call PtrControl(pm,k,'rho_back')
+    		call pm%m%solveMesh(pm%eps0)
+    
+    		!Electric field : -D*phi
+    		pm%m%E = - multiplyD(pm%m%phi,pm%m%dx,pm%m%BCindex)
+    
+    		!Force assignment : mat'*E
+    		do i=1, pm%n
+    			call pm%a(i)%forceAssign(pm%p(i), pm%m)
+    		end do
+    
+    		do i=1, pm%n
+    			call pm%p(i)%accelSpecies(dt)
+    		end do
+
+			call r%recordPlasma(pm, k)									!record for n=1~Nt
+        end do
+
+		call printPlasma(r)
+
+		call destroyPM1D(pm)
+		call destroyRecord(r)
+	end subroutine
+
+    function DsinePerturbation(x,y) result(df)
+        real(mp), intent(in) :: x(:), y(:)
+        real(mp) :: df(size(y))
+
+        real(mp) :: a=0.4_mp
+
+        df = 1.0_mp + a*SIN(2.0_mp*pi*x)
+    end function
+
+    function sinePerturbation(x,y) result(f)
+        real(mp), intent(in) :: x(:), y(:)
+        real(mp) :: f(size(y))
+
+        real(mp) :: a=0.4_mp
+
+        f = x + a/2.0_mp/pi*( 1.0_mp - COS(2.0_mp*pi*x) ) - y
+    end function
+
     subroutine testVelocityGradient
         type(species) :: p
         type(mesh) :: m

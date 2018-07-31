@@ -118,7 +118,7 @@ contains
 !		call buildRecord(r,sheath%nt,2,sheath%L,sheath%ng,'Procassini',20)
 !
 !		call buildSpecies(sheath%p(1),-qe,me)
-!		call buildSpecies(sheath%p(2),qe,mi)
+!99999		call buildSpecies(sheath%p(2),qe,mi)
 !
 !		call sheath_initialize(sheath,Ne,Ni,Te,Ti,Kb,n0)
 !		call forwardsweep(sheath,r,Null_input,PartialUniform_Maxwellian2)
@@ -190,16 +190,16 @@ contains
 		Time_f = 1200.0_mp
 
 		A = (/ ve0, vi0, 0.5_mp/1.4_mp, 1.0_mp*Ni /)
-!		A = (/ 0.1_mp, ve0, vi0, 1.0_mp*Ni /)
+!		A = (/ 0.25_mp/1.4_mp, ve0, vi0, 1.0_mp*Ni /)
 		call buildPM1D(sheath,Time_f,0.0_mp,Ng,2,pBC=2,mBC=2,order=1,A=A,L=L,dt=dt)
-		call buildRecord(r,sheath%nt,2,sheath%L,sheath%ng,'Sheath',10)
+		call buildRecord(r,sheath%nt,2,sheath%L,sheath%ng,'Sheath',1000)
 
 		call buildSpecies(sheath%p(1),-1.0_mp,1.0_mp)
 		call buildSpecies(sheath%p(2),Z,mu)
 
         call init_random_seed
 		call sheath_initialize(sheath,Ne,Ni,tau,mu)
-		call forwardsweep(sheath,r,Null_input,PartialUniform_Rayleigh2)
+		call forwardsweep(sheath,r,Null_input,PartialUniform_Maxwellian2)
 
 		call printPlasma(r)
 
@@ -292,9 +292,8 @@ contains
 		vi0 = sqrt(1.0_mp/mu/tau)
 		Time_f = 300.0_mp
 
-		A = (/ ve0, vi0, 0.5_mp/1.4_mp, 1.0_mp*Ni /)
-!		A = (/ 0.1_mp, ve0, vi0, 1.0_mp*Ni /)
-		call buildPM1D(sheath,Time_f,0.0_mp,Ng,2,pBC=2,mBC=2,order=1,A=A,L=L,dt=dt)
+		A = (/ 0.25_mp/1.4_mp, ve0, vi0, 1.0_mp*Ni /)
+		call buildPM1D(sheath,Time_f,0.0_mp,Ng,2,pBC=1,mBC=2,order=1,A=A,L=L,dt=dt)
 		call buildRecord(r,sheath%nt,2,sheath%L,sheath%ng,trim(dir),10)
 
 		call buildSpecies(sheath%p(1),-1.0_mp,1.0_mp)
@@ -302,8 +301,8 @@ contains
 
         call init_random_seed
 
-        inputNe = 97162
-        inputNi = 99949
+        inputNe = 99512
+        inputNi = 99965
         allocate(xp_e(inputNe))
         allocate(vp_e(inputNe,3))
         allocate(spwt_e(inputNe))
@@ -338,12 +337,116 @@ contains
         rho_back = 0.0_mp
         rho_back(Ng) = - ( -inputNe*L/Ne + Z*inputNi*L/Ni )
 		call sheath%m%setMesh(rho_back)
-		call forwardsweep(sheath,r,Null_input,Modified_Maxwellian2)
+		call forwardsweep(sheath,r,Null_input,Modified_Maxwellian)
 
 		call printPlasma(r)
 
 		call destroyRecord(r)
 		call destroyPM1D(sheath)
 	end subroutine
+
+	subroutine modified_sheath_Jcurve
+		type(PM1D) :: sheath
+		type(recordData) :: r
+		real(mp) ::  vc_min, vc_max
+        real(mp), allocatable :: vc(:)
+		integer, parameter :: N = 1E5, Ng = 128
+		real(mp), parameter :: L = 25.0_mp, Ls = 0.5_mp/1.4_mp, mu = 100.0_mp, Z = 1.0_mp, tau = 1.0_mp
+        real(mp), allocatable :: xp_e(:), vp_e(:,:), spwt_e(:), xp_i(:), vp_i(:,:), spwt_i(:)
+		real(mp) :: dx, rho_back(Ng)
+        integer :: Nsample, inputNe, inputNi
+		real(mp) :: Time
+		real(mp) :: A(5),J
+		integer :: i, thefile, idx, input, ierror
+		character(len=100):: dir, filename
+        Time = getOption('QoI_curve/time',300.0_mp)
+        dir = getOption('QoI_curve/directory','modified_sheath_curve')
+        filename = getOption('QoI_curve/filename','J.bin')
+        input = getOption('QoI_curve/random_seed',0)
+        vc_min = getOption('QoI_curve/min_parameter_value',1.0_mp)
+        vc_max = getOption('QoI_curve/max_parameter_value',3.0_mp)
+        Nsample = getOption('QoI_curve/number_of_sample',1001)
+
+        allocate(vc(Nsample))
+		vc = (/ ((vc_max-vc_min)*(i-1)/(Nsample-1)+vc_min,i=1,Nsample) /)
+
+		call allocateBuffer(Nsample,2,mpih)
+        thefile = MPIWriteSetup(mpih,'data/'//trim(dir),filename)
+
+        inputNe = 99512
+        inputNi = 99965
+        allocate(xp_e(inputNe))
+        allocate(vp_e(inputNe,3))
+        allocate(spwt_e(inputNe))
+        allocate(xp_i(inputNi))
+        allocate(vp_i(inputNi,3))
+        allocate(spwt_i(inputNi))
+        if( mpih%my_rank.eq.0 ) then
+            open(unit=305,file='data/'//trim(dir)//'/IC/xp_e.bin',form='unformatted',access='stream')
+            read(305) xp_e
+            close(305)
+            open(unit=305,file='data/'//trim(dir)//'/IC/vp_e.bin',form='unformatted',access='stream')
+            read(305) vp_e
+            close(305)
+            open(unit=305,file='data/'//trim(dir)//'/IC/xp_i.bin',form='unformatted',access='stream')
+            read(305) xp_i
+            close(305)
+            open(unit=305,file='data/'//trim(dir)//'/IC/vp_i.bin',form='unformatted',access='stream')
+            read(305) vp_i
+            close(305)
+        end if
+        call MPI_Bcast(xp_e, inputNe, MPI_DOUBLE, 0, MPI_COMM_WORLD, mpih%ierr)
+        call MPI_Bcast(xp_i, inputNi, MPI_DOUBLE, 0, MPI_COMM_WORLD, mpih%ierr)
+        call MPI_Bcast(vp_e, inputNe*3, MPI_DOUBLE, 0, MPI_COMM_WORLD, mpih%ierr)
+        call MPI_Bcast(vp_i, inputNi*3, MPI_DOUBLE, 0, MPI_COMM_WORLD, mpih%ierr)
+        spwt_e = L/N
+        spwt_i = L/N
+
+        rho_back = 0.0_mp
+        rho_back(Ng) = - ( -inputNe*L/N + Z*inputNi*L/N )
+
+		do i=1,mpih%sendcnt
+		    A = (/ 1.0_mp, tau, Ls, 1.0_mp*N, vc(mpih%displc(mpih%my_rank)+i) /)
+		    call buildPM1D(sheath,Time,0.0_mp,Ng,2,pBC=2,mBC=2,order=1,A=A,L=L,dt=0.1_mp)
+		    call buildRecord(r,sheath%nt,2,sheath%L,sheath%ng,                                      &
+                            trim(dir)//'/'//trim(adjustl(mpih%rank_str)),20)
+
+		    call buildSpecies(sheath%p(1),-1.0_mp,1.0_mp)
+		    call buildSpecies(sheath%p(2),Z,mu)
+		    call init_random_seed(input=input)
+
+    		call sheath%p(1)%setSpecies(inputNe,xp_e,vp_e,spwt_e)
+    		call sheath%p(2)%setSpecies(inputNi,xp_i,vp_i,spwt_i)
+    		call sheath%m%setMesh(rho_back)
+
+		    call forwardsweep(sheath,r,Null_input,Modified_Maxwellian2,InstantPhiAtWall,J)
+
+			mpih%writebuf = (/vc(mpih%displc(mpih%my_rank)+i),J/)
+
+            call MPI_FILE_WRITE(thefile, mpih%writebuf, 2, MPI_DOUBLE, & 
+                                MPI_STATUS_IGNORE, mpih%ierr)
+            call MPI_FILE_SYNC(thefile,mpih%ierr)
+
+			call destroyRecord(r)
+			call destroyPM1D(sheath)
+
+            print ('(A,I5,A,I5,A,F8.3,A,F8.3)'), 'Rank-',mpih%my_rank,      &
+                                                 ' Sample-',i,              &
+                                                 ', vc=',mpih%writebuf(1),  &
+                                                 ', J=',mpih%writebuf(2)
+		end do
+
+        deallocate(xp_e)
+        deallocate(vp_e)
+        deallocate(spwt_e)
+        deallocate(xp_i)
+        deallocate(vp_i)
+        deallocate(spwt_i)
+
+        deallocate(vc)
+
+        call MPI_FILE_CLOSE(thefile, mpih%ierr)            
+	end subroutine
+
 
 end module
