@@ -162,7 +162,7 @@ contains
         timeEnd = timeStart + 4.0_mp*Period
         convectionVelocity = 0.0_mp
         if( (time.ge.timeStart) .and. (time.le.timeEnd) ) then
-            convectionVelocity = 20.0_mp*pm%A0(2)*SIN( 2.0_mp*pi*(time-timeStart)/Period )
+            convectionVelocity = pm%A0(5)*SIN( 2.0_mp*pi*(time-timeStart)/Period )
         end if
 
 		spwt_add = pm%p(2)%spwt(1)
@@ -198,7 +198,7 @@ contains
         timeEnd = timeStart + 4.0_mp*Period
         convectionVelocity = 0.0_mp
         if( (time.ge.timeStart) .and. (time.le.timeEnd) ) then
-            convectionVelocity = 20.0_mp*pm%A0(2)*SIN( 2.0_mp*pi*(time-timeStart)/Period )
+            convectionVelocity = pm%A0(5)*SIN( 2.0_mp*pi*(time-timeStart)/Period )
         end if
 
 		spwt_add = pm%p(2)%spwt(1)
