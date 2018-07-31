@@ -186,6 +186,32 @@ contains
 		end do
 	end subroutine
 
+!==================== Shock particle BC ====================================
+
+	subroutine applyBC_injecting_reflecting(p,m,dt,vC,vT)			!refluxing at both planes
+		type(species), intent(inout) :: p
+		type(mesh), intent(inout) :: m
+		real(mp), intent(in) :: dt, vC, vT
+		real(mp) :: temp(3)
+		integer :: i, np1
+		real(mp), allocatable :: vec(:), vec2(:,:)
+
+		!apply refluxing BC
+		do i=1,p%np
+			if( p%xp(i).le.0.0_mp ) then
+				temp = vT*randn(3) + vC
+				p%vp(i,:) = temp
+				call RANDOM_NUMBER(temp)
+				p%xp(i) = temp(1)*dt*p%vp(i,1)
+			end if
+            !reflecting
+			if( p%xp(i).ge.m%L ) then
+                p%vp(i,:) = -p%vp(i,:)
+				p%xp(i) = 2.0_mp*m%L - p%xp(i)
+			end if			
+		end do
+	end subroutine
+
 !=================== sensitivity particle BC ===============================
 
     subroutine uniformParticleCustomRefluxing(p,m,dt,Lv,Nadd,inputVP)
