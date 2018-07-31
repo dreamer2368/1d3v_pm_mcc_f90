@@ -148,4 +148,14 @@ contains
         end if
     end subroutine
 
+    subroutine InstantPhiAtWall(pm,k,J)
+        class(PM1D), intent(in) :: pm
+		integer, intent(in) :: k
+		real(mp), intent(inout) :: J
+        
+        if( k.eq.pm%nt ) then
+            J = J + ( -pm%m%phi(pm%ng) )
+        end if
+    end subroutine
+
 end module
