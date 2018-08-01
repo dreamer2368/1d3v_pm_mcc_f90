@@ -22,8 +22,8 @@ contains
 
 !======= [Spatial]_[Velocity] source distribution ==================
 
-	!Uniform on x in [(0.5-A(1))*L, (0.5+A(1))*L]
-	!Rayleigh on v with \sigma = A(2),A(3) (electron,ion)
+	!Uniform on x in [(0.5-A(3))*L, (0.5+A(3))*L]
+	!Rayleigh on v with \sigma = A(1),A(2) (electron,ion)
 	!Keep A(4) number of ion
 	subroutine PartialUniform_Rayleigh(pm,k)
 		class(PM1D), intent(inout) :: pm
@@ -37,13 +37,13 @@ contains
 		allocate(vp_add(Nadd,3))
 
 		call RANDOM_NUMBER(xp_add)
-		xp_add = xp_add*2.0_mp*pm%A0(1)*pm%L + (0.5_mp - pm%A0(1))*pm%L
+		xp_add = xp_add*2.0_mp*pm%A0(3)*pm%L + (0.5_mp - pm%A0(3))*pm%L
 		spwt_add = pm%p(1)%spwt(1)
-		vp_add = pm%A0(2)*randr(Nadd,3)
+		vp_add = pm%A0(1)*randr(Nadd,3)
 		call pm%p(1)%appendSpecies(Nadd,xp_add,vp_add,spwt_add)
 	
 		spwt_add = pm%p(2)%spwt(1)
-		vp_add = pm%A0(3)*randr(Nadd,3)
+		vp_add = pm%A0(2)*randr(Nadd,3)
 		call pm%p(2)%appendSpecies(Nadd,xp_add,vp_add,spwt_add)
 
 		deallocate(xp_add)
@@ -80,8 +80,8 @@ contains
 		deallocate(spwt_add)
 	end subroutine
 
-	!Uniform on x in [(0.5-A(1))*L, (0.5+A(1))*L]
-	!Maxwellian on v with \sigma = A(2),A(3) (electron,ion)
+	!Uniform on x in [(0.5-A(3))*L, (0.5+A(3))*L]
+	!Maxwellian on v with \sigma = A(1),A(2) (electron,ion)
 	!Keep A(4) number of ion
 	subroutine PartialUniform_Maxwellian(pm,k)
 		class(PM1D), intent(inout) :: pm
@@ -95,13 +95,13 @@ contains
 		allocate(vp_add(Nadd,3))
 
 		call RANDOM_NUMBER(xp_add)
-		xp_add = xp_add*2.0_mp*pm%A0(1)*pm%L + (0.5_mp - pm%A0(1))*pm%L
+		xp_add = xp_add*2.0_mp*pm%A0(3)*pm%L + (0.5_mp - pm%A0(3))*pm%L
 		spwt_add = pm%p(1)%spwt(1)
-		vp_add = pm%A0(2)*randn(Nadd,3)
+		vp_add = pm%A0(1)*randn(Nadd,3)
 		call pm%p(1)%appendSpecies(Nadd,xp_add,vp_add,spwt_add)
 
 		spwt_add = pm%p(2)%spwt(1)
-		vp_add = pm%A0(3)*randn(Nadd,3)
+		vp_add = pm%A0(2)*randn(Nadd,3)
 		call pm%p(2)%appendSpecies(Nadd,xp_add,vp_add,spwt_add)
 
 		deallocate(xp_add)
