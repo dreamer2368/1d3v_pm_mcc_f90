@@ -279,7 +279,7 @@ contains
         real(mp) :: rho_back(Ng)
 		character(len=100):: dir, filename
 
-		real(mp) :: A(4)
+		real(mp) :: A(5)
 		integer :: i
 
         dir = 'modified_sheath'
@@ -292,8 +292,8 @@ contains
 		vi0 = sqrt(1.0_mp/mu/tau)
 		Time_f = 300.0_mp
 
-		A = (/ 0.25_mp/1.4_mp, ve0, vi0, 1.0_mp*Ni /)
-		call buildPM1D(sheath,Time_f,0.0_mp,Ng,2,pBC=1,mBC=2,order=1,A=A,L=L,dt=dt)
+		A = (/ ve0, vi0, 0.5_mp/1.4_mp, 1.0_mp*Ni, 2.0_mp /)
+		call buildPM1D(sheath,Time_f,0.0_mp,Ng,2,pBC=2,mBC=2,order=1,A=A,L=L,dt=dt)
 		call buildRecord(r,sheath%nt,2,sheath%L,sheath%ng,trim(dir),10)
 
 		call buildSpecies(sheath%p(1),-1.0_mp,1.0_mp)
@@ -301,7 +301,7 @@ contains
 
         call init_random_seed
 
-        inputNe = 99512
+        inputNe = 97299
         inputNi = 99965
         allocate(xp_e(inputNe))
         allocate(vp_e(inputNe,3))
@@ -337,7 +337,7 @@ contains
         rho_back = 0.0_mp
         rho_back(Ng) = - ( -inputNe*L/Ne + Z*inputNi*L/Ni )
 		call sheath%m%setMesh(rho_back)
-		call forwardsweep(sheath,r,Null_input,Modified_Maxwellian)
+		call forwardsweep(sheath,r,Null_input,Modified_Maxwellian2)
 
 		call printPlasma(r)
 
@@ -373,7 +373,7 @@ contains
 		call allocateBuffer(Nsample,2,mpih)
         thefile = MPIWriteSetup(mpih,'data/'//trim(dir),filename)
 
-        inputNe = 99512
+        inputNe = 97299
         inputNi = 99965
         allocate(xp_e(inputNe))
         allocate(vp_e(inputNe,3))
@@ -406,7 +406,7 @@ contains
         rho_back(Ng) = - ( -inputNe*L/N + Z*inputNi*L/N )
 
 		do i=1,mpih%sendcnt
-		    A = (/ 1.0_mp, tau, Ls, 1.0_mp*N, vc(mpih%displc(mpih%my_rank)+i) /)
+		    A = (/ 1.0_mp, sqrt(1.0_mp/mu/tau), Ls, 1.0_mp*N, vc(mpih%displc(mpih%my_rank)+i) /)
 		    call buildPM1D(sheath,Time,0.0_mp,Ng,2,pBC=2,mBC=2,order=1,A=A,L=L,dt=0.1_mp)
 		    call buildRecord(r,sheath%nt,2,sheath%L,sheath%ng,                                      &
                             trim(dir)//'/'//trim(adjustl(mpih%rank_str)),20)
