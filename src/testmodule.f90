@@ -16,8 +16,14 @@ contains
 		type(PM1D) :: pm
 		type(FSens) :: fs
 		type(recordData) :: r, fsr
+
+		procedure(control), pointer :: PtrControl=>NULL()
+		procedure(source), pointer :: PtrSource=>NULL()
+		procedure(QoI), pointer :: PtrQoI=>NULL()
+
 		integer, parameter :: Ne = 1E5, Ni = 1E5, Ng = 128
 		integer :: NInit=5E4, Ngv, NInject, NLimit
+
         real(mp), parameter :: tau = 1.0_mp, mu = 100.0_mp, Z = 1.0_mp
         real(mp) :: L, dt, dx
         real(mp) :: Lv(2), dv(2)
@@ -28,8 +34,14 @@ contains
         real(mp) :: rho_back(Ng)
 		character(len=100):: dir, filename
 
+        integer :: NIonFluxR, NSensitivityFluxR
+        real(mp) :: ionFluxL, ionFluxR, sensitivityFluxR
+
+        real(mp), allocatable :: xp0(:), vp0(:,:), frac(:,:,:)
+        integer, allocatable :: g(:,:), gv(:,:)
+
 		real(mp) :: A(5)
-		integer :: i
+		integer :: i,j,ii,k
 
         dir = 'modified_sheath_sensitivity'
 
@@ -45,12 +57,14 @@ contains
 		call buildPM1D(pm,Time_f,0.0_mp,Ng,2,pBC=2,mBC=2,order=1,A=A,L=L,dt=dt)
 		call buildRecord(r,pm%nt,2,pm%L,pm%ng,trim(dir),10)
 
+        call createInjection(16,xp0,vp0,g,gv,frac,pm%a(1))
+
 		call buildSpecies(pm%p(1),-1.0_mp,1.0_mp)
 		call buildSpecies(pm%p(2),Z,mu)
 
         call init_random_seed
 
-        inputNe = 99512
+        inputNe = 97299
         inputNi = 99965
         allocate(xp_e(inputNe))
         allocate(vp_e(inputNe,3))
@@ -92,13 +106,261 @@ contains
 		call buildFSens(fs,pm,Lv(2),Ngv,NInject,NLimit)
 		call buildRecord(fsr,fs%nt,2,fs%L,fs%ng,trim(dir)//'/f_A',10)
 
-		call forwardsweep(pm,r,Null_input,Modified_Maxwellian2)
+        allocate(xp_e(0))
+        allocate(vp_e(0,0))
+        allocate(spwt_e(0))
+        allocate(xp_i(0))
+        allocate(vp_i(0,0))
+        allocate(spwt_i(0))
+
+		call fs%p(1)%setSpecies(0,xp_e,vp_e,spwt_e)
+		call fs%p(2)%setSpecies(0,xp_e,vp_e,spwt_e)
+        rho_back = 0.0_mp
+		call fs%m%setMesh(rho_back)
+
+        deallocate(xp_e)
+        deallocate(vp_e)
+        deallocate(spwt_e)
+        deallocate(xp_i)
+        deallocate(vp_i)
+        deallocate(spwt_i)
+
+		k=0
+        PtrControl=>Null_input
+        PtrSource=>Modified_Maxwellian2
+
+!        PtrQoI=>InstantPhiAtWall
+!        allocate(Jhist(pm%nt))
+!        allocate(DJhist(pm%nt))
+!        Jhist = 0.0_mp
+!        DJhist = 0.0_mp
+
+		!Time stepping
+		call r%recordPlasma(pm, k)									!record for n=1~Nt
+		do k=1,pm%nt
+    		call PtrControl(pm,k,'xp')
+
+    		call PtrSource(pm,k)
+    
+    		do i=1,pm%n
+    			call pm%p(i)%moveSpecies(dt)
+    		end do
+    
+            ionFluxL = SUM(PACK(pm%p(2)%spwt,pm%p(2)%xp.le.0.0_mp))
+            ionFluxR = SUM(PACK(pm%p(2)%spwt,pm%p(2)%xp.ge.pm%m%L))
+            NIonFluxR = COUNT(pm%p(2)%xp.ge.pm%m%L)
+    		do i=1,pm%n
+    			call pm%applyBC(pm%p(i),pm%m,pm%dt,pm%A0(i))
+    		end do
+    
+    		!charge assignment
+    		pm%m%rho = 0.0_mp
+    		do i=1, pm%n
+    			call pm%a(i)%chargeAssign(pm%p(i),pm%m)
+    		end do
+    
+    		call PtrControl(pm,k,'rho_back')
+    		call pm%m%solveMesh(pm%eps0)
+    
+    		!Electric field : -D*phi
+    		pm%m%E = - multiplyD(pm%m%phi,pm%m%dx,pm%m%BCindex)
+    
+    		!Force assignment : mat'*E
+    		do i=1, pm%n
+    			call pm%a(i)%forceAssign(pm%p(i), pm%m)
+    		end do
+    
+    		do i=1, pm%n
+    			call pm%p(i)%accelSpecies(dt)
+    		end do
+
+!			call PtrQoI(pm,k,Jtemp)
+!            Jhist(k) = Jtemp
+
+			call r%recordPlasma(pm, k)									!record for n=1~Nt
+
+    		do i=1,fs%n
+	    		call fs%p(i)%moveSpecies(dt)
+	    	end do
+
+!print *, 'ion flux: ', ionFluxL
+!print *, 'ion flux (uniform): ', dt/SQRT(2.0_mp*pi*mu*tau)
+!print *, 'sensitivity flux: ', SUM(PACK(fs%p(2)%spwt, fs%p(2)%xp.le.0.0_mp))
+!print *, 'sensitivity flux (uniform): ', -dt/SQRT(8.0_mp*pi*mu*tau**3)
+!print *, 'number of electron (before) = ', fs%p(1)%np, SIZE(fs%p(1)%spwt)
+!print *, 'number of ion (before) = ', fs%p(2)%np, SIZE(fs%p(2)%spwt)
+!print *, 'net electron charge (in domain) = ', SUM(fs%p(1)%spwt)*fs%p(1)%qs
+!print *, 'net ion charge (in domain) = ', SUM(fs%p(2)%spwt)*fs%p(2)%qs
+
+            NSensitivityFluxR = COUNT(fs%p(2)%xp.ge.fs%m%L)
+            sensitivityFluxR = SUM(PACK(fs%p(2)%spwt, fs%p(2)%xp.ge.fs%m%L))
+    		do i=1,fs%n
+    			call fs%applyBC(fs%p(i),fs%m,fs%dt,fs%A0(i))
+    		end do
+
+    		fs%m%rho = 0.0_mp
+            do i=1,fs%n
+                call fs%a(i)%chargeAssign(fs%p(i),fs%m)
+            end do
+!print *, 'number of flux = ', NSensitivityFluxR
+!print *, 'flux amount = ', sensitivityFluxR
+!print *, 'number of electron (after) = ', fs%p(1)%np, SIZE(fs%p(1)%spwt)
+!print *, 'number of ion (after) = ', fs%p(2)%np, SIZE(fs%p(2)%spwt)
+!print *, 'net electron charge (in domain) = ', SUM(fs%p(1)%spwt)*fs%p(1)%qs
+!print *, 'net ion charge (in domain) = ', SUM(fs%p(2)%spwt)*fs%p(2)%qs
+!print *, 'net particle charge (in domain) = ', SUM(fs%p(1)%spwt)*fs%p(1)%qs + SUM(fs%p(2)%spwt)*fs%p(2)%qs
+!print *, 'net mesh charge (in domain) = ', sum(fs%m%rho(2:fs%m%ng-1)*fs%m%dx)                        &
+!                                         + sum(fs%m%rho((/1,fs%m%ng/))*0.5_mp*fs%m%dx)
+!print *, 'net mesh charge (surface) = ', sum(fs%m%rho_back)
+!print *, 'net mesh charge (total) = ', sum(fs%m%rho(2:fs%m%ng-1)*fs%m%dx)                            &
+!                                     + sum(fs%m%rho((/1,fs%m%ng/))*0.5_mp*fs%m%dx)              &
+!                                     + sum(fs%m%rho_back)
+
+	    	call fs%m%solveMesh(fs%eps0)
+
+	    	!Electric field : E_A = -D*phi_A
+		    fs%m%E = - multiplyD(fs%m%phi,fs%m%dx,fs%m%BCindex)
+
+    		do i=1, fs%n
+    			call fs%a(i)%forceAssign(fs%p(i), pm%m)
+    		end do
+    
+    		do i=1, fs%n
+    			call fs%p(i)%accelSpecies(dt)
+    		end do
+
+!	        call Modified_Maxwellian2_Sensitivity(fs,k,NIonFluxR,ionFluxR,NSensitivityFluxR,sensitivityFluxR)
+	        call Modified_Maxwellian2_Sensitivity(fs,k,0,0.0_mp,NSensitivityFluxR,sensitivityFluxR)
+
+!            Dvf = 0.0_mp
+!            do i=1, fs%n
+!        		do j = 1, pm%p(i)%np
+!        			vp = pm%p(i)%vp(j,1)
+!                    call assign_TSC_derivative(vp,dv(i),gv3,fracv3)	!for velocity derivative interpolation
+!                    where( abs(gv3)>Ngv )
+!                        gv3 = 0
+!                        fracv3 = 0.0_mp
+!                    elsewhere
+!                        gv3 = gv3 + Ngv + 1
+!                    end where
+!        			g = pm%a(i)%g(:,j)
+!        
+!                    do ii=1,3
+!        			    Dvf(g,gv3(ii),i) = Dvf(g,gv3(ii),i) + pm%p(i)%spwt(j)/pm%m%dx/dv(i)*pm%a(i)%frac(:,j)*fracv3(ii)
+!                    end do
+!        		end do
+!        		Dvf(:,1,:) = Dvf(:,1,:)*2.0_mp
+!        		Dvf(:,2*Ngv+1,:) = Dvf(:,2*Ngv+1,:)*2.0_mp
+!
+!        		!Multiply E_A
+!        		E_temp = fs%p(i)%qs/fs%p(i)%ms*fs%m%E
+!!        		E_temp = 1.0_mp
+!        		do j=1,2*Ngv+1
+!        			S(:,j,i) = Dvf(:,j,i)*E_temp 
+!                end do
+!            end do
+!        	!Multiply dt
+!        	S = -S*dt
+!
+!            S = 0.0_mp
+!            !Source sensitivity
+!            S(1:Ns,:,1) = S(1:Ns,:,1) + sensitivityFluxR*Se
+!            S(1:Ns,:,2) = S(1:Ns,:,2) + sensitivityFluxR*Si1 + ionFluxR/tau*( Si1 - Si2 )
+!
+!            do i=1,fs%n
+!                fs%dv = dv(i)
+!                fs%J = S(:,:,i)
+!
+!                call tempSpecies(i)%setSpecies(fs%p(i)%np,fs%p(i)%xp,fs%p(i)%vp,fs%p(i)%spwt)
+!                tempSpecies(i)%spwt = 0.0_mp
+!
+!                call fs%numberDensity(fs%p(i),fs%a(i))
+!                call fs%updateWeight(fs%p(i),fs%a(i))
+!!                call fs%updateWeight(tempSpecies(i),fs%a(i))
+!            end do
+!        
+!		    if( (fsr%mod.eq.1) .or. (mod(k,fsr%mod).eq.0) ) then
+!			    kr = merge(k,k/fsr%mod,fsr%mod.eq.1)
+!		    	write(kstr,*) kr
+!    	    	open(unit=304,file='data/'//trim(dir)//'/f_A/distribution/'//trim(adjustl(kstr))//'.bin',         &
+!                         status='replace',form='unformatted',access='stream')
+!                do i=1,fs%n
+!                    fs%dv = dv(i)
+!            		call fs%FDistribution(fs%p(i),fs%a(i))
+!!            		call fs%FDistribution(tempSpecies(i),fs%a(i))
+!        	    	write(304) fs%f_A
+!                end do
+!!    	    	write(304) S
+!    	    	close(304)
+!            end if
+!
+!			call PtrQoI(fs,k,DJtemp)
+!            DJhist(k) = DJtemp
+
+			call fsr%recordPlasma(fs, k)									!record for n=1~Nt
+		end do
 
 		call printPlasma(r)
+		call printPlasma(fsr)
 
 		call destroyRecord(r)
 		call destroyPM1D(pm)
+        call destroyRecord(fsr)
+        call destroyFSens(fs)
+
+        deallocate(xp0)
+        deallocate(vp0)
+        deallocate(g)
+        deallocate(gv)
+        deallocate(frac)
 	end subroutine
+
+    subroutine createInjection(N,xp0,vp0,g,gv,frac,a)
+        type(pmAssign), intent(inout) :: a
+        integer, intent(in) :: N
+        
+        real(mp), allocatable, intent(out) :: xp0(:), vp0(:,:), frac(:,:,:)
+        integer, allocatable, intent(out) :: g(:,:), gv(:,:)
+
+        integer :: newN, Nx, i,j
+        real(mp) :: dx, dv, fracx(a%order+1), fracv(a%order+1)
+
+        Nx = CEILING(SQRT(N*1.0_mp))
+        newN = Nx**2
+
+        if( ALLOCATED(xp0) ) deallocate(xp0)
+        if( ALLOCATED(vp0) ) deallocate(vp0)
+        if( ALLOCATED(frac) ) deallocate(frac)
+        if( ALLOCATED(g) ) deallocate(g)
+        if( ALLOCATED(gv) ) deallocate(gv)
+
+        allocate(xp0(newN))
+        allocate(vp0(newN,3))
+        allocate(g(a%order+1,newN))
+        allocate(gv(a%order+1,newN))
+        allocate(frac(a%order+1,a%order+1,newN))
+
+        dx = 1.0_mp/(Nx-1)
+        dv = 1.0_mp/(Nx-1)
+   
+        do i=1,Nx
+            do j=1,Nx
+                xp0( (i-1)*Nx+j ) = -0.5_mp + (j-1)*dx
+                vp0( (i-1)*Nx+j, 1 ) = -0.5_mp + (i-1)*dv
+            end do
+        end do
+
+        do i=1,newN
+            call a%assignMatrix(xp0(i),1.0_mp,g(:,i),fracx)
+            call a%assignMatrix(vp0(i,1),1.0_mp,gv(:,i),fracv)
+            do j=1,a%order+1
+                frac(:,j,i) = fracx*fracv(j)
+            end do
+        end do
+
+        g = g-1
+        gv = gv-1
+    end subroutine
 
 	subroutine Shock
         use modTarget
@@ -492,6 +754,10 @@ contains
                 tempSpecies(i)%spwt = 0.0_mp
 
                 call fs%numberDensity(fs%p(i),fs%a(i))
+if( (fsr%mod.eq.1) .or. (mod(k,fsr%mod).eq.0) ) then
+print *, i,'-th species, max source: ', MAXVAL(ABS(fs%J/1e-4))
+print *, i,'-th species, max number: ', MAXVAL(fs%n_A)
+end if
                 call fs%updateWeight(fs%p(i),fs%a(i))
 !                call fs%updateWeight(tempSpecies(i),fs%a(i))
             end do
