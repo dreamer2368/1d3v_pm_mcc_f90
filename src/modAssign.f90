@@ -94,7 +94,7 @@ contains
 
 		!assignment matrix
 !		g1 = FLOOR(xp/dx - 0.5_mp)+1				!For periodic BC
-		g1 = FLOOR(100.0_mp*xp/dx)/100 + 1						!For bounded BC
+		g1 = FLOOR(xp/dx) + 1						!For bounded BC
 		gl = g1
 		gr = gl+1
 
