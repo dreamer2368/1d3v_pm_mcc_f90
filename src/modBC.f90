@@ -62,17 +62,19 @@ contains
 		!apply BC
 		do while( i .le. np1 )
 			if( p%xp(i).le.0.0_mp ) then
+				m%rho_back(1) = m%rho_back(1) + p%spwt(i)*p%qs
 				p%xp(i) = p%xp(np1)					!replacement with the last particle
 				p%vp(i,:) = p%vp(np1,:)
+                p%spwt(i) = p%spwt(np1)
 				p%Ep(i) = p%Ep(np1)
-				m%rho_back(1) = m%rho_back(1) + p%spwt(i)*p%qs
 				np1 = np1-1
 				i = i-1
 			elseif( p%xp(i).ge.m%L ) then
+				m%rho_back(m%ng) = m%rho_back(m%ng) + p%spwt(i)*p%qs
 				p%xp(i) = p%xp(np1)
 				p%vp(i,:) = p%vp(np1,:)
+                p%spwt(i) = p%spwt(np1)
 				p%Ep(i) = p%Ep(np1)
-				m%rho_back(m%ng) = m%rho_back(m%ng) + p%spwt(i)*p%qs
 				np1 = np1-1
 				i = i-1
 			end if
@@ -92,6 +94,11 @@ contains
 		deallocate(p%vp)
 		allocate(p%vp(np1,3))
 		p%vp = vec2
+
+		vec = p%spwt(1:np1)
+		deallocate(p%spwt)
+		allocate(p%spwt(np1))
+		p%spwt = vec
 
 		vec = p%Ep(1:np1)
 		deallocate(p%Ep)
@@ -126,10 +133,11 @@ contains
 		!apply absorbing BC
 		do while( i .le. np1 )
 			if( p%xp(i).ge.m%L ) then
+				m%rho_back(m%ng) = m%rho_back(m%ng) + p%spwt(i)*p%qs
 				p%xp(i) = p%xp(np1)
 				p%vp(i,:) = p%vp(np1,:)
+                p%spwt(i) = p%spwt(np1)
 				p%Ep(i) = p%Ep(np1)
-				m%rho_back(m%ng) = m%rho_back(m%ng) + p%spwt(i)*p%qs
 				np1 = np1-1
 				i = i-1
 			end if
@@ -149,6 +157,11 @@ contains
 		deallocate(p%vp)
 		allocate(p%vp(np1,3))
 		p%vp = vec2
+
+		vec = p%spwt(1:np1)
+		deallocate(p%spwt)
+		allocate(p%spwt(np1))
+		p%spwt = vec
 
 		vec = p%Ep(1:np1)
 		deallocate(p%Ep)
