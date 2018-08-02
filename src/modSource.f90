@@ -210,4 +210,54 @@ contains
 		deallocate(spwt_add)
 	end subroutine
 
+	subroutine Modified_Maxwellian2_Sensitivity(pm,k,NIonFluxR,ionFluxR,NSensitivityFluxR,sensitivityFluxR)
+		class(PM1D), intent(inout) :: pm
+        integer, intent(in) :: k, NIonFluxR, NSensitivityFluxR
+        real(mp), intent(in) :: ionFluxR, sensitivityFluxR
+		integer :: newN, Nadd, i
+		real(mp), allocatable :: xp_add(:), vp_add(:,:), spwt_add(:)
+        real(mp) :: time, convectionVelocity, timeStart, timeEnd, Period
+
+        time = k*pm%dt
+        Period = 0.2_mp*pm%nt*pm%dt
+        timeStart = 0.1_mp*pm%nt*pm%dt
+        timeEnd = timeStart + 4.0_mp*Period
+        if( (time.ge.timeStart) .and. (time.le.timeEnd) ) then
+            Nadd = 2*((NIonFluxR+1)/2)
+        else
+            Nadd = 0
+        end if
+        newN = NSensitivityFluxR + Nadd
+		allocate(xp_add(newN))
+		allocate(spwt_add(newN))
+		allocate(vp_add(newN,3))
+
+		call RANDOM_NUMBER(xp_add)
+		xp_add = xp_add*pm%A0(3)*pm%L
+		spwt_add(1:NSensitivityFluxR) = sensitivityFluxR/NSensitivityFluxR
+		vp_add(1:NSensitivityFluxR,1) = pm%A0(1)*randn(NSensitivityFluxR)
+		call pm%p(1)%appendSpecies(newN-Nadd,                                   &
+                                    xp_add(1:newN-Nadd),                        &
+                                    vp_add(1:newN-Nadd,:),                      &
+                                    spwt_add(1:newN-Nadd) )
+
+        convectionVelocity = 0.0_mp
+        if( (time.ge.timeStart) .and. (time.le.timeEnd) ) then
+            convectionVelocity = pm%A0(5)*SIN( 2.0_mp*pi*(time-timeStart)/Period )
+        end if
+
+		vp_add(1:NSensitivityFluxR,1) = pm%A0(2)*randn(NSensitivityFluxR) + convectionVelocity
+        vp_add(newN-Nadd+1:newN-Nadd/2,1) = pm%A0(2)*randr(Nadd/2) + convectionVelocity
+        vp_add(newN-Nadd/2+1:newN,1) = -pm%A0(2)*randr(Nadd/2) + convectionVelocity
+
+        spwt_add(newN-Nadd+1:newN-Nadd/2) = ionFluxR*SQRT(2.0_mp/pi)/pm%A0(2)*SIN( 2.0_mp*pi*(time-timeStart)/Period )/Nadd
+        spwt_add(newN-Nadd/2+1:newN) = -ionFluxR*SQRT(2.0_mp/pi)/pm%A0(2)*SIN( 2.0_mp*pi*(time-timeStart)/Period )/Nadd
+
+		call pm%p(2)%appendSpecies(newN,xp_add,vp_add,spwt_add)
+
+		deallocate(xp_add)
+		deallocate(vp_add)
+		deallocate(spwt_add)
+	end subroutine
+
 end module
