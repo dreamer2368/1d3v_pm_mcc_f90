@@ -22,7 +22,7 @@ contains
 		procedure(QoI), pointer :: PtrQoI=>NULL()
 
 		integer, parameter :: Ne = 1E5, Ni = 1E5, Ng = 128
-		integer :: NInit=5E4, Ngv, NInject, NLimit
+		integer :: NInit=5E4, Ngv(2), NInject, NLimit
 
         real(mp), parameter :: tau = 1.0_mp, mu = 100.0_mp, Z = 1.0_mp
         real(mp) :: L, dt, dx
@@ -32,16 +32,22 @@ contains
         integer :: inputNe, inputNi
         real(mp), allocatable :: xp_e(:), vp_e(:,:), spwt_e(:), xp_i(:), vp_i(:,:), spwt_i(:)
         real(mp) :: rho_back(Ng)
-		character(len=100):: dir, filename
+		character(len=100):: dir, filename, kstr
 
         integer :: NIonFluxR, NSensitivityFluxR
         real(mp) :: ionFluxL, ionFluxR, sensitivityFluxR
 
+        integer :: Ns
+        real(mp) :: time, timeStart, timeEnd, Period, convectionVelocity, timeFactor
+        real(mp) :: Ls, fracS, Zi
+        real(mp), allocatable :: vg(:), Se(:,:), Si(:,:)
+
+        real(mp) :: hc = 1.0E-4
         real(mp), allocatable :: xp0(:), vp0(:,:), frac(:,:,:)
         integer, allocatable :: g(:,:), gv(:,:)
 
 		real(mp) :: A(5)
-		integer :: i,j,ii,k
+		integer :: i,j,ii,k,kr
 
         dir = 'modified_sheath_sensitivity'
 
@@ -101,9 +107,13 @@ contains
         rho_back(Ng) = - ( -inputNe*L/Ne + Z*inputNi*L/Ni )
 		call pm%m%setMesh(rho_back)
 
-		Lv = 5.0_mp*(/ ve0, vi0 /)
-        dv = Lv/Ngv
-		call buildFSens(fs,pm,Lv(2),Ngv,NInject,NLimit)
+		Lv = (/ 5.0_mp, 4.0_mp /)
+        Ngv(1) = Ng/2
+        dv(1) = Lv(1)/Ngv(1)
+        dv(2) = 5.0_mp*vi0/Ngv(1)
+        Ngv(2) = CEILING(Lv(2)/dv(2))
+        dv(2) = Lv(2)/Ngv(2)
+		call buildFSens(fs,pm,Lv(1),Ngv(1),NInject,NLimit)
 		call buildRecord(fsr,fs%nt,2,fs%L,fs%ng,trim(dir)//'/f_A',10)
 
         allocate(xp_e(0))
@@ -124,6 +134,16 @@ contains
         deallocate(xp_i)
         deallocate(vp_i)
         deallocate(spwt_i)
+
+        !Source Term Profile
+        Ls = L*0.5_mp/1.4_mp
+        Ns = FLOOR( Ls/pm%m%dx + 0.5_mp ) + 1
+        fracS = Ls/pm%m%dx + 0.5_mp - ( Ns - 1 )
+
+        allocate(vg(2*Ngv(2)+1))
+        vg = (/ ((i-Ngv(2)-1)*dv(2),i=1,2*Ngv(2)+1) /)
+        allocate(Se(Ng,2*Ngv(1)+1))
+        allocate(Si(Ng,2*Ngv(2)+1))
 
 		k=0
         PtrControl=>Null_input
@@ -261,12 +281,31 @@ contains
 !            end do
 !        	!Multiply dt
 !        	S = -S*dt
-!
-!            S = 0.0_mp
-!            !Source sensitivity
-!            S(1:Ns,:,1) = S(1:Ns,:,1) + sensitivityFluxR*Se
-!            S(1:Ns,:,2) = S(1:Ns,:,2) + sensitivityFluxR*Si1 + ionFluxR/tau*( Si1 - Si2 )
-!
+
+            Se = 0.0_mp
+            Si = 0.0_mp
+            !Source sensitivity
+            time = k*pm%dt
+            Period = 0.2_mp*pm%nt*pm%dt
+            timeStart = 0.1_mp*pm%nt*pm%dt
+            timeEnd = timeStart + 4.0_mp*Period
+            convectionVelocity = 0.0_mp
+            if( (time.ge.timeStart) .and. (time.le.timeEnd) ) then
+                convectionVelocity = pm%A0(5)*SIN( 2.0_mp*pi*(time-timeStart)/Period )
+                timeFactor = 2.0_mp*SIN( 2.0_mp*pi*(time-timeStart)/Period )/SQRT(2.0_mp*pi)/vi0
+
+                Zi = SUM( ABS(vg-convectionVelocity)/2.0_mp/vi0/vi0                                         &
+                            *EXP( -(vg-convectionVelocity)**2/2.0_mp/vi0/vi0 ) )*dv(2)
+                do i=1,Ns-1
+                    Si(i,:) = Si(i,:) + timeFactor/Ls/Zi*(vg-convectionVelocity)/2.0_mp/vi0/vi0             &
+                                            *EXP(-(vg-convectionVelocity)**2/2.0_mp/vi0/vi0)
+                end do
+                Si(Ns,:) = Si(Ns,:) + timeFactor*fracS/Ls/Zi*(vg-convectionVelocity)/2.0_mp/vi0/vi0         &
+                                            *EXP(-(vg-convectionVelocity)**2/2.0_mp/vi0/vi0)
+            end if
+!            print *, 'Ion Source: ', ( 0.5_mp*SUM(Si(1,:))+SUM(Si(2:Ns,:)) )*pm%m%dx*dv(2)
+!            print *, 'Ion (absolute) Source: ', ( 0.5_mp*SUM(ABS(Si(1,:)))+SUM(ABS(Si(2:Ns,:))) )*pm%m%dx*dv(2)
+
 !            do i=1,fs%n
 !                fs%dv = dv(i)
 !                fs%J = S(:,:,i)
@@ -279,20 +318,20 @@ contains
 !!                call fs%updateWeight(tempSpecies(i),fs%a(i))
 !            end do
 !        
-!		    if( (fsr%mod.eq.1) .or. (mod(k,fsr%mod).eq.0) ) then
-!			    kr = merge(k,k/fsr%mod,fsr%mod.eq.1)
-!		    	write(kstr,*) kr
-!    	    	open(unit=304,file='data/'//trim(dir)//'/f_A/distribution/'//trim(adjustl(kstr))//'.bin',         &
-!                         status='replace',form='unformatted',access='stream')
+		    if( (fsr%mod.eq.1) .or. (mod(k,fsr%mod).eq.0) ) then
+			    kr = merge(k,k/fsr%mod,fsr%mod.eq.1)
+		    	write(kstr,*) kr
+    	    	open(unit=304,file='data/'//trim(dir)//'/f_A/distribution/'//trim(adjustl(kstr))//'.bin',         &
+                         status='replace',form='unformatted',access='stream')
 !                do i=1,fs%n
 !                    fs%dv = dv(i)
 !            		call fs%FDistribution(fs%p(i),fs%a(i))
 !!            		call fs%FDistribution(tempSpecies(i),fs%a(i))
 !        	    	write(304) fs%f_A
 !                end do
-!!    	    	write(304) S
-!    	    	close(304)
-!            end if
+    	    	write(304) Si
+    	    	close(304)
+            end if
 !
 !			call PtrQoI(fs,k,DJtemp)
 !            DJhist(k) = DJtemp
@@ -313,6 +352,9 @@ contains
         deallocate(g)
         deallocate(gv)
         deallocate(frac)
+
+        deallocate(Se)
+        deallocate(Si)
 	end subroutine
 
     subroutine createInjection(N,xp0,vp0,g,gv,frac,a)

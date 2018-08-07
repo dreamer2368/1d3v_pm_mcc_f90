@@ -77,6 +77,7 @@ contains
                 dpm%scheme = INJECTION
         end select
 
+        !Need to fix: Why does this take so long time??
         if( dpm%scheme.eq.INJECTION ) then
     		call createDistribution(dpm,dpm%NInject,dpm%xp_inject,dpm%vp_inject,	&
 	    									dpm%g_inject,dpm%gv_inject,dpm%frac_inject)

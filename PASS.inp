@@ -21,7 +21,7 @@ parameters_of_interest/001 = 1.5
 parameters_of_interest/002 = 1.0e-9
 
 #Sensitivity-pdf approach parameters
-sensitivity_pdf/discretization = 'injection'       #non-collocated, collocated, injection
+sensitivity_pdf/discretization = 'non-collocated'       #non-collocated, collocated, injection
 
 #Adjoint convergence test time
 adjoint_convergence/time = 60.0
