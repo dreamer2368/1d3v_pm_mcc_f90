@@ -45,7 +45,7 @@ contains
 		this%n_A = 0.0_mp
 		this%f_A = 0.0_mp
 		this%Dvf = 0.0_mp
-        call this%a%buildAssign(2*Ngv+1,1,1)
+        call this%a%buildAssign(2*Ngv+1,1,3)
 	end subroutine
 
 	subroutine destroyPhaseSpaceMesh(this)
@@ -228,65 +228,91 @@ contains
 		class(phaseSpaceMesh), intent(inout) :: this
 		type(species), intent(in) :: p
 		type(pmAssign), intent(in) :: a
-		real(mp), dimension(this%ng,2*this%ngv+3) :: n_temp
-		integer :: i,k, g(a%order+1), g_v(2)
-		real(mp) :: frac(2,2)
+		real(mp), dimension(this%ng,2*this%ngv+1) :: n_temp
+		integer :: i,k, g(a%order+1), g_vp(2)
+		real(mp) :: frac_vp(2), frac(2,2)
 		integer :: vgl, vgr, k_temp
 		real(mp) :: vp, h
-		integer, dimension(:,:), pointer :: g_x
-		real(mp), dimension(:,:), pointer :: frac_x
+		integer, dimension(:,:), pointer :: g_x, g_v
+		real(mp), dimension(:,:), pointer :: frac_x, frac_v
 
 		!F_A to phase space
-		n_temp = 0.0_mp
 		g_x=>a%g
 		frac_x=>a%frac
+
+		DEALLOCATE(this%a%g)
+		DEALLOCATE(this%a%frac)
+		this%a%np = p%np
+		ALLOCATE(this%a%g(this%a%order+1,p%np))
+		ALLOCATE(this%a%frac(this%a%order+1,p%np))
+		g_v=>this%a%g
+		frac_v=>this%a%frac
+
+		n_temp = 0.0_mp
 		do k = 1, p%np
 			vp = p%vp(k,1)
-			vgl = FLOOR(vp/this%dv) + this%ngv+2
-			vgr = vgl+1
-			if( vgl<1 .or. vgr>2*this%ngv+3 )	then
-				cycle
-			end if
+            call this%a%assignMatrix(vp,this%dv,g_vp,frac_vp)
+            g_vp = g_vp+this%ngv
+            call this%a%adjustGrid(this%ngv,g_vp,frac_vp)
+!			vgl = FLOOR(vp/this%dv) + this%ngv+1
+!			vgr = vgl+1
+!			if( vgl<1 .or. vgr>2*this%ngv+1 )	then
+!				cycle
+!			end if
+!			g_vp = (/ vgl, vgr /)
+!			h = vp/this%dv - FLOOR(vp/this%dv)
 			g = g_x(:,k)
-			g_v = (/ vgl, vgr /)
-			h = vp/this%dv - FLOOR(vp/this%dv)
-			frac(:,1) = (1.0_mp-h)*frac_x(:,k)
-			frac(:,2) = h*frac_x(:,k)
-			n_temp(g,g_v) = n_temp(g,g_v) + frac/this%dx/this%dv
+            g_v(:,k) = g_vp
+            frac_v(:,k) = frac_vp
+!			frac(:,1) = (1.0_mp-h)*frac_x(:,k)
+!			frac(:,2) = h*frac_x(:,k)
+            do i=1,this%a%order+1
+    			frac(:,i) = frac_vp(i)*frac_x(:,k)
+            end do
+			n_temp(g,g_vp) = n_temp(g,g_vp) + frac/this%dx/this%dv
 		end do
         if( a%mBCidx .ne. 0 ) then
             n_temp((/1,a%ng/),:) = n_temp((/1,a%ng/),:)*2.0_mp
         end if
-        this%n_A = n_temp(:,2:2*this%ngv+2)
+        n_temp(:,(/1,2*this%ngv+1/)) = n_temp(:,(/1,2*this%ngv+1/))*2.0_mp
+        
+        this%n_A = n_temp
 	end subroutine
 
 	subroutine updateWeight(this,p,a)
 		class(phaseSpaceMesh), intent(inout) :: this
 		type(species), intent(inout) :: p
 		type(pmAssign), intent(in) :: a
-		integer :: i,k, g(a%order+1), g_v(2)
+		integer :: i,k, g(a%order+1), g_vp(2)
 		real(mp) :: frac(2,2)
 		integer :: vgl, vgr, k_temp
 		real(mp) :: vp, h
-		integer, dimension(:,:), pointer :: g_x
-		real(mp), dimension(:,:), pointer :: frac_x
+		integer, dimension(:,:), pointer :: g_x, g_v
+		real(mp), dimension(:,:), pointer :: frac_x, frac_v
 
 		!Update weight
 		g_x=>a%g
 		frac_x=>a%frac
+		g_v=>this%a%g
+		frac_v=>this%a%frac
+
 		do k = 1, p%np
-			vp = p%vp(k,1)
-			vgl = FLOOR(vp/this%dv) + this%ngv+1
-			vgr = vgl+1
-			if( vgl<1 .or. vgr>2*this%ngv+1 )	then
-				cycle
-			end if
+!			vp = p%vp(k,1)
+!			vgl = FLOOR(vp/this%dv) + this%ngv+1
+!			vgr = vgl+1
+!			if( vgl<1 .or. vgr>2*this%ngv+1 )	then
+!				cycle
+!			end if
 			g = g_x(:,k)
-			g_v = (/ vgl, vgr /)
-			h = vp/this%dv - FLOOR(vp/this%dv)
-			frac(:,1) = (1.0_mp-h)*frac_x(:,k)
-			frac(:,2) = h*frac_x(:,k)
-			p%spwt(k) = p%spwt(k) + SUM( this%J(g,g_v)*frac/this%n_A(g,g_v) )
+!			g_vp = (/ vgl, vgr /)
+            g_vp = g_v(:,k)
+!			h = vp/this%dv - FLOOR(vp/this%dv)
+            do i=1,this%a%order+1
+                frac(:,i) = frac_v(i,k)*frac_x(:,k)
+            end do
+!			frac(:,1) = (1.0_mp-h)*frac_x(:,k)
+!			frac(:,2) = h*frac_x(:,k)
+			p%spwt(k) = p%spwt(k) + SUM( this%J(g,g_vp)*frac/this%n_A(g,g_vp) )
 		end do
 	end subroutine
 

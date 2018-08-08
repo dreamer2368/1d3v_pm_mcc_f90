@@ -47,7 +47,7 @@ program main
 !	call InjectionTest
 !	call MPITest
 !	call SensitivityInitializeTest
-!	call Debye_sensitivity
+	call Debye_sensitivity
 !	call forYeoh
 !	call RedistributionTest
 !	call updateWeightTest
@@ -59,12 +59,13 @@ program main
 !    call MPI_write_test
 !    call FFTtest
 !    call Landau_Jtheta
-    call sheath_edge
+!    call sheath_edge
 !    call customFluxTest
 !    call sheath_Jcurve
 !    call Sheath_sensitivity
 !    call testVelocityGradient
 !    call modified_sheath
+!    call modified_sheath_sensitivity
 !    call Shock
 
 	! print to screen

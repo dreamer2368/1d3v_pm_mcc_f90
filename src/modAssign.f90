@@ -65,6 +65,8 @@ contains
 				this%adjustGrid=>adjustGrid_bounded
 			case(2)	!Dirichlet-Neumann
 				this%adjustGrid=>adjustGrid_bounded
+			case(3)	!Velocity space
+				this%adjustGrid=>adjustGrid_velocity
 		end select
 
 		allocate(this%g(1,1))
@@ -331,6 +333,17 @@ contains
 !		if( g(2).eq.ng ) then
 !			frac(2) = frac(2)*2.0_mp
 !		end if
+	end subroutine
+
+	subroutine adjustGrid_velocity(ngv,g,frac)
+		integer, intent(in) :: ngv
+		integer, intent(inout) :: g(:)
+		real(mp), intent(inout) :: frac(:)
+
+		if( MINVAL(g)<1 .or. MAXVAL(g)>2*ngv+1 ) then
+            g = ngv+1
+            frac = 0.0_mp
+		end if
 	end subroutine
 
 end module
