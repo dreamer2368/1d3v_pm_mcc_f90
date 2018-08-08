@@ -6,7 +6,7 @@ SRCDIR = src
 OBJDIR = obj
 MODDIR = mod
 
-FFTWLIBS=/g/g92/chung28/Programs/fftw-3.3.8/lib/libfftw3.a
+FFTWLIBS=/Users/Kevin/bin/FFTW/lib/libfftw3.a
 VECLIBSMACOSX=
 LAPACKLIB=-L/opt/local/lib/lapack-3.5.0 -llapack -lblas
 BLASLIB=/opt/local/lib/lapack-3.5.0/librefblas.a
@@ -14,7 +14,7 @@ PNETCDFLIBS=
 
 LIBS    = $(FFTWLIBS)
 
-EXE = sheath_Jcurve
+EXE = exec
 F90SRC = main.f90 \
 		modInputHelper.f90 \
 		constants.f90 \
@@ -24,6 +24,7 @@ F90SRC = main.f90 \
 		modSpecies.f90 \
 		modMesh.f90 \
 		modAssign.f90 \
+		modPhaseSpaceMesh.f90 \
 		modRecord.f90 \
 		modPM1D.f90 \
 		modAdj.f90 \
@@ -73,9 +74,12 @@ $(OBJDIR)/modMPI.o : $(OBJDIR)/constants.o
 $(OBJDIR)/modInputHelper.o : $(OBJDIR)/modMPI.o
 $(OBJDIR)/modVelocityProfile.o : $(OBJDIR)/constants.o
 $(OBJDIR)/modSpecies.o : $(OBJDIR)/constants.o
+$(OBJDIR)/modPhaseSpaceMesh.o : $(OBJDIR)/constants.o
 $(OBJDIR)/modMesh.o : $(OBJDIR)/MatrixVector.o
 $(OBJDIR)/modAssign.o : $(OBJDIR)/modSpecies.o \
 						$(OBJDIR)/modMesh.o
+$(OBJDIR)/modPhaseSpaceMesh.o : $(OBJDIR)/modSpecies.o \
+						$(OBJDIR)/modAssign.o
 $(OBJDIR)/modBC.o : $(OBJDIR)/modSpecies.o \
 					$(OBJDIR)/modMesh.o \
 					$(OBJDIR)/modVelocityProfile.o \
@@ -90,7 +94,8 @@ $(OBJDIR)/modAdj.o : $(OBJDIR)/modPM1D.o
 $(OBJDIR)/modQoI.o : $(OBJDIR)/modAdj.o
 $(OBJDIR)/modFSens.o : $(OBJDIR)/modBC.o \
 						$(OBJDIR)/modRecord.o \
-						$(OBJDIR)/modInputHelper.o
+						$(OBJDIR)/modInputHelper.o \
+						$(OBJDIR)/modPhaseSpaceMesh.o
 $(OBJDIR)/init.o : $(OBJDIR)/modFSens.o
 $(OBJDIR)/modTarget.o : $(OBJDIR)/modAdj.o \
 						$(OBJDIR)/random.o

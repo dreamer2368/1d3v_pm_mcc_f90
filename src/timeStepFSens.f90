@@ -108,11 +108,11 @@ contains
 				open(unit=305,file='data/'//dr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
 						status='replace',form='unformatted',access='stream')
                 if( dpm%scheme.eq.COLLOCATED ) then
-				    call dpm%FDistribution(dpm%p(1),this%a(1))
+				    call dpm%psM(1)%FDistribution(dpm%p(1),this%a(1))
                 else
-				    call dpm%FDistribution(dpm%p(1),dpm%a(1))
+				    call dpm%psM(1)%FDistribution(dpm%p(1),dpm%a(1))
                 end if
-				write(305) dpm%f_A
+				write(305) dpm%psM(1)%f_A
 				close(305)
 !				open(unit=305,file='data/'//dr%dir//'/j_'//trim(adjustl(kstr))//'.bin',	&
 !						status='replace',form='unformatted',access='stream')
@@ -338,16 +338,16 @@ contains
 
 		do i=1,dpm%n
 			call CPU_TIME(time1)
-			call dpm%FVelocityGradient(pm%p(i),pm%a(i))
-			call dpm%FSensSourceTerm(pm%p(i)%qs,pm%p(i)%ms)
+			call dpm%psM(i)%FVelocityGradient(pm%p(i),pm%a(i))
+			call dpm%psM(i)%FSensSourceTerm(pm%p(i)%qs,pm%p(i)%ms,dpm%m%E,dpm%dt)
 			call CPU_TIME(time2)
 			r%cpt_temp(8) = r%cpt_temp(8) + (time2-time1)
 
 			call CPU_TIME(time1)
 			r%cpt_temp(9) = r%cpt_temp(9) + (time1-time2)
 
-			call dpm%numberDensity(dpm%p(i),dpm%a(i))
-			call dpm%updateWeight(dpm%p(i),dpm%a(i))
+			call dpm%psM(i)%numberDensity(dpm%p(i),dpm%a(i))
+			call dpm%psM(i)%updateWeight(dpm%p(i),dpm%a(i))
 			call CPU_TIME(time2)
 			r%cpt_temp(10) = r%cpt_temp(10) + (time2-time1)
 		end do
@@ -362,17 +362,17 @@ contains
 
         do i=1,dpm%n
 			call CPU_TIME(time1)
-			call dpm%FVelocityGradient(pm%p(i),pm%a(i))
-			call dpm%FSensSourceTerm(pm%p(i)%qs,pm%p(i)%ms)
+			call dpm%psM(i)%FVelocityGradient(pm%p(i),pm%a(i))
+			call dpm%psM(i)%FSensSourceTerm(pm%p(i)%qs,pm%p(i)%ms,dpm%m%E,dpm%dt)
 			call CPU_TIME(time2)
 			r%cpt_temp(8) = r%cpt_temp(8) + (time2-time1)
 
 			!InjectSource+Remeshing
-			call dpm%InjectSource(dpm%p(i),dpm%J)
+			call dpm%InjectSource(dpm%L,dpm%psM(i)%Lv,dpm%p(i),dpm%psM(i)%J)
 			call CPU_TIME(time1)
 			r%cpt_temp(9) = r%cpt_temp(9) + (time1-time2)
 
-			call dpm%Redistribute(dpm%p(i))
+			call dpm%Redistribute(dpm%p(i),dpm%psM(i)%Lv)
 			call CPU_TIME(time2)
 			r%cpt_temp(10) = r%cpt_temp(10) + (time2-time1)
 		end do
@@ -390,16 +390,16 @@ contains
 			dpm%p(i)%vp=pm%p(i)%vp
 
 			call CPU_TIME(time1)
-			call dpm%FVelocityGradient(pm%p(i),pm%a(i))
-			call dpm%FSensSourceTerm(pm%p(i)%qs,pm%p(i)%ms)
+			call dpm%psM(i)%FVelocityGradient(pm%p(i),pm%a(i))
+			call dpm%psM(i)%FSensSourceTerm(pm%p(i)%qs,pm%p(i)%ms,dpm%m%E,dpm%dt)
 			call CPU_TIME(time2)
 			r%cpt_temp(8) = r%cpt_temp(8) + (time2-time1)
 
 			call CPU_TIME(time1)
 			r%cpt_temp(9) = r%cpt_temp(9) + (time1-time2)
 
-			call dpm%numberDensity(dpm%p(i),pm%a(i))
-			call dpm%updateWeight(dpm%p(i),pm%a(i))
+			call dpm%psM(i)%numberDensity(dpm%p(i),pm%a(i))
+			call dpm%psM(i)%updateWeight(dpm%p(i),pm%a(i))
 			call CPU_TIME(time2)
 			r%cpt_temp(10) = r%cpt_temp(10) + (time2-time1)
 		end do

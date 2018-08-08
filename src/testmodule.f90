@@ -3,6 +3,7 @@ module testmodule
 	use init
 	use timeStepAdj
 	use timeStepFSens
+    use modPhaseSpaceMesh
 	use modMPI
 
 	implicit none
@@ -16,6 +17,7 @@ contains
 		type(PM1D) :: pm
 		type(FSens) :: fs
 		type(recordData) :: r, fsr
+        type(phaseSpaceMesh) :: psM(2)
 
 		procedure(control), pointer :: PtrControl=>NULL()
 		procedure(source), pointer :: PtrSource=>NULL()
@@ -43,11 +45,15 @@ contains
         real(mp), allocatable :: vg(:), Se(:,:), Si(:,:)
 
         real(mp) :: hc = 1.0E-4
-        real(mp), allocatable :: xp0(:), vp0(:,:), frac(:,:,:)
+        real(mp), allocatable :: xp0(:), vp0(:,:), frac_x(:,:), frac_v(:,:)
         integer, allocatable :: g(:,:), gv(:,:)
 
+        integer :: addNMax, addNk
+        real(mp), allocatable :: xp_add(:), vp_add(:,:), spwt_add(:), fracx_add(:,:), frac0(:,:)
+        integer, allocatable :: g_add(:,:), gv_add(:,:)
+
 		real(mp) :: A(5)
-		integer :: i,j,ii,k,kr
+		integer :: i,j,jj,ii,k,kr
 
         dir = 'modified_sheath_sensitivity'
 
@@ -63,7 +69,8 @@ contains
 		call buildPM1D(pm,Time_f,0.0_mp,Ng,2,pBC=2,mBC=2,order=1,A=A,L=L,dt=dt)
 		call buildRecord(r,pm%nt,2,pm%L,pm%ng,trim(dir),10)
 
-        call createInjection(16,xp0,vp0,g,gv,frac,pm%a(1))
+        call createInjection(16,xp0,vp0,g,gv,frac_x,frac_v,pm%a(1))
+        allocate(frac0(pm%a(1)%order+1,pm%a(1)%order+1))
 
 		call buildSpecies(pm%p(1),-1.0_mp,1.0_mp)
 		call buildSpecies(pm%p(2),Z,mu)
@@ -113,8 +120,11 @@ contains
         dv(2) = 5.0_mp*vi0/Ngv(1)
         Ngv(2) = CEILING(Lv(2)/dv(2))
         dv(2) = Lv(2)/Ngv(2)
-		call buildFSens(fs,pm,Lv(1),Ngv(1),NInject,NLimit)
+		call buildFSens(fs,pm,Lv,Ngv,NInject,NLimit)
 		call buildRecord(fsr,fs%nt,2,fs%L,fs%ng,trim(dir)//'/f_A',10)
+
+        call psM(1)%buildPhaseSpaceMesh(L,Lv(1),Ng,Ngv(1),pm%m%dx)
+        call psM(2)%buildPhaseSpaceMesh(L,Lv(2),Ng,Ngv(2),pm%m%dx)
 
         allocate(xp_e(0))
         allocate(vp_e(0,0))
@@ -306,18 +316,46 @@ contains
 !            print *, 'Ion Source: ', ( 0.5_mp*SUM(Si(1,:))+SUM(Si(2:Ns,:)) )*pm%m%dx*dv(2)
 !            print *, 'Ion (absolute) Source: ', ( 0.5_mp*SUM(ABS(Si(1,:)))+SUM(ABS(Si(2:Ns,:))) )*pm%m%dx*dv(2)
 
-!            do i=1,fs%n
-!                fs%dv = dv(i)
-!                fs%J = S(:,:,i)
-!
+            psM(1)%J = Se
+            psM(2)%J = Si
+            do i=1,fs%n
 !                call tempSpecies(i)%setSpecies(fs%p(i)%np,fs%p(i)%xp,fs%p(i)%vp,fs%p(i)%spwt)
 !                tempSpecies(i)%spwt = 0.0_mp
+
+                call psM(i)%numberDensity(fs%p(i),fs%a(i))
+
+!                addNMax = 16*COUNT(psM(i)%J/psM(i)%n_A.le.hc)
+!                allocate(xp_add(addNMax))
+!                allocate(vp_add(addNMax,3))
+!                allocate(spwt_add(addNMax))
+!                allocate(g_add(fs%a(i)%order+1,addNMax))
+!                allocate(gv_add(fs%a(i)%order+1,addNMax))
+!                allocate(frac_add(fs%a(i)%order+1,fs%a(i)%order+1,addNMax))
+!                xp_add = 0.0_mp
+!                vp_add = 0.0_mp
+!                spwt_add = 0.0_mp
+!                g_add = 0
+!                gv_add = 0
+!                frac_add = 0.0_mp
 !
-!                call fs%numberDensity(fs%p(i),fs%a(i))
-!                call fs%updateWeight(fs%p(i),fs%a(i))
-!!                call fs%updateWeight(tempSpecies(i),fs%a(i))
-!            end do
-!        
+!                addNk = 0
+!                do j=1,fs%ng
+!                    do jj=1,2*psM(i)%ngv+1
+!                        if( psM(i)%J(j,jj)/psM(i)%n_A(j,jj).le.hc ) then
+!                            xp_add(addNk+1:addNk+16) = xp0 + (j-1)*fs%m%dx
+!                            vp_add(addNk+1:addNk+16,1) = vp0 + (jj-psM(i)%ngv-1)*psM(i)%dv
+!                            g_add(:,addNk+1:addNk+16) = g + j
+!                            gv_add(:,addNk+1:addNk+16) = gv + jj
+!                            frac_add(:,:,addNk+1:addNk+16) = frac
+!
+!                            addNk = addNk + 16
+!                        end if
+!                    end do
+!                end do
+!                call psM(i)%updateWeight_temp(fs%p(i),fs%a(i))
+!                call fs%updateWeight(tempSpecies(i),fs%a(i))
+            end do
+        
 		    if( (fsr%mod.eq.1) .or. (mod(k,fsr%mod).eq.0) ) then
 			    kr = merge(k,k/fsr%mod,fsr%mod.eq.1)
 		    	write(kstr,*) kr
@@ -351,17 +389,18 @@ contains
         deallocate(vp0)
         deallocate(g)
         deallocate(gv)
-        deallocate(frac)
+        deallocate(frac_x)
+        deallocate(frac_v)
 
         deallocate(Se)
         deallocate(Si)
 	end subroutine
 
-    subroutine createInjection(N,xp0,vp0,g,gv,frac,a)
+    subroutine createInjection(N,xp0,vp0,g,gv,frac_x,frac_v,a)
         type(pmAssign), intent(inout) :: a
         integer, intent(in) :: N
         
-        real(mp), allocatable, intent(out) :: xp0(:), vp0(:,:), frac(:,:,:)
+        real(mp), allocatable, intent(out) :: xp0(:), vp0(:,:), frac_x(:,:), frac_v(:,:)
         integer, allocatable, intent(out) :: g(:,:), gv(:,:)
 
         integer :: newN, Nx, i,j
@@ -372,7 +411,8 @@ contains
 
         if( ALLOCATED(xp0) ) deallocate(xp0)
         if( ALLOCATED(vp0) ) deallocate(vp0)
-        if( ALLOCATED(frac) ) deallocate(frac)
+        if( ALLOCATED(frac_x) ) deallocate(frac_x)
+        if( ALLOCATED(frac_v) ) deallocate(frac_v)
         if( ALLOCATED(g) ) deallocate(g)
         if( ALLOCATED(gv) ) deallocate(gv)
 
@@ -380,7 +420,8 @@ contains
         allocate(vp0(newN,3))
         allocate(g(a%order+1,newN))
         allocate(gv(a%order+1,newN))
-        allocate(frac(a%order+1,a%order+1,newN))
+        allocate(frac_x(a%order+1,newN))
+        allocate(frac_v(a%order+1,newN))
 
         dx = 1.0_mp/(Nx-1)
         dv = 1.0_mp/(Nx-1)
@@ -393,11 +434,8 @@ contains
         end do
 
         do i=1,newN
-            call a%assignMatrix(xp0(i),1.0_mp,g(:,i),fracx)
-            call a%assignMatrix(vp0(i,1),1.0_mp,gv(:,i),fracv)
-            do j=1,a%order+1
-                frac(:,j,i) = fracx*fracv(j)
-            end do
+            call a%assignMatrix(xp0(i),1.0_mp,g(:,i),frac_x(:,i))
+            call a%assignMatrix(vp0(i,1),1.0_mp,gv(:,i),frac_v(:,i))
         end do
 
         g = g-1
@@ -577,7 +615,7 @@ contains
 		type(FSens) :: fs
 		type(recordData) :: r, fsr
 		integer, parameter :: Ne = 1E5, Ni = 1E5, Ng = 128
-		integer :: NInit=5E4, Ngv, NInject, NLimit
+		integer :: NInit=5E4, Ngv(2), NInject, NLimit
         real(mp), parameter :: tau = 1.0_mp, mu = 100.0_mp, Z = 1.0_mp
         real(mp) :: L, dt, dx
 		real(mp) :: ve0, vi0, Time_f
@@ -627,26 +665,26 @@ contains
 
 		Lv = 5.0_mp*(/ ve0, vi0 /)
         dv = Lv/Ngv
-		call buildFSens(fs,pm,Lv(2),Ngv,NInject,NLimit)
+		call buildFSens(fs,pm,Lv,Ngv,NInject,NLimit)
 		call buildRecord(fsr,fs%nt,2,fs%L,fs%ng,trim(dir)//'/f_A',10)
 		call sheath_DerivativeToTau_initialize(fs,Ne,Ni,tau,mu)
 
 		call buildSpecies(tempSpecies(1),-1.0_mp,1.0_mp)
 		call buildSpecies(tempSpecies(2),Z,mu)
 
-        allocate(S(Ng,2*Ngv+1,2))
-        allocate(Dvf(Ng,2*Ngv+1,2))
-        allocate(nA(Ng,2*Ngv+1,2))
+        allocate(S(Ng,2*Ngv(1)+1,2))
+        allocate(Dvf(Ng,2*Ngv(1)+1,2))
+        allocate(nA(Ng,2*Ngv(1)+1,2))
 
         !Source Term Profile
         Ls = L*0.5_mp/1.4_mp
         Ns = FLOOR( Ls/pm%m%dx + 0.5_mp ) + 1
         fracS = Ls/pm%m%dx + 0.5_mp - ( Ns - 1 )
 
-        allocate(vg(2*Ngv+1))
-        vg = (/ ((i-Ngv-1)*dv(1),i=1,2*Ngv+1) /)
+        allocate(vg(2*Ngv(1)+1))
+        vg = (/ ((i-Ngv(1)-1)*dv(1),i=1,2*Ngv(1)+1) /)
         Ze = SUM(ABS(vg)/2.0_mp*EXP(-vg**2/2.0_mp))*dv(1)
-        allocate(Se(Ns,2*Ngv+1))
+        allocate(Se(Ns,2*Ngv(1)+1))
         do i=1,Ns-1
             Se(i,:) = 1.0_mp/Ls/Ze*ABS(vg)/2.0_mp*EXP(-vg**2/2.0_mp)
         end do
@@ -654,11 +692,11 @@ contains
         print *, 'Electron sensitivity source profile integral: ',                          &
                  SUM(Se(2:Ns,:))*dv(1)*pm%m%dx + SUM(Se(1,:))*dv(1)*0.5_mp*pm%m%dx
 
-        vg = (/ ((i-Ngv-1)*dv(2),i=1,2*Ngv+1) /)
+        vg = (/ ((i-Ngv(2)-1)*dv(2),i=1,2*Ngv(2)+1) /)
         Zi1 = SUM( mu*tau*ABS(vg)/2.0_mp*EXP(-mu*tau*vg**2/2.0_mp) )*dv(2)
         Zi2 = SUM( mu**2*tau**2*ABS(vg)**3/4.0_mp*EXP(-mu*tau*vg**2/2.0_mp) )*dv(2)
-        allocate(Si1(Ns,2*Ngv+1))
-        allocate(Si2(Ns,2*Ngv+1))
+        allocate(Si1(Ns,2*Ngv(2)+1))
+        allocate(Si2(Ns,2*Ngv(2)+1))
         do i=1,Ns-1
             Si1(i,:) = 1.0_mp/Ls/Zi1*mu*tau*ABS(vg)/2.0_mp*EXP(-mu*tau*vg**2/2.0_mp)
             Si2(i,:) = 1.0_mp/Ls/Zi2*mu**2*tau**2*ABS(vg)**3/4.0_mp*EXP(-mu*tau*vg**2/2.0_mp)
@@ -758,11 +796,11 @@ contains
         		do j = 1, pm%p(i)%np
         			vp = pm%p(i)%vp(j,1)
                     call assign_TSC_derivative(vp,dv(i),gv3,fracv3)	!for velocity derivative interpolation
-                    where( abs(gv3)>Ngv )
+                    where( abs(gv3)>Ngv(i) )
                         gv3 = 0
                         fracv3 = 0.0_mp
                     elsewhere
-                        gv3 = gv3 + Ngv + 1
+                        gv3 = gv3 + Ngv(i) + 1
                     end where
         			g = pm%a(i)%g(:,j)
         
@@ -776,7 +814,7 @@ contains
         		!Multiply E_A
         		E_temp = fs%p(i)%qs/fs%p(i)%ms*fs%m%E
 !        		E_temp = 1.0_mp
-        		do j=1,2*Ngv+1
+        		do j=1,2*Ngv(i)+1
         			S(:,j,i) = Dvf(:,j,i)*E_temp 
                 end do
             end do
@@ -789,18 +827,18 @@ contains
             S(1:Ns,:,2) = S(1:Ns,:,2) + sensitivityFluxR*Si1 + ionFluxR/tau*( Si1 - Si2 )
 
             do i=1,fs%n
-                fs%dv = dv(i)
-                fs%J = S(:,:,i)
+                fs%psM(i)%dv = dv(i)
+                fs%psM(i)%J = S(:,:,i)
 
                 call tempSpecies(i)%setSpecies(fs%p(i)%np,fs%p(i)%xp,fs%p(i)%vp,fs%p(i)%spwt)
                 tempSpecies(i)%spwt = 0.0_mp
 
-                call fs%numberDensity(fs%p(i),fs%a(i))
+                call fs%psM(i)%numberDensity(fs%p(i),fs%a(i))
 if( (fsr%mod.eq.1) .or. (mod(k,fsr%mod).eq.0) ) then
-print *, i,'-th species, max source: ', MAXVAL(ABS(fs%J/1e-4))
-print *, i,'-th species, max number: ', MAXVAL(fs%n_A)
+print *, i,'-th species, max source: ', MAXVAL(ABS(fs%psM(i)%J/1e-4))
+print *, i,'-th species, max number: ', MAXVAL(fs%psM(i)%n_A)
 end if
-                call fs%updateWeight(fs%p(i),fs%a(i))
+                call fs%psM(i)%updateWeight(fs%p(i),fs%a(i))
 !                call fs%updateWeight(tempSpecies(i),fs%a(i))
             end do
         
@@ -810,10 +848,10 @@ end if
     	    	open(unit=304,file='data/'//trim(dir)//'/f_A/distribution/'//trim(adjustl(kstr))//'.bin',         &
                          status='replace',form='unformatted',access='stream')
                 do i=1,fs%n
-                    fs%dv = dv(i)
-            		call fs%FDistribution(fs%p(i),fs%a(i))
-!            		call fs%FDistribution(tempSpecies(i),fs%a(i))
-        	    	write(304) fs%f_A
+                    fs%psM(i)%dv = dv(i)
+            		call fs%psM(i)%FDistribution(fs%p(i),fs%a(i))
+!            		call fs%psM(i)%FDistribution(tempSpecies(i),fs%a(i))
+        	    	write(304) fs%psM(i)%f_A
                 end do
 !    	    	write(304) S
     	    	close(304)
@@ -850,8 +888,8 @@ end if
 		type(PM1D) :: pm
         type(FSens) :: fs
 		type(recordData) :: r
-		integer, parameter :: Ng=64, N=1E5, order=1
-		real(mp), parameter :: Ti=20, Tf = 100, L=2.0_mp, Lv=5.0_mp
+		integer, parameter :: Ng=64, Ngv(1)=Ng/2, N=1E5, order=1
+		real(mp), parameter :: Ti=20, Tf = 100, L=2.0_mp, Lv(1)=5.0_mp
 		real(mp) :: xp0(N), vp0(N,3), spwt0(N), rho_back(Ng), qe=-1.0_mp, me=1.0_mp
         real(mp) :: v, mu=1.0_mp, tau=1.0_mp, Z1,Z2, ionFluxL
 		integer :: g(2)
@@ -880,7 +918,7 @@ end if
 
 		call pm%m%setMesh((/ (0.0_mp, i=1,pm%m%ng) /))
 
-		call fs%buildFSens(pm,Lv,Ng/2,N,N)
+		call fs%buildFSens(pm,Lv,Ngv,N,N)
         ionFluxL = pm%dt/SQRT(2.0_mp*pi*mu*tau)
 
         do k=1,pm%nt
@@ -913,12 +951,12 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
     			fs%a(1)%frac(:,j) = frac
     		end do
 
-    		call fs%FDistribution(pm%p(1),fs%a(1))
+    		call fs%psM(1)%FDistribution(pm%p(1),fs%a(1))
 
 			write(kstr,*) k
     		open(unit=304,file='data/test_custom_reflux/f_A/'//trim(adjustl(kstr))//'.bin',         &
                         status='replace',form='unformatted',access='stream')
-    		write(304) fs%f_A
+    		write(304) fs%psM(1)%f_A
     		close(304)
 
 	    	call recordPlasma(r,pm,k)
@@ -959,8 +997,8 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
 	subroutine redistribute_temp_test
 		type(PM1D) :: pm
 		type(FSens) :: fs
-		real(mp), parameter :: L=2.7_mp, Lv=4.6_mp, wv=0.4_mp, dt=0.05_mp
-		integer, parameter :: Ng=64, NInject=5E3, NLimit=5E4
+		real(mp), parameter :: L=2.7_mp, Lv(1)=4.6_mp, wv=0.4_mp, dt=0.05_mp
+		integer, parameter :: Ng=64, Ngv(1)=Ng/2, NInject=5E3, NLimit=5E4
 
 		call pm%buildPM1D(1.0_mp,1.0_mp,Ng,N=1,pBC=0,mBC=0,order=1,L=L,dt=dt)
 		call pm%p(1)%buildSpecies(1.0_mp,1.0_mp)
@@ -973,10 +1011,10 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
 		pm%p(1)%vp = wv*randn(NLimit,3)
 		pm%p(1)%spwt = 1.0_mp/NLimit
 
-		call fs%buildFSens(pm,Lv,Ng/2,NInject,NLimit)
+		call fs%buildFSens(pm,Lv,Ngv,NInject,NLimit)
 		call fs%p(1)%buildSpecies(1.0_mp,1.0_mp)
 		call fs%p(1)%setSpecies(NLimit,pm%p(1)%xp,pm%p(1)%vp,pm%p(1)%spwt)
-		call Redistribute(fs,fs%p(1))
+		call Redistribute(fs,fs%p(1),fs%psM(1)%Lv)
 
 		open(unit=301,file='data/redistribution/xp0.bin',status='replace',form='unformatted',access='stream')
 		open(unit=302,file='data/redistribution/vp0.bin',status='replace',form='unformatted',access='stream')
@@ -1063,8 +1101,8 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
 		type(FSens) :: fs
 		type(recordData) :: r
 		real(mp), parameter :: Tf=1.0_mp, Ti=0.5_mp, dt = 1.0_mp
-		real(mp), parameter :: L = 1.0_mp, Lv=0.5_mp, w = 0.1_mp
-		integer, parameter :: Ng=64, N=2E6, NInject=1E6
+		real(mp), parameter :: L = 1.0_mp, Lv(1)=0.5_mp, w = 0.1_mp
+		integer, parameter :: Ng=64, Ngv(1)=Ng/2, N=2E6, NInject=1E6
 		integer :: i,k
 		integer :: g(2)
 		real(mp) :: frac(2)
@@ -1073,14 +1111,14 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
 
 		call pm%buildPM1D(Tf,Ti,Ng,N=1,pBC=0,mBC=0,order=1,L=L,dt=dt)
 		call pm%p(1)%buildSpecies(1.0_mp,1.0_mp)
-		call fs%buildFSens(pm,Lv,Ng/2,NInject,NInject)
+		call fs%buildFSens(pm,Lv,Ngv,NInject,NInject)
 		call fs%p(1)%setSpecies(1,(/0.0_mp/),(/0.0_mp,0.0_mp,0.0_mp/),(/0.0_mp/))
 		call r%buildRecord(pm%nt,N,pm%L,Ng,'updateWeightTest',1)
 
 		call RANDOM_NUMBER(xp0)
 		xp0 = xp0*L
 		call RANDOM_NUMBER(vp0)
-		vp0 = (2.0_mp*vp0-1.0_mp)*Lv
+		vp0 = (2.0_mp*vp0-1.0_mp)*Lv(1)
 		xp0(1:N/2) = randn(N/2)*w + 0.5_mp*L
 		vp0(1:N/2,:) = randn(N/2,3)*w
 		spwt0 = 1.0_mp/N
@@ -1095,7 +1133,7 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
 			fs%a(1)%frac(:,k) = frac
 		end do
 
-		call fs%FDistribution(fs%p(1),fs%a(1))
+		call fs%psM(1)%FDistribution(fs%p(1),fs%a(1))
 
 		open(unit=300,file='data/updateWeightTest/record.bin',status='replace',form='unformatted',access='stream')
 		open(unit=301,file='data/updateWeightTest/xp.bin',status='replace',form='unformatted',access='stream')
@@ -1106,23 +1144,23 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
 		write(301) xp0
 		write(302) vp0
 		write(303) spwt0
-		write(304) fs%f_A
+		write(304) fs%psM(1)%f_A
 		close(300)
 		close(301)
 		close(302)
 		close(303)
 		close(304)
 
-		fs%J = -1.0_mp
+		fs%psM(1)%J = -1.0_mp
 
-		call fs%updateWeight(fs%p(1),fs%a(1))
+		call fs%psM(1)%updateWeight(fs%p(1),fs%a(1))
 		open(unit=304,file='data/updateWeightTest/n_A.bin',status='replace',form='unformatted',access='stream')
-		write(304) fs%f_A
+		write(304) fs%psM(1)%f_A
 		close(304)
-		call fs%FDistribution(fs%p(1),fs%a(1))
+		call fs%psM(1)%FDistribution(fs%p(1),fs%a(1))
 
 		open(unit=304,file='data/updateWeightTest/f_A_after.bin',status='replace',form='unformatted',access='stream')
-		write(304) fs%f_A
+		write(304) fs%psM(1)%f_A
 		close(304)
 
 		call pm%destroyPM1D
@@ -1135,8 +1173,8 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
 		type(FSens) :: fs
 		type(recordData) :: r
 		real(mp), parameter :: Tf=1.0_mp, Ti=0.5_mp, dt = 1.0_mp
-		real(mp), parameter :: L = 1.0_mp, Lv=0.5_mp, w = 0.1_mp
-		integer, parameter :: Ng=64, N=2E6, NInject=1E6
+		real(mp), parameter :: L = 1.0_mp, Lv(1)=0.5_mp, w = 0.1_mp
+		integer, parameter :: Ng=64, N=2E6, Ngv(1)=Ng/2, NInject=1E6
 		integer :: i,k
 		integer :: g(2)
 		real(mp) :: frac(2)
@@ -1144,7 +1182,7 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
 
 		call pm%buildPM1D(Tf,Ti,Ng,N=1,pBC=0,mBC=0,order=1,L=L,dt=dt)
 		call pm%p(1)%buildSpecies(1.0_mp,1.0_mp)
-		call fs%buildFSens(pm,Lv,Ng/2,NInject,NInject)
+		call fs%buildFSens(pm,Lv,Ngv,NInject,NInject)
 		call fs%p(1)%setSpecies(1,(/0.0_mp/),(/0.0_mp,0.0_mp,0.0_mp/),(/0.0_mp/))
 		call r%buildRecord(pm%nt,N,pm%L,Ng,'RedistributionTest',1)
 
@@ -1164,7 +1202,7 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
 			fs%a(1)%frac(:,k) = frac
 		end do
 
-		call fs%FDistribution(fs%p(1),fs%a(1))
+		call fs%psM(1)%FDistribution(fs%p(1),fs%a(1))
 
 		open(unit=300,file='data/RedistributionTest/record.bin',status='replace',form='unformatted',access='stream')
 		open(unit=301,file='data/RedistributionTest/xp.bin',status='replace',form='unformatted',access='stream')
@@ -1175,15 +1213,15 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
 		write(301) xp0
 		write(302) vp0
 		write(303) spwt0
-		write(304) fs%f_A
+		write(304) fs%psM(1)%f_A
 		close(300)
 		close(301)
 		close(302)
 		close(303)
 		close(304)
 
-		call fs%Redistribute(fs%p(1))
-		call fs%FDistribution(fs%p(1),fs%a(1))
+		call fs%Redistribute(fs%p(1),fs%psM(1)%Lv)
+		call fs%psM(1)%FDistribution(fs%p(1),fs%a(1))
 
 		open(unit=301,file='data/RedistributionTest/xp_rdst.bin',status='replace',form='unformatted',access='stream')
 		open(unit=302,file='data/RedistributionTest/vp_rdst.bin',status='replace',form='unformatted',access='stream')
@@ -1192,7 +1230,7 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
 		write(301) fs%p(1)%xp
 		write(302) fs%p(1)%vp
 		write(303) fs%p(1)%spwt
-		write(304) fs%f_A
+		write(304) fs%psM(1)%f_A
 		close(301)
 		close(302)
 		close(303)
@@ -1208,8 +1246,8 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
 		type(FSens) :: fs
 		type(recordData) :: r
 		real(mp), parameter :: Tf=1.0_mp, Ti=0.5_mp, vT=1.0_mp, dt = 1.0_mp
-		real(mp), parameter :: L = 20.0_mp, Lv=5.0_mp, w = 1.0_mp
-		integer, parameter :: Ng=256, N=1000000, NInit=1000000
+		real(mp), parameter :: L = 20.0_mp, Lv(1)=5.0_mp, w = 1.0_mp
+		integer, parameter :: Ng=256, Ngv(1)=Ng/2, N=1000000, NInit=1000000
 		integer :: i,k
 		integer :: g(2)
 		real(mp) :: frac(2)
@@ -1217,7 +1255,7 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
 
 		call pm%buildPM1D(Tf,Ti,Ng,N=1,pBC=0,mBC=0,order=1,L=L,dt=dt,A=(/vT/))
 		call pm%p(1)%buildSpecies(1.0_mp,1.0_mp)
-		call fs%buildFSens(pm,Lv,Ng/2,NInit,NInit)
+		call fs%buildFSens(pm,Lv,Ngv,NInit,NInit)
 		call r%buildRecord(pm%nt,N,pm%L,Ng,'SensitivityInitTest',1)
 
 		open(unit=300,file='data/SensitivityInitTest/record.bin',status='replace',form='unformatted',access='stream')
@@ -1234,8 +1272,8 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
 			fs%a(1)%frac(:,k) = frac
 		end do
 		fs%m%E = 1.0_mp
-		call fs%FVelocityGradient(pm%p(1),pm%a(1))
-		call fs%FSensSourceTerm(pm%p(1)%qs,pm%p(1)%ms)
+		call fs%psM(1)%FVelocityGradient(pm%p(1),pm%a(1))
+		call fs%psM(1)%FSensSourceTerm(pm%p(1)%qs,pm%p(1)%ms,fs%m%E,fs%dt)
 
 		open(unit=301,file='data/SensitivityInitTest/xp.bin',status='replace',form='unformatted',access='stream')
 		open(unit=302,file='data/SensitivityInitTest/vp.bin',status='replace',form='unformatted',access='stream')
@@ -1244,7 +1282,7 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
 		write(301) fs%p(1)%xp
 		write(302) fs%p(1)%vp
 		write(303) fs%p(1)%spwt
-		write(304) fs%j
+		write(304) fs%psM(1)%j
 		close(301)
 		close(302)
 		close(303)
@@ -1277,8 +1315,8 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
 		type(FSens) :: fs
 		type(recordData) :: r
 		real(mp), parameter :: Tf=1.0_mp, Ti=0.5_mp, dt = 1.0_mp
-		real(mp), parameter :: L = 1.0_mp, Lv=0.5_mp, w = 0.1_mp
-		integer, parameter :: Ng=64, N=1000000, NInject=1000000
+		real(mp), parameter :: L = 1.0_mp, Lv(1)=0.5_mp, w = 0.1_mp
+		integer, parameter :: Ng=64, Ngv(1)=Ng/2, N=1000000, NInject=1000000
 		integer :: i,k
 		integer :: g(2)
 		real(mp) :: frac(2)
@@ -1286,7 +1324,7 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
 
 		call pm%buildPM1D(Tf,Ti,Ng,N=1,pBC=0,mBC=0,order=1,L=L,dt=dt)
 		call pm%p(1)%buildSpecies(1.0_mp,1.0_mp)
-		call fs%buildFSens(pm,Lv,Ng/2,NInject,NInject)
+		call fs%buildFSens(pm,Lv,Ngv,NInject,NInject)
 		call fs%p(1)%setSpecies(1,(/0.0_mp/),(/0.0_mp,0.0_mp,0.0_mp/),(/0.0_mp/))
 		call r%buildRecord(pm%nt,N,pm%L,Ng,'InjectionTest',1)
 
@@ -1309,8 +1347,8 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
 			pm%a(1)%frac(:,k) = frac
 		end do
 
-		call fs%FVelocityGradient(pm%p(1),pm%a(1))
-		call fs%FSensSourceTerm(pm%p(1)%qs,pm%p(1)%ms)
+		call fs%psM(1)%FVelocityGradient(pm%p(1),pm%a(1))
+		call fs%psM(1)%FSensSourceTerm(pm%p(1)%qs,pm%p(1)%ms,fs%m%E,dt)
 
 		open(unit=300,file='data/InjectionTest/record.bin',status='replace',form='unformatted',access='stream')
 		open(unit=301,file='data/InjectionTest/xp.bin',status='replace',form='unformatted',access='stream')
@@ -1321,7 +1359,7 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
 		write(301) xp0
 		write(302) vp0
 		write(303) spwt0
-		write(304) fs%j
+		write(304) fs%psM(1)%j
 		close(300)
 		close(301)
 		close(302)
@@ -1330,13 +1368,13 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
 
 		do k=1,Ng+1
 			do i=1,Ng
-				fs%j(i,k) = SIN( 2.0_mp*pi*i/Ng )/SQRT(2.0_mp*pi)/w*EXP( -((k-Ng/2-1)*fs%dv)**2/2.0_mp/w/w )
+				fs%psM(1)%j(i,k) = SIN( 2.0_mp*pi*i/Ng )/SQRT(2.0_mp*pi)/w*EXP( -((k-Ng/2-1)*fs%psM(1)%dv)**2/2.0_mp/w/w )
 			end do
 		end do
 		open(unit=304,file='data/InjectionTest/j_source.bin',status='replace',form='unformatted',access='stream')
-		write(304) fs%j
+		write(304) fs%psM(1)%j
 		close(304)
-		call fs%InjectSource(fs%p(1),fs%j)
+		call fs%InjectSource(fs%L, fs%psM(1)%Lv, fs%p(1),fs%psM(1)%J)
 
 		call fs%applyBC(fs%p(1),fs%m,fs%dt,fs%A0(1))
 		!X-direction Interpolation
@@ -1346,7 +1384,7 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
 			fs%a(1)%g(:,k) = g
 			fs%a(1)%frac(:,k) = frac
 		end do
-		call fs%FDistribution(fs%p(1),fs%a(1))
+		call fs%psM(1)%FDistribution(fs%p(1),fs%a(1))
 
 		open(unit=301,file='data/InjectionTest/xp_inject.bin',status='replace',form='unformatted',access='stream')
 		open(unit=302,file='data/InjectionTest/vp_inject.bin',status='replace',form='unformatted',access='stream')
@@ -1355,7 +1393,7 @@ print *, 'sensitivity flux (uniform): ', -pm%dt/SQRT(8.0_mp*pi*mu*tau**3)
 		write(301) fs%p(1)%xp
 		write(302) fs%p(1)%vp
 		write(303) fs%p(1)%spwt
-		write(304) fs%f_A
+		write(304) fs%psM(1)%f_A
 		close(301)
 		close(302)
 		close(303)
