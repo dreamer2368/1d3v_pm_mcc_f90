@@ -93,8 +93,8 @@ contains
 		type(FSens) :: fs
 		type(recordData) :: r, fsr
 		integer :: N, Ng
-		integer :: NInit=5E4, Ngv, NInject, NLimit
-		real(mp) :: L = 20.0_mp, Lv, Q = 2.0_mp
+		integer :: NInit=5E4, Ngv(1), NInject, NLimit
+		real(mp) :: L = 20.0_mp, Lv(1), Q = 2.0_mp
 		real(mp) :: dt=0.05_mp, dx
 		real(mp) :: Time, vT = 1.5_mp
 		real(mp) :: A(2), J, grad
@@ -118,8 +118,11 @@ contains
 !		NInject = 5*N/pm%nt
 		call buildFSens(fs,pm,Lv,Ngv,NInject,NLimit)
 		call buildRecord(fsr,fs%nt,1,fs%L,fs%ng,trim(dir)//'/f_A',10)
-		call Debye_sensitivity_init(fs,N,vT,'vT')
-!		call Debye_sensitivity_init_sync(fs,pm,vT,'vT')
+        if( fs%scheme.eq.COLLOCATED ) then
+    		call Debye_sensitivity_init_sync(fs,pm,vT,'vT')
+        else
+	    	call Debye_sensitivity_init(fs,N,vT,'vT')
+        end if
 
 		call forwardsweep_sensitivity(pm,r,fs,fsr,Debye,J,grad)
 
@@ -143,8 +146,8 @@ contains
 		integer, parameter  :: Nsample=101
 		real(mp) :: vT(Nsample)
 		integer :: N = 100000, Ng = 64
-		integer :: NInit=5E4, Ngv=32, NInject=5E3, NLimit=5E4
-		real(mp) :: L = 20.0_mp, Lv, Q = 2.0_mp
+		integer :: NInit=5E4, Ngv(1)=32, NInject=5E3, NLimit=5E4
+		real(mp) :: L = 20.0_mp, Lv(1), Q = 2.0_mp
 		real(mp) :: dt=0.05_mp, dx
 		real(mp) :: Time = 750.0_mp
 		real(mp) :: A(2),J,grad
@@ -208,8 +211,8 @@ contains
 		integer, parameter  :: Nsample=1E4
 		real(mp), parameter :: vT=1.5_mp
 		integer, parameter :: N = 1E5, Ng = 64
-		integer, parameter :: NInit=5E4, Ngv=32, NInject=5E3, NLimit=3E5
-		real(mp) :: L = 20.0_mp, Lv, Q = 2.0_mp
+		integer, parameter :: NInit=5E4, Ngv(1)=32, NInject=5E3, NLimit=3E5
+		real(mp) :: L = 20.0_mp, Lv(1), Q = 2.0_mp
 		real(mp) :: dt=0.05_mp, dx
 		real(mp) :: Time, A(2)
 		real(mp) :: J,grad,adj_grad(1)
