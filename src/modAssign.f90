@@ -204,6 +204,31 @@ contains
 		end do
 	end subroutine
 
+    subroutine appendAssign(this,dN,dg,dfrac)
+        class(pmAssign), intent(inout) :: this
+        integer, intent(in) :: dN, dg(this%order+1,dN)
+        real(mp), intent(in) :: dfrac(this%order+1,dN)
+
+        integer :: new_g(this%order+1,size(this%g,2)+dN)
+        real(mp) :: new_frac(this%order+1,size(this%g,2)+dN)
+
+        integer :: N0
+        N0 = size(this%g,2)
+        
+        new_g(:,1:N0) = this%g
+        new_g(:,N0+1:N0+dN) = dg
+
+        new_frac(:,1:N0) = this%frac
+        new_frac(:,N0+1:N0+dN) = dfrac
+
+        deallocate(this%g)
+        deallocate(this%frac)
+        allocate(this%g(this%order+1,N0+dN))
+        allocate(this%frac(this%order+1,N0+dN))
+        this%g = new_g
+        this%frac= new_frac
+    end subroutine
+
 !======================= Adjoint assignment (periodic only) ===============================================
 
 	subroutine Adj_chargeAssign(this,p,m,rhos,xps)
