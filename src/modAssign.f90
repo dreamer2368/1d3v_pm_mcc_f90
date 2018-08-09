@@ -129,11 +129,33 @@ contains
 		h = xp/dx - g0 + 1.0_mp
 
 		frac0 = 0.75_mp - h*h
-		fracl = 0.5_mp*(0.5_mp-h)*(0.5_mp-h)
-		fracr = 0.5_mp*(0.5_mp+h)*(0.5_mp+h)
+		fracl = 0.5_mp*(0.5_mp+h)*(0.5_mp+h)
+		fracr = 0.5_mp*(0.5_mp-h)*(0.5_mp-h)
 
 		g = (/gl,g0,gr/)
 		frac = (/ fracl, frac0, fracr /)
+	end subroutine
+
+	subroutine assign_CIC_derivative(vp,dv,gv,fracv)	!for velocity derivative interpolation
+		real(mp), intent(in) :: vp, dv
+		integer, intent(out) :: gv(:)
+		real(mp), intent(out) :: fracv(:)
+		integer :: i, np
+		integer :: g1, gl, gr
+		real(mp) :: fracl, fracr		!fraction for left grid point
+		real(mp) :: h
+
+		!assignment matrix
+		g1 = FLOOR(vp/dv)
+		gl = g1
+		gr = gl+1
+
+		h = vp/dv - g1
+		fracl = 1.0_mp/dv
+		fracr = -1.0_mp/dv
+
+		gv = (/ gl, gr /)
+		fracv = (/ fracl, fracr /)
 	end subroutine
 
 	subroutine assign_TSC_derivative(vp,dv,gv,fracv)	!for velocity derivative interpolation
