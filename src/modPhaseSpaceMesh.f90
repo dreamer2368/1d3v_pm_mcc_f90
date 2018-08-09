@@ -250,11 +250,20 @@ contains
 			vp = p%vp(k,1)
             call this%a%assignMatrix(vp,this%dv,g_vp,frac_vp)
             g_vp = g_vp + this%ngv
-            call this%a%adjustGrid(this%ngv,g_vp,frac_vp)
+!            call this%a%adjustGrid(this%ngv,g_vp,frac_vp)
 
+            if( g_vp(1)<1 .or. g_vp(2)>2*this%ngv+1 ) then
+                g_v(:,k) = this%ngv+1
+                frac_v(:,k) = 0.0_mp
+                cycle
+            else
+                g_v(:,k) = g_vp
+                frac_v(:,k) = frac_vp
+            end if
+                
 			g = g_x(:,k)
-            g_v(:,k) = g_vp
-            frac_v(:,k) = frac_vp
+!            g_v(:,k) = g_vp
+!            frac_v(:,k) = frac_vp
             do i=1,this%a%order+1
 			    n_temp(g,g_vp(i)) = n_temp(g,g_vp(i)) + frac_vp(i)*frac_x(:,k)/this%dx/this%dv
             end do
@@ -287,10 +296,16 @@ contains
 		frac_v=>this%a%frac
 
 		do k = 1, p%np
+            if( SUM(frac_v(:,k)).eq.0.0_mp ) cycle
 			g = g_x(:,k)
             g_vp = g_v(:,k)
+!			vp = p%vp(k,1)
+!            call this%a%assignMatrix(vp,this%dv,g_vp,frac_vp)
+!            g_vp = g_vp + this%ngv
+!            call this%a%adjustGrid(this%ngv,g_vp,frac_vp)
 
             do i=1,this%a%order+1
+!                p%spwt(k) = p%spwt(k) + SUM( H_temp(g,g_vp(i))*frac_vp(i)*frac_x(:,k) )
                 p%spwt(k) = p%spwt(k) + SUM( H_temp(g,g_vp(i))*frac_v(i,k)*frac_x(:,k) )
             end do
 		end do
