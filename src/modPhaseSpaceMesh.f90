@@ -12,6 +12,8 @@ module modPhaseSpaceMesh
         real(mp), allocatable :: J(:,:), n_A(:,:), Dvf(:,:)
         real(mp), allocatable :: f_A(:,:)
 
+        real(mp), allocatable :: frac(:,:,:)
+
         type(pmAssign) :: a
     contains
         procedure, pass(this) :: buildPhaseSpaceMesh
@@ -56,6 +58,8 @@ contains
 		deallocate(this%n_A)
 		deallocate(this%f_A)
 		deallocate(this%Dvf)
+
+        if( ALLOCATED(this%frac) ) deallocate(this%frac)
 
         call this%a%destroyAssign
 	end subroutine
@@ -197,23 +201,24 @@ contains
 		class(phaseSpaceMesh), intent(inout) :: this
 		type(species), intent(in) :: p
 		type(pmAssign), intent(in) :: a
-		integer :: i,k, g(a%order+1), gv(3)
-		real(mp) :: vp, fracv(3)
+		integer :: i,k, g(a%order+1), gv(2)
+		real(mp) :: vp, fracv(2)
 
 		!DvF to phase space
 		this%Dvf = 0.0_mp
 		do k = 1, p%np
 			vp = p%vp(k,1)
-            call assign_TSC_derivative(vp,this%dv,gv,fracv)	!for velocity derivative interpolation
+            call assign_CIC_derivative(vp,this%dv,gv,fracv)	!for velocity derivative interpolation
+!            call assign_TSC_derivative(vp,this%dv,gv,fracv)	!for velocity derivative interpolation
             where( abs(gv)>this%ngv )
-                gv = 0
+                gv = this%ngv
                 fracv = 0.0_mp
             elsewhere
                 gv = gv + this%ngv + 1
             end where
 			g = a%g(:,k)
 
-            do i=1,3
+            do i=1,2
 			    this%Dvf(g,gv(i)) = this%Dvf(g,gv(i)) + p%spwt(k)*a%frac(:,k)*fracv(i)/this%dv/this%dx
             end do
 		end do
@@ -248,6 +253,9 @@ contains
 		g_v=>this%a%g
 		frac_v=>this%a%frac
 
+!        if( ALLOCATED(this%frac) ) deallocate(this%frac)
+!        allocate(this%frac(a%order+1,this%a%order+1,p%np))
+
 		n_temp = 0.0_mp
 		do k = 1, p%np
 			vp = p%vp(k,1)
@@ -267,9 +275,12 @@ contains
 !			frac(:,1) = (1.0_mp-h)*frac_x(:,k)
 !			frac(:,2) = h*frac_x(:,k)
             do i=1,this%a%order+1
-    			frac(:,i) = frac_vp(i)*frac_x(:,k)
+!    			frac(:,i) = frac_vp(i)*frac_x(:,k)
+			    n_temp(g,g_vp(i)) = n_temp(g,g_vp(i)) + frac_vp(i)*frac_x(:,k)/this%dx/this%dv
+!    			this%frac(:,i,k) = frac_vp(i)*frac_x(:,k)
+!			    n_temp(g,g_vp(i)) = n_temp(g,g_vp(i)) + this%frac(:,i,k)/this%dx/this%dv
             end do
-			n_temp(g,g_vp) = n_temp(g,g_vp) + frac/this%dx/this%dv
+!			n_temp(g,g_vp) = n_temp(g,g_vp) + frac/this%dx/this%dv
 		end do
         if( a%mBCidx .ne. 0 ) then
             n_temp((/1,a%ng/),:) = n_temp((/1,a%ng/),:)*2.0_mp
@@ -283,12 +294,14 @@ contains
 		class(phaseSpaceMesh), intent(inout) :: this
 		type(species), intent(inout) :: p
 		type(pmAssign), intent(in) :: a
-		integer :: i,k, g(a%order+1), g_vp(2)
+		integer :: i,j,k, g(a%order+1), g_vp(2)
 		real(mp) :: frac(2,2)
 		integer :: vgl, vgr, k_temp
 		real(mp) :: vp, h
 		integer, dimension(:,:), pointer :: g_x, g_v
 		real(mp), dimension(:,:), pointer :: frac_x, frac_v
+        real(mp), dimension(size(this%J,1),size(this%J,2)) :: H_temp
+        H_temp = this%J/this%n_A
 
 		!Update weight
 		g_x=>a%g
@@ -307,12 +320,15 @@ contains
 !			g_vp = (/ vgl, vgr /)
             g_vp = g_v(:,k)
 !			h = vp/this%dv - FLOOR(vp/this%dv)
-            do i=1,this%a%order+1
-                frac(:,i) = frac_v(i,k)*frac_x(:,k)
-            end do
+!            do i=1,this%a%order+1
+!                frac(:,i) = frac_v(i,k)*frac_x(:,k)
+!            end do
 !			frac(:,1) = (1.0_mp-h)*frac_x(:,k)
 !			frac(:,2) = h*frac_x(:,k)
-			p%spwt(k) = p%spwt(k) + SUM( this%J(g,g_vp)*frac/this%n_A(g,g_vp) )
+            do i=1,this%a%order+1
+                p%spwt(k) = p%spwt(k) + SUM( H_temp(g,g_vp(i))*frac_v(i,k)*frac_x(:,k) )
+            end do
+!            p%spwt(k) = p%spwt(k) + SUM( H_temp(g,g_vp)*this%frac(:,:,k) )
 		end do
 	end subroutine
 
