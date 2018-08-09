@@ -292,6 +292,8 @@ contains
 			write(301,701) 'Remeshing	', total, mean, pct
 			print *, "============================================================================="
 			close(301)
+
+            print *, "Factor: ", SUM(this%cpt_time)/SUM(this%cpt_time(1:7,:))
 		end if
 	end subroutine
 
