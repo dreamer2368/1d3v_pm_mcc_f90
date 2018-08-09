@@ -66,7 +66,7 @@ $(EXE): $(F90OBJ)
 
 # All .o files depend on the corresponding .f90 file
 $(OBJDIR)/%.o: $(SRCDIR)/%.f90
-	$(F90) -J$(MODDIR) -c -o $@ $<
+	$(F90) -J$(MODDIR) -O3 -c -o $@ $<
 
 # Dependencies
 $(OBJDIR)/random.o : $(OBJDIR)/constants.o

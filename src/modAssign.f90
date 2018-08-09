@@ -138,8 +138,8 @@ contains
 
 	subroutine assign_CIC_derivative(vp,dv,gv,fracv)	!for velocity derivative interpolation
 		real(mp), intent(in) :: vp, dv
-		integer, intent(out) :: gv(:)
-		real(mp), intent(out) :: fracv(:)
+		integer, intent(out) :: gv(2)
+		real(mp), intent(out) :: fracv(2)
 		integer :: i, np
 		integer :: g1, gl, gr
 		real(mp) :: fracl, fracr		!fraction for left grid point
@@ -362,7 +362,7 @@ contains
 		integer, intent(inout) :: g(:)
 		real(mp), intent(inout) :: frac(:)
 
-		if( MINVAL(g)<1 .or. MAXVAL(g)>2*ngv+1 ) then
+		if( g(1)<1 .or. g(2)>2*ngv+1 ) then
             g = ngv+1
             frac = 0.0_mp
 		end if
