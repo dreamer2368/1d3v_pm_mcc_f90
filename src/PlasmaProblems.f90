@@ -359,7 +359,7 @@ contains
 		real(mp) :: A(5),J
 		integer :: i, thefile, idx, input, ierror
 		character(len=100):: dir, filename
-        Time = getOption('QoI_curve/time',300.0_mp)
+        Time = getOption('QoI_curve/time',160.0_mp)
         dir = getOption('QoI_curve/directory','modified_sheath_curve')
         filename = getOption('QoI_curve/filename','J.bin')
         input = getOption('QoI_curve/random_seed',0)
@@ -373,8 +373,8 @@ contains
 		call allocateBuffer(Nsample,2,mpih)
         thefile = MPIWriteSetup(mpih,'data/'//trim(dir),filename)
 
-        inputNe = 97299
-        inputNi = 99965
+        inputNi = 799624/8
+        inputNe = 777016/8
         allocate(xp_e(inputNe))
         allocate(vp_e(inputNe,3))
         allocate(spwt_e(inputNe))
