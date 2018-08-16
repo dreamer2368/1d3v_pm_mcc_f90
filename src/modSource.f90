@@ -193,12 +193,14 @@ contains
 		call pm%p(1)%appendSpecies(Nadd,xp_add,vp_add,spwt_add)
 
         time = k*pm%dt
-        Period = 0.2_mp*pm%nt*pm%dt
-        timeStart = 0.1_mp*pm%nt*pm%dt
-        timeEnd = timeStart + 4.0_mp*Period
+        Period = 120.0_mp
+        timeStart = 30.0_mp
+!        Period = 0.4_mp*pm%nt*pm%dt
+!        timeStart = 0.1_mp*pm%nt*pm%dt
+        timeEnd = timeStart + 2.0_mp*Period
         convectionVelocity = 0.0_mp
         if( (time.ge.timeStart) .and. (time.le.timeEnd) ) then
-            convectionVelocity = pm%A0(5)*SIN( 2.0_mp*pi*(time-timeStart)/Period )
+            convectionVelocity = pm%A0(5)*( 0.5_mp - 0.5_mp*COS( 2.0_mp*pi*(time-timeStart)/Period ) )
         end if
 
 		spwt_add = pm%p(2)%spwt(1)
@@ -220,7 +222,9 @@ contains
 
         time = k*pm%dt
         Period = 0.2_mp*pm%nt*pm%dt
+!        Period = 30.0_mp
         timeStart = 0.1_mp*pm%nt*pm%dt
+!        timeStart = 10.0_mp
         timeEnd = timeStart + 4.0_mp*Period
         if( (time.ge.timeStart) .and. (time.le.timeEnd) ) then
             Nadd = 2*((NIonFluxR+1)/2)
