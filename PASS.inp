@@ -7,7 +7,7 @@ test3 = 24
 print_simulation_detail = true
 
 #Base simulation parameters
-simulation_time = 150.0
+simulation_time = 30.0
 number_of_particles = 100000
 number_of_grids = 64
 number_of_injecting_particles = 5E4
@@ -30,6 +30,9 @@ adjoint_convergence/directory = 'debye_adj_test/dp'
 #Sampling parameter
 sensitivity_sampling/time = 10.0
 sensitivity_sampling/directory = 'debye_sampling'
+sensitivity_sampling/number_of_particles = 100000
+sensitivity_sampling/number_of_grids = 64
+sensitivity_sampling/timestep_size = 0.1
 
 #QoI curve
 QoI_curve/time = 4.5

@@ -210,8 +210,8 @@ contains
 		type(mpiHandler) :: mpih
 		integer, parameter  :: Nsample=1E4
 		real(mp), parameter :: vT=1.5_mp
-		integer, parameter :: N = 1E5, Ng = 64
-		integer, parameter :: NInit=5E4, Ngv(1)=32, NInject=5E3, NLimit=3E5
+		integer :: N = 1E5, Ng = 64
+		integer :: NInit=5E4, Ngv(1)=32, NInject=5E3, NLimit=3E5
 		real(mp) :: L = 20.0_mp, Lv(1), Q = 2.0_mp
 		real(mp) :: dt=0.05_mp, dx
 		real(mp) :: Time, A(2)
@@ -220,6 +220,9 @@ contains
 		character(len=100) :: prefix,dir,Time_str
         dir = getOption('sensitivity_sampling/directory','debye_sampling')
         Time = getOption('sensitivity_sampling/time',0.0_mp)
+        N = getOption('sensitivity_sampling/number_of_particles',100000)
+        Ng = getOption('sensitivity_sampling/number_of_grids',64)
+        dt = getOption('sensitivity_sampling/timestep_size',0.05_mp)
         write(Time_str,'(F8.3)'), Time
         dir = trim(dir)//'/T'//trim(adjustl(Time_str))
 		A = (/ vT, 0.0_mp /)
@@ -253,8 +256,8 @@ contains
 			call adj%m%setMesh(d%m%rho_back)
 			call backward_sweep(adj,d,r,adj_grad,dDebye,Null_dinput,dDebye_dvT,Null_input,Null_source)
 
-			mpih%sendbuf(i,:) = (/J,grad,adj_grad(1)/)
-             mpih%sendbuf(i,:) = (/J,grad/)
+!			mpih%sendbuf(i,:) = (/J,grad,adj_grad(1)/)
+!             mpih%sendbuf(i,:) = (/J,grad/)
             mpih%writebuf = (/ J,grad,adj_grad(1) /)
 
             call MPI_FILE_WRITE(thefile, mpih%writebuf, 3, MPI_DOUBLE, & 
