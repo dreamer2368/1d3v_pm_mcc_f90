@@ -227,7 +227,7 @@ contains
         dir = trim(dir)//'/T'//trim(adjustl(Time_str))
 		A = (/ vT, 0.0_mp /)
 
-		call buildMPIHandler(mpih)
+!		call buildMPIHandler(mpih)
 		call allocateBuffer(Nsample,3,mpih)
 !        call allocateBuffer(Nsample,2,mpih)
 
@@ -294,7 +294,7 @@ contains
 
         call MPI_FILE_CLOSE(thefile, mpih%ierr)            
 
-		call destroyMPIHandler(mpih)
+!		call destroyMPIHandler(mpih)
 	end subroutine
 
 end module
