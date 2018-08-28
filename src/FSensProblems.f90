@@ -207,7 +207,6 @@ contains
 		type(adjoint) :: adj
 		type(FSens) :: fs
 		type(recordData) :: r,fsr
-		type(mpiHandler) :: mpih
 		integer, parameter  :: Nsample=1E4
 		real(mp), parameter :: vT=1.5_mp
 		integer :: N = 1E5, Ng = 64
@@ -219,16 +218,16 @@ contains
 		integer :: i,thefile
 		character(len=100) :: prefix,dir,Time_str
         dir = getOption('sensitivity_sampling/directory','debye_sampling')
-        Time = getOption('sensitivity_sampling/time',0.0_mp)
+        Time = getOption('sensitivity_sampling/time',150.0_mp)
         N = getOption('sensitivity_sampling/number_of_particles',100000)
         Ng = getOption('sensitivity_sampling/number_of_grids',64)
         dt = getOption('sensitivity_sampling/timestep_size',0.05_mp)
-        write(Time_str,'(F8.3)'), Time
-        dir = trim(dir)//'/T'//trim(adjustl(Time_str))
+!        write(Time_str,'(F8.3)'), Time
+!        dir = trim(dir)//'/T'//trim(adjustl(Time_str))
 		A = (/ vT, 0.0_mp /)
 
 !		call buildMPIHandler(mpih)
-		call allocateBuffer(Nsample,3,mpih)
+		call mpih%allocateBuffer(Nsample,3)
 !        call allocateBuffer(Nsample,2,mpih)
 
         thefile = MPIWriteSetup(mpih,'data/'//trim(dir))
