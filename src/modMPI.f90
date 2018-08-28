@@ -106,7 +106,7 @@ contains
         integer(kind=MPI_OFFSET_KIND) :: disp
         integer :: i
 
-		call system('mkdir -p '//trim(dir))
+        if( this%my_rank.eq.0 ) call system('mkdir -p '//trim(dir))
         if( present(filename) ) then
             filename_ = trim(dir)//'/'//trim(filename)
         else
