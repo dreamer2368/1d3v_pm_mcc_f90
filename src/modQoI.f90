@@ -153,8 +153,8 @@ contains
 		integer, intent(in) :: k
 		real(mp), intent(inout) :: J
         
-        if( k.ge.FLOOR(0.9_mp*pm%nt) ) then
-            J = J + 1.0_mp/(pm%nt-FLOOR(0.9_mp*pm%nt)+1)*( -pm%m%phi(pm%ng) )
+        if( k.ge.FLOOR(0.85_mp*pm%nt) ) then
+            J = J + 1.0_mp/(pm%nt-FLOOR(0.85_mp*pm%nt)+1)*( -pm%m%phi(pm%ng) )
         end if
     end subroutine
 
