@@ -245,8 +245,8 @@ contains
 	
 			Lv = A(1)*6.0_mp
 			call buildFSens(fs,d,Lv,Ngv,NInject,NLimit)
-			dir = trim(dir)//'/f_A'
-			call buildRecord(fsr,fs%nt,1,fs%L,fs%ng,trim(dir),20)
+			call buildRecord(fsr,fs%nt,1,fs%L,fs%ng,                                                &
+                             trim(dir)//'/'//trim(adjustl(mpih%rank_str))//'/f_A',20)
 			call Debye_sensitivity_init(fs,2*N,A(1))
 
 			call forwardsweep_sensitivity(d,r,fs,fsr,Debye,J,grad)

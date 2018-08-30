@@ -100,11 +100,12 @@ contains
 		procedure(source) :: inputSource
 		procedure(control), pointer :: PtrControl
 		procedure(source), pointer :: PtrSource
-		integer :: kr,i
+		integer :: kr,i,fileUnit
 		character(len=1000) :: istr, kstr, dir_temp
 		real(mp), allocatable :: xp0(:), vp0(:,:), spwt0(:)
 		PtrControl=>inputControl
 		PtrSource=>inputSource
+        fileUnit = mpih%my_rank+305
 
 		kr = merge(nk,nk/r%mod,r%mod.eq.1)
 		write(kstr,*) kr
@@ -114,17 +115,17 @@ contains
 			allocate(spwt0(r%np(i,kr+1)))
 			write(istr,*) i
 			dir_temp='data/'//r%dir//'/xp/'//trim(adjustl(kstr))//'_'//trim(adjustl(istr))//'.bin'
-			open(unit=305,file=trim(dir_temp),form='unformatted',access='stream')
+			open(unit=fileUnit,file=trim(dir_temp),form='unformatted',access='stream')
+			read(fileUnit) xp0
+			close(fileUnit)
 			dir_temp='data/'//r%dir//'/vp/'//trim(adjustl(kstr))//'_'//trim(adjustl(istr))//'.bin'
-			open(unit=306,file=trim(dir_temp),form='unformatted',access='stream')
+			open(unit=fileUnit,file=trim(dir_temp),form='unformatted',access='stream')
+			read(fileUnit) vp0
+			close(fileUnit)
 			dir_temp='data/'//r%dir//'/spwt/'//trim(adjustl(kstr))//'_'//trim(adjustl(istr))//'.bin'
-			open(unit=307,file=trim(dir_temp),form='unformatted',access='stream')
-			read(305) xp0
-			read(306) vp0
-			read(307) spwt0
-			close(305)
-			close(306)
-			close(307)
+			open(unit=fileUnit,file=trim(dir_temp),form='unformatted',access='stream')
+			read(fileUnit) spwt0
+			close(fileUnit)
 			call pm%p(i)%destroySpecies
 			call pm%p(i)%setSpecies(r%np(i,kr+1),xp0,vp0,spwt0)
 			deallocate(xp0)

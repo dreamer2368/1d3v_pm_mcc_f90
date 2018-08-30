@@ -1,6 +1,7 @@
 module modRecord
 
 	use modPM1D
+    use modMPI
 
 	implicit none
 
@@ -100,9 +101,10 @@ contains
 		class(recordData), intent(inout) :: this
 		class(PM1D), intent(in) :: pm
 		integer, intent(in) :: k					!k : time step
-		integer :: n,j, kr								!n : species
+		integer :: n,j, kr, fileUnit								!n : species
 		character(len=100) :: nstr, kstr
 		real(mp) :: qe = 1.602176565E-19
+        fileUnit = mpih%my_rank+305
 
 		this%cpt_time(:,k+1) = this%cpt_temp
 		this%cpt_temp=0.0_mp
@@ -111,18 +113,18 @@ contains
 			do n=1,pm%n
 				write(nstr,*) n
 				write(kstr,*) kr
-				open(unit=305,file='data/'//this%dir//'/xp/'//trim(adjustl(kstr))//'_'	&
+				open(unit=fileUnit,file='data/'//this%dir//'/xp/'//trim(adjustl(kstr))//'_'	&
 					//trim(adjustl(nstr))//'.bin',status='replace',form='unformatted',access='stream')
-				open(unit=306,file='data/'//this%dir//'/vp/'//trim(adjustl(kstr))//'_'	&
+				write(fileUnit) pm%p(n)%xp
+				close(fileUnit)
+				open(unit=fileUnit,file='data/'//this%dir//'/vp/'//trim(adjustl(kstr))//'_'	&
 					//trim(adjustl(nstr))//'.bin',status='replace',form='unformatted',access='stream')
-				open(unit=307,file='data/'//this%dir//'/spwt/'//trim(adjustl(kstr))//'_'	&
+				write(fileUnit) pm%p(n)%vp
+				close(fileUnit)
+				open(unit=fileUnit,file='data/'//this%dir//'/spwt/'//trim(adjustl(kstr))//'_'	&
 					//trim(adjustl(nstr))//'.bin',status='replace',form='unformatted',access='stream')
-				write(305) pm%p(n)%xp
-				write(306) pm%p(n)%vp
-				write(307) pm%p(n)%spwt
-				close(305)
-				close(306)
-				close(307)
+				write(fileUnit) pm%p(n)%spwt
+				close(fileUnit)
 
 				!time step: 0~Nt, in array: 1~(Nt+1) (valgrind prefers this way of allocation)
 				this%np(n,kr+1) = pm%p(n)%np
@@ -147,151 +149,153 @@ contains
 	subroutine printPlasma(this)
 		class(recordData), intent(in) :: this
 		character(len=100) :: s
-		integer :: i,j
+		integer :: i,j,fileUnit
 		real(mp) :: total, mean, pct
+        fileUnit = mpih%my_rank+300
 
-		open(unit=300,file='data/'//this%dir//'/record',status='replace')
-		open(unit=301,file='data/'//this%dir//'/E.bin',status='replace',form='unformatted',access='stream')
-		open(unit=302,file='data/'//this%dir//'/rho.bin',status='replace',form='unformatted',access='stream')
-		open(unit=303,file='data/'//this%dir//'/PE.bin',status='replace',form='unformatted',access='stream')
-		open(unit=304,file='data/'//this%dir//'/Np.bin',status='replace',form='unformatted',access='stream')
-		open(unit=305,file='data/'//this%dir//'/phi.bin',status='replace',form='unformatted',access='stream')
-		open(unit=306,file='data/'//this%dir//'/Ncoll.bin',status='replace',form='unformatted',access='stream')
-		open(unit=307,file='data/'//this%dir//'/cpt_time.bin',status='replace',form='unformatted',access='stream')
+		open(unit=fileUnit,file='data/'//this%dir//'/record',status='replace')
+		open(unit=fileUnit+1,file='data/'//this%dir//'/E.bin',status='replace',form='unformatted',access='stream')
+		open(unit=fileUnit+2,file='data/'//this%dir//'/rho.bin',status='replace',form='unformatted',access='stream')
+		open(unit=fileUnit+3,file='data/'//this%dir//'/PE.bin',status='replace',form='unformatted',access='stream')
+		open(unit=fileUnit+4,file='data/'//this%dir//'/Np.bin',status='replace',form='unformatted',access='stream')
+		open(unit=fileUnit+5,file='data/'//this%dir//'/phi.bin',status='replace',form='unformatted',access='stream')
+		open(unit=fileUnit+6,file='data/'//this%dir//'/Ncoll.bin',status='replace',form='unformatted',access='stream')
+		open(unit=fileUnit+7,file='data/'//this%dir//'/cpt_time.bin',status='replace',form='unformatted',access='stream')
 		do i=1,this%n
 			write(s,*) i
-			open(unit=307+i,file='data/'//this%dir//'/KE_'//trim(adjustl(s))//'.bin',status='replace',form='unformatted',access='stream')
+			open(unit=fileUnit+7+i,file='data/'//this%dir//'/KE_'//trim(adjustl(s))//'.bin',                &
+                 status='replace',form='unformatted',access='stream')
 		end do
-		print *, this%n, this%ng, this%nt, this%L, this%mod
-		write(300,*) this%n, this%ng, this%nt, this%L, this%mod
-		close(300)
+        print *, this%n, this%ng, this%nt, this%L, this%mod
+		write(fileUnit,*) this%n, this%ng, this%nt, this%L, this%mod
+		close(fileUnit)
 
-      write(306) this%n_coll
-      close(306)
+        write(fileUnit+6) this%n_coll
+        close(fileUnit+6)
 
-		write(307) this%cpt_time
-		close(307)
+		write(fileUnit+7) this%cpt_time
+		close(fileUnit+7)
 
 		do i = 1,this%nt/this%mod+1
-			write(301) this%Edata(:,i)
-			write(302) this%rhodata(:,i)
-			write(303) this%PE(i)
-			write(304) this%np(:,i)
-			write(305) this%phidata(:,i)
+			write(fileUnit+1) this%Edata(:,i)
+			write(fileUnit+2) this%rhodata(:,i)
+			write(fileUnit+3) this%PE(i)
+			write(fileUnit+4) this%np(:,i)
+			write(fileUnit+5) this%phidata(:,i)
 			do j=1,this%n
-				write(307+j) this%KE(j,i)
+				write(fileUnit+7+j) this%KE(j,i)
 			end do
 		end do
 
-		close(301)
-		close(302)
-		close(303)
-		close(304)
-		close(305)
+		close(fileUnit+1)
+		close(fileUnit+2)
+		close(fileUnit+3)
+		close(fileUnit+4)
+		close(fileUnit+5)
 		do i=1,this%n
-			close(307+i)
+			close(fileUnit+7+i)
 		end do
 
 701	FORMAT	(A, F10.3,'	',E10.3,'	', F10.2,'%')
 		if( SUM(this%cpt_time(8,:)).eq.0.0_mp ) then
-			open(unit=301,file='data/'//this%dir//'/original_cpt_summary.dat',status='replace')
-			write(301,*) 'Step	Total	Mean	Percentage'
+			open(unit=fileUnit,file='data/'//this%dir//'/original_cpt_summary.dat',status='replace')
+			write(fileUnit,*) 'Step	Total	Mean	Percentage'
 			print *, "================ Computation Time Summary ==================================="
 			print *, "Original simulation	   	     Total            Mean	 Percentage	"
 			total = SUM(this%cpt_time(1,:))
 			mean = total/this%nt
 			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Particle Move			", total, mean, pct
-			write(301,701) 'Particle-Move	', total, mean, pct
+			write(fileUnit,701) 'Particle-Move	', total, mean, pct
 			total = SUM(this%cpt_time(2,:))
 			mean = total/this%nt
 			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "ApplyBC				", total, mean, pct
-			write(301,701) 'ApplyBC	', total, mean, pct
+			write(fileUnit,701) 'ApplyBC	', total, mean, pct
 			total = SUM(this%cpt_time(3,:))
 			mean = total/this%nt
 			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "ChargeAssign			", total, mean, pct
-			write(301,701) 'Charge-Assign	', total, mean, pct
+			write(fileUnit,701) 'Charge-Assign	', total, mean, pct
 			total = SUM(this%cpt_time(4,:))
 			mean = total/this%nt
 			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Poisson Solver			", total, mean, pct
-			write(301,701) 'Poisson-Solver	', total, mean, pct
+			write(fileUnit,701) 'Poisson-Solver	', total, mean, pct
 			total = SUM(this%cpt_time(5,:))
 			mean = total/this%nt
 			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Efield Gradient			", total, mean, pct
-			write(301,701) 'Efield-Gradient	', total, mean, pct
+			write(fileUnit,701) 'Efield-Gradient	', total, mean, pct
 			total = SUM(this%cpt_time(6,:))
 			mean = total/this%nt
 			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Force Assign			", total, mean, pct
-			write(301,701) 'Force-Assign	', total, mean, pct
+			write(fileUnit,701) 'Force-Assign	', total, mean, pct
 			total = SUM(this%cpt_time(7,:))
 			mean = total/this%nt
 			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Particle Accel			", total, mean, pct
-			write(301,701) 'Particle-Accel	', total, mean, pct
+			write(fileUnit,701) 'Particle-Accel	', total, mean, pct
 			print *, "============================================================================="
-			close(301)
+			close(fileUnit)
 		else
-			open(unit=301,file='data/'//this%dir//'/sensitivity_cpt_summary.dat',status='replace')
-			write(301,*) 'Step	Total	Mean	Percentage'
+			open(unit=fileUnit,file='data/'//this%dir//'/sensitivity_cpt_summary.dat',status='replace')
+			write(fileUnit,*) 'Step	Total	Mean	Percentage'
 			print *, "================ Computation Time Summary ==================================="
 			print *, "Sensitivity simulation	  	     Total            Mean   	 Percentage	"
 			total = SUM(this%cpt_time(1,:))
 			mean = total/this%nt
 			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Particle Move			", total, mean, pct
-			write(301,701) 'Particle-Move	', total, mean, pct
+			write(fileUnit,701) 'Particle-Move	', total, mean, pct
 			total = SUM(this%cpt_time(2,:))
 			mean = total/this%nt
 			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "ApplyBC				", total, mean, pct
-			write(301,701) 'ApplyBC	', total, mean, pct
+			write(fileUnit,701) 'ApplyBC	', total, mean, pct
 			total = SUM(this%cpt_time(3,:))
 			mean = total/this%nt
 			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "ChargeAssign			", total, mean, pct
-			write(301,701) 'Charge-Assign	', total, mean, pct
+			write(fileUnit,701) 'Charge-Assign	', total, mean, pct
 			total = SUM(this%cpt_time(4,:))
 			mean = total/this%nt
 			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Poisson Solver			", total, mean, pct
-			write(301,701) 'Poisson-Solver	', total, mean, pct
+			write(fileUnit,701) 'Poisson-Solver	', total, mean, pct
 			total = SUM(this%cpt_time(5,:))
 			mean = total/this%nt
 			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Efield Gradient			", total, mean, pct
-			write(301,701) 'Efield-Gradient	', total, mean, pct
+			write(fileUnit,701) 'Efield-Gradient	', total, mean, pct
 			total = SUM(this%cpt_time(6,:))
 			mean = total/this%nt
 			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Force Assign			", total, mean, pct
-			write(301,701) 'Force-Assign	', total, mean, pct
+			write(fileUnit,701) 'Force-Assign	', total, mean, pct
 			total = SUM(this%cpt_time(7,:))
 			mean = total/this%nt
 			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Particle Accel			", total, mean, pct
-			write(301,701) 'Particle-Accel	', total, mean, pct
+			write(fileUnit,701) 'Particle-Accel	', total, mean, pct
 			total = SUM(this%cpt_time(8,:))
 			mean = total/this%nt
 			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Sensitivity Source		", total, mean, pct
-			write(301,701) 'Sensitivity-Source	', total, mean, pct
+			write(fileUnit,701) 'Sensitivity-Source	', total, mean, pct
 			total = SUM(this%cpt_time(9,:))
 			mean = total/this%nt
 			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Injection			", total, mean, pct
-			write(301,701) 'Injection	', total, mean, pct
+			write(fileUnit,701) 'Injection	', total, mean, pct
 			total = SUM(this%cpt_time(10,:))
 			mean = total/this%nt
 			pct = total/SUM(this%cpt_time)*100.0_mp
 			print 701, "Remeshing			", total, mean, pct
-			write(301,701) 'Remeshing	', total, mean, pct
+			write(fileUnit,701) 'Remeshing	', total, mean, pct
 			print *, "============================================================================="
-			close(301)
+			close(fileUnit)
 
             print *, "Factor: ", SUM(this%cpt_time)/SUM(this%cpt_time(1:7,:))
 		end if

@@ -15,7 +15,7 @@ PNETCDFLIBS=
 
 LIBS    = $(FFTWLIBS)
 
-EXE = exec
+EXE = debye_sampling
 F90SRC = main.f90 \
 		modInputHelper.f90 \
 		constants.f90 \
@@ -90,7 +90,8 @@ $(OBJDIR)/ArMCC.o : $(OBJDIR)/modSpecies.o \
 $(OBJDIR)/modPM1D.o : $(OBJDIR)/modBC.o \
 						$(OBJDIR)/modAssign.o \
 						$(OBJDIR)/ArMCC.o
-$(OBJDIR)/modRecord.o : $(OBJDIR)/modPM1D.o
+$(OBJDIR)/modRecord.o : $(OBJDIR)/modPM1D.o \
+						$(OBJDIR)/modMPI.o
 $(OBJDIR)/modAdj.o : $(OBJDIR)/modPM1D.o
 $(OBJDIR)/modQoI.o : $(OBJDIR)/modAdj.o
 $(OBJDIR)/modFSens.o : $(OBJDIR)/modBC.o \

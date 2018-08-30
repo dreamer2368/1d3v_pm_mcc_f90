@@ -20,7 +20,7 @@ contains
 		procedure(control), pointer :: PtrControl=>NULL()
 		procedure(source), pointer :: PtrSource=>NULL()
 		procedure(QoI), pointer :: PtrQoI=>NULL()
-		integer :: i,k
+		integer :: i,k,fileUnit
 		real(mp) :: Jtemp, J_hist(this%nt)
 		if( PRESENT(inputControl) ) then
                         PtrControl=>inputControl
@@ -55,10 +55,11 @@ contains
 			call r%recordPlasma(this, k)									!record for n=1~Nt
 		end do
 		if( PRESENT(J) ) J=Jtemp
-		open(unit=305,file='data/'//r%dir//'/J_hist.bin',	&
+        fileUnit = mpih%my_rank+305
+		open(unit=fileUnit,file='data/'//r%dir//'/J_hist.bin',	&
 					status='replace',form='unformatted',access='stream')
-		write(305) J_hist
-		close(305)
+		write(fileUnit) J_hist
+		close(fileUnit)
 	end subroutine
 
 	subroutine halfStep(this,PtrControl)

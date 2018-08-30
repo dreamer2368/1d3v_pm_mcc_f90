@@ -43,7 +43,7 @@ contains
 		real(mp), intent(out) :: J,grad
 		procedure(control), optional :: inputControl
 		procedure(source), optional :: inputSource
-		integer :: i,k,kr
+		integer :: i,k,kr,fileUnit
 		character(len=100) :: kstr
 		real(mp), dimension(this%nt) :: J_hist, grad_hist
 		real(mp) :: time1, time2
@@ -77,6 +77,7 @@ contains
 		J_hist = 0.0_mp
 		grad_hist = 0.0_mp
 		k=0
+        fileUnit = mpih%my_rank+305
 
 		!Time stepping
 		call halfStep(this,PtrControl)
@@ -102,23 +103,23 @@ contains
 
 			call PtrUpdate(dpm,this,PtrControl,PtrSource,k,dr)
 
-			if( (dr%mod.eq.1) .or. (mod(k,dr%mod).eq.0) ) then
-				kr = merge(k,k/dr%mod,dr%mod.eq.1)
-				write(kstr,*) kr
-				open(unit=305,file='data/'//dr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
-						status='replace',form='unformatted',access='stream')
-                if( dpm%scheme.eq.COLLOCATED ) then
-				    call dpm%psM(1)%FDistribution(dpm%p(1),this%a(1))
-                else
-				    call dpm%psM(1)%FDistribution(dpm%p(1),dpm%a(1))
-                end if
-				write(305) dpm%psM(1)%f_A
-				close(305)
-!				open(unit=305,file='data/'//dr%dir//'/j_'//trim(adjustl(kstr))//'.bin',	&
+!			if( (dr%mod.eq.1) .or. (mod(k,dr%mod).eq.0) ) then
+!				kr = merge(k,k/dr%mod,dr%mod.eq.1)
+!				write(kstr,*) kr
+!				open(unit=fileUnit,file='data/'//dr%dir//'/'//trim(adjustl(kstr))//'.bin',	&
 !						status='replace',form='unformatted',access='stream')
-!				write(305) dpm%j
-!				close(305)
-			end if
+!                if( dpm%scheme.eq.COLLOCATED ) then
+!				    call dpm%psM(1)%FDistribution(dpm%p(1),this%a(1))
+!                else
+!				    call dpm%psM(1)%FDistribution(dpm%p(1),dpm%a(1))
+!                end if
+!				write(fileUnit) dpm%psM(1)%f_A
+!				close(fileUnit)
+!!				open(unit=305,file='data/'//dr%dir//'/j_'//trim(adjustl(kstr))//'.bin',	&
+!!						status='replace',form='unformatted',access='stream')
+!!				write(305) dpm%j
+!!				close(305)
+!			end if
 
             call PtrIntegrateG(dpm,this,dr)
 
@@ -126,14 +127,14 @@ contains
 			grad_hist(k) = grad
 			call dr%recordPlasma(dpm, k)
 		end do
-		open(unit=305,file='data/'//dr%dir//'/grad_hist.bin',	&
+		open(unit=fileUnit,file='data/'//dr%dir//'/grad_hist.bin',	&
 					status='replace',form='unformatted',access='stream')
-		write(305) grad_hist
-		close(305)
-		open(unit=305,file='data/'//dr%dir//'/J_hist.bin',	&
+		write(fileUnit) grad_hist
+		close(fileUnit)
+		open(unit=fileUnit,file='data/'//dr%dir//'/J_hist.bin',	&
 					status='replace',form='unformatted',access='stream')
-		write(305) J_hist
-		close(305)
+		write(fileUnit) J_hist
+		close(fileUnit)
 	end subroutine
 
 	subroutine halfStep_Sensitivity(dpm,pm,PtrControl)
