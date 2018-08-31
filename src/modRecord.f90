@@ -151,49 +151,59 @@ contains
 		character(len=100) :: s
 		integer :: i,j,fileUnit
 		real(mp) :: total, mean, pct
-        fileUnit = mpih%my_rank+300
+        fileUnit = mpih%my_rank+305
 
 		open(unit=fileUnit,file='data/'//this%dir//'/record',status='replace')
-		open(unit=fileUnit+1,file='data/'//this%dir//'/E.bin',status='replace',form='unformatted',access='stream')
-		open(unit=fileUnit+2,file='data/'//this%dir//'/rho.bin',status='replace',form='unformatted',access='stream')
-		open(unit=fileUnit+3,file='data/'//this%dir//'/PE.bin',status='replace',form='unformatted',access='stream')
-		open(unit=fileUnit+4,file='data/'//this%dir//'/Np.bin',status='replace',form='unformatted',access='stream')
-		open(unit=fileUnit+5,file='data/'//this%dir//'/phi.bin',status='replace',form='unformatted',access='stream')
-		open(unit=fileUnit+6,file='data/'//this%dir//'/Ncoll.bin',status='replace',form='unformatted',access='stream')
-		open(unit=fileUnit+7,file='data/'//this%dir//'/cpt_time.bin',status='replace',form='unformatted',access='stream')
-		do i=1,this%n
-			write(s,*) i
-			open(unit=fileUnit+7+i,file='data/'//this%dir//'/KE_'//trim(adjustl(s))//'.bin',                &
-                 status='replace',form='unformatted',access='stream')
-		end do
         print *, this%n, this%ng, this%nt, this%L, this%mod
 		write(fileUnit,*) this%n, this%ng, this%nt, this%L, this%mod
 		close(fileUnit)
 
-        write(fileUnit+6) this%n_coll
-        close(fileUnit+6)
+		open(unit=fileUnit,file='data/'//this%dir//'/Ncoll.bin',status='replace',form='unformatted',access='stream')
+        write(fileUnit) this%n_coll
+        close(fileUnit)
 
-		write(fileUnit+7) this%cpt_time
-		close(fileUnit+7)
+		open(unit=fileUnit,file='data/'//this%dir//'/cpt_time.bin',status='replace',form='unformatted',access='stream')
+		write(fileUnit) this%cpt_time
+		close(fileUnit)
 
+		open(unit=fileUnit,file='data/'//this%dir//'/E.bin',status='replace',form='unformatted',access='stream')
 		do i = 1,this%nt/this%mod+1
-			write(fileUnit+1) this%Edata(:,i)
-			write(fileUnit+2) this%rhodata(:,i)
-			write(fileUnit+3) this%PE(i)
-			write(fileUnit+4) this%np(:,i)
-			write(fileUnit+5) this%phidata(:,i)
-			do j=1,this%n
-				write(fileUnit+7+j) this%KE(j,i)
-			end do
+			write(fileUnit) this%Edata(:,i)
 		end do
+		close(fileUnit)
 
-		close(fileUnit+1)
-		close(fileUnit+2)
-		close(fileUnit+3)
-		close(fileUnit+4)
-		close(fileUnit+5)
+		open(unit=fileUnit,file='data/'//this%dir//'/rho.bin',status='replace',form='unformatted',access='stream')
+		do i = 1,this%nt/this%mod+1
+			write(fileUnit) this%rhodata(:,i)
+		end do
+		close(fileUnit)
+
+		open(unit=fileUnit,file='data/'//this%dir//'/PE.bin',status='replace',form='unformatted',access='stream')
+		do i = 1,this%nt/this%mod+1
+			write(fileUnit) this%PE(i)
+		end do
+		close(fileUnit)
+
+		open(unit=fileUnit,file='data/'//this%dir//'/Np.bin',status='replace',form='unformatted',access='stream')
+		do i = 1,this%nt/this%mod+1
+			write(fileUnit) this%np(:,i)
+		end do
+		close(fileUnit)
+
+		open(unit=fileUnit,file='data/'//this%dir//'/phi.bin',status='replace',form='unformatted',access='stream')
+		do i = 1,this%nt/this%mod+1
+			write(fileUnit) this%phidata(:,i)
+		end do
+		close(fileUnit)
+
 		do i=1,this%n
-			close(fileUnit+7+i)
+			write(s,*) i
+			open(unit=fileUnit,file='data/'//this%dir//'/KE_'//trim(adjustl(s))//'.bin',                &
+                 status='replace',form='unformatted',access='stream')
+    		do j = 1,this%nt/this%mod+1
+    	        write(fileUnit) this%KE(i,j)
+    		end do
+		    close(fileUnit)
 		end do
 
 701	FORMAT	(A, F10.3,'	',E10.3,'	', F10.2,'%')
