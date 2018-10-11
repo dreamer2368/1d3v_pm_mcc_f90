@@ -102,33 +102,42 @@ contains
         real(mp) :: time1, time2
 
 		newN = this%np+dN
-		allocate(temp_x(newN))
-		allocate(temp_v(newN,3))
-		allocate(temp_w(newN))
-		temp_x = 0.0_mp
-		temp_v = 0.0_mp
-		temp_w = 0.0_mp
+		allocate(temp_x(this%np))
+		allocate(temp_v(this%np,3))
+		allocate(temp_w(this%np))
+		temp_x = this%xp
+		temp_v = this%vp
+		temp_w = this%spwt
 
-        call CPU_TIME(time1)
+	    deallocate(this%xp)
+		deallocate(this%vp)
+		deallocate(this%Ep)
+		deallocate(this%spwt)
 
-		temp_x(1:this%np) = this%xp
-		temp_x(this%np+1:newN) = xp0
+		allocate(this%xp(newN))
+		allocate(this%spwt(newN))
+		allocate(this%vp(newN,3))
+		allocate(this%Ep(newN))
 
-		temp_v(1:this%np,:) = this%vp
-		temp_v(this%np+1:newN,:) = vp0
-
-		temp_w(1:this%np) = this%spwt
-		temp_w(this%np+1:newN) = spwt0
-
-		call this%setSpecies(newN,temp_x,temp_v,temp_w)
-
-        call CPU_TIME(time2)
-        timeProfile(12) = timeProfile(12) + (time2-time1)
-        functionCalls(12) = functionCalls(12) + 1
+		this%xp(1:this%np) = temp_x
+		this%vp(1:this%np,:) = temp_v
+		this%spwt(1:this%np) = temp_w
 
 		deallocate(temp_x)
 		deallocate(temp_v)
 		deallocate(temp_w)
+
+        call CPU_TIME(time1)
+
+		this%xp(this%np+1:newN) = xp0
+		this%vp(this%np+1:newN,:) = vp0
+		this%spwt(this%np+1:newN) = spwt0
+		this%Ep = 0.0_mp
+		this%np = newN
+
+        call CPU_TIME(time2)
+        timeProfile(12) = timeProfile(12) + (time2-time1)
+        functionCalls(12) = functionCalls(12) + 1
 	end subroutine
 
 end module
