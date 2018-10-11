@@ -161,11 +161,16 @@ contains
 		real(mp), intent(in) :: frac(:,:,:)
 		real(mp), intent(out) :: spwt0(size(g,2))
 		integer :: k,N
+        real(mp) :: time1, time2
 		N = size(g,2)
 
+        call CPU_TIME(time1)
 		do k=1,N
 			spwt0(k) = SUM( J(g(:,k),gv(:,k))*frac(:,:,k) )*Lx*2.0_mp*Lv/N
 		end do
+        call CPU_TIME(time2)
+        timeProfile(11) = timeProfile(11) + (time2-time1)
+        functionCalls(11) = functionCalls(11) + 1
 	end subroutine
 
 !	subroutine createDistribution(this,a,N,xp0,vp0,g,gv,frac)
@@ -395,12 +400,17 @@ contains
 		real(mp) :: maxspwt
 		integer :: N0
 		real(mp), allocatable :: v0(:,:)
+
+        real(mp) :: time1, time2
+
 		spwt0 = 0.0_mp
 		nx = INT(SQRT(1.0_mp*this%NLimit))
 		dx = this%m%L/nx
 		dv = 2.0_mp*Lv/nx
 
 		if( p%np>3*this%NLimit ) then
+            call CPU_TIME(time1)
+
 			do k=1,p%np
 				xp=p%xp(k)
 				vp=p%vp(k,1)
@@ -451,6 +461,10 @@ contains
 										v0,	&
 										PACK(spwt0,IsNonTrivial))
 			deallocate(v0)
+
+            call CPU_TIME(time2)
+            timeProfile(13) = timeProfile(13) + (time2-time1)
+            functionCalls(13) = functionCalls(13) + 1
 		end if
 	end subroutine
 

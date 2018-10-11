@@ -44,6 +44,10 @@ contains
 		Jtemp = 0.0_mp
 		J_hist = 0.0_mp
 
+        !Profiling computation time
+        timeProfile = 0.0_mp
+        functionCalls = 0
+
 		!Time stepping
 !		call halfStep(this,target_input)
 		call PtrQoI(this,k,Jtemp)
@@ -113,64 +117,54 @@ contains
 		real(mp) :: rhs(this%ng-1), phi1(this%ng-1)
 		real(mp) :: dt, L
 		integer :: N, Ng, i
-		real(mp) :: time1, time2, cpt_temp(7)
+		real(mp) :: time1, time2
 		dt = this%dt
 		L = this%L
 		N = this%n
 		Ng = this%ng
-		cpt_temp = 0.0_mp
 
 		call PtrControl(this,k,'xp')
 
 		call PtrSource(this,k)
 
-		call CPU_TIME(time1)
 		do i=1,this%n
 			call this%p(i)%moveSpecies(dt)
 		end do
-		call CPU_TIME(time2)
-		cpt_temp(1) = (time2-time1)
 
 		do i=1,this%n
 			call this%applyBC(this%p(i),this%m,this%dt,this%A0(i))
 		end do
-		call CPU_TIME(time1)
-		cpt_temp(2) = (time1-time2)
 
 		!charge assignment
 		this%m%rho = 0.0_mp
 		do i=1, this%n
 			call this%a(i)%chargeAssign(this%p(i),this%m)
 		end do
-		call CPU_TIME(time2)
-		cpt_temp(3) = (time2-time1)
 
+        call CPU_TIME(time2)
 		call PtrControl(this,k,'rho_back')
 		call this%m%solveMesh(this%eps0)
 		call CPU_TIME(time1)
-		cpt_temp(4) = (time1-time2)
+		timeProfile(4) = timeProfile(4) + (time1-time2)
+        functionCalls(4) = functionCalls(4) + 1
 
 		!Electric field : -D*phi
 		this%m%E = - multiplyD(this%m%phi,this%m%dx,this%m%BCindex)
 		call CPU_TIME(time2)
-		cpt_temp(5) = (time2-time1)
+		timeProfile(5) = timeProfile(5) + (time2-time1)
+        functionCalls(5) = functionCalls(5) + 1
 
 		!Force assignment : mat'*E
 		do i=1, this%n
 			call this%a(i)%forceAssign(this%p(i), this%m)
 		end do
-		call CPU_TIME(time1)
-		cpt_temp(6) = (time1-time2)
 
 		do i=1, this%n
 			call this%p(i)%accelSpecies(dt)
 		end do
-		call CPU_TIME(time2)
-		cpt_temp(7) = (time2-time1)
 
 		if( present(r) ) then
 			call this%mcc_collision(this%p,this%A0,r%n_coll(:,k))
-			r%cpt_temp(1:7) = r%cpt_temp(1:7) + cpt_temp
 		else
 			call this%mcc_collision(this%p,this%A0)
 		end if

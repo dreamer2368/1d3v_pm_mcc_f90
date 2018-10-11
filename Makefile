@@ -15,7 +15,7 @@ PNETCDFLIBS=
 
 LIBS    = $(FFTWLIBS)
 
-EXE = debye_sampling
+EXE = exec
 F90SRC = main.f90 \
 		modInputHelper.f90 \
 		constants.f90 \

@@ -193,6 +193,9 @@ contains
 		integer :: g(this%order+1)
 		real(mp) :: frac(this%order+1)
 		integer :: i,ip
+        real(mp) :: time1, time2
+
+        call CPU_TIME(time1)
 
         rho = 0.0_mp
 
@@ -214,6 +217,10 @@ contains
         end if
 
         m%rho = m%rho + rho
+
+        call CPU_TIME(time2)
+        timeProfile(3) = timeProfile(3) + (time2-time1)
+        functionCalls(3) = functionCalls(3) + 1
 	end subroutine
 
 	subroutine forceAssign(this,p,m)
@@ -221,11 +228,16 @@ contains
 		type(species), intent(inout) :: p
 		type(mesh), intent(in) :: m
 		integer :: i
+        real(mp) :: time1, time2
 
+        call CPU_TIME(time1)
 		p%Ep = 0.0_mp
 		do i=1,this%np
 			p%Ep(i) = sum( this%frac(:,i)*m%E(this%g(:,i)) )
 		end do
+        call CPU_TIME(time2)
+        timeProfile(6) = timeProfile(6) + (time2-time1)
+        functionCalls(6) = functionCalls(6) + 1
 	end subroutine
 
     subroutine appendAssign(this,dN,dg,dfrac)

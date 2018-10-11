@@ -39,7 +39,9 @@ contains
 		type(mesh), intent(inout) :: m
 		real(mp), intent(in) :: dt, A0
 		integer :: i
+        real(mp) :: time1, time2
 
+		call CPU_TIME(time1)
 		!apply BC
 		do i=1,p%np
 			if( p%xp(i)<0 ) then
@@ -48,6 +50,9 @@ contains
 				p%xp(i) = p%xp(i) - m%L
 			end if
 		end do
+		call CPU_TIME(time2)
+		timeProfile(2) = timeProfile(2) + (time2-time1)
+        functionCalls(2) = functionCalls(2) + 1
 	end subroutine
 
 	subroutine applyBC_absorbing(p,m,dt,A0)
@@ -56,7 +61,9 @@ contains
 		real(mp), intent(in) :: dt, A0
 		integer :: i, np1
 		real(mp), allocatable :: vec(:), vec2(:,:)
+        real(mp) :: time1, time2
 
+		call CPU_TIME(time1)
 		np1 = p%np
 		i = 1
 		!apply BC
@@ -107,6 +114,9 @@ contains
 
 		deallocate(vec)
 		deallocate(vec2)
+		call CPU_TIME(time2)
+		timeProfile(2) = timeProfile(2) + (time2-time1)
+        functionCalls(2) = functionCalls(2) + 1
 	end subroutine
 
 	subroutine applyBC_refluxing_absorbing(p,m,dt,vT)			!refluxing at the left plane, absorbing at the right plane
@@ -116,7 +126,9 @@ contains
 		real(mp) :: temp(3)
 		integer :: i, np1
 		real(mp), allocatable :: vec(:), vec2(:,:)
+        real(mp) :: time1, time2
 
+		call CPU_TIME(time1)
 		!apply refluxing BC
 		do i=1,p%np
 			if( p%xp(i).le.0.0_mp ) then
@@ -170,6 +182,9 @@ contains
 
 		deallocate(vec)
 		deallocate(vec2)
+		call CPU_TIME(time2)
+		timeProfile(2) = timeProfile(2) + (time2-time1)
+        functionCalls(2) = functionCalls(2) + 1
 	end subroutine
 
 	subroutine applyBC_refluxing_refluxing(p,m,dt,vT)			!refluxing at both planes
@@ -179,7 +194,9 @@ contains
 		real(mp) :: temp(3)
 		integer :: i, np1
 		real(mp), allocatable :: vec(:), vec2(:,:)
+        real(mp) :: time1, time2
 
+		call CPU_TIME(time1)
 		!apply refluxing BC
 		do i=1,p%np
 			if( p%xp(i).le.0.0_mp ) then
@@ -197,6 +214,9 @@ contains
 				p%xp(i) = m%L + temp(1)*dt*p%vp(i,1)
 			end if			
 		end do
+		call CPU_TIME(time2)
+		timeProfile(2) = timeProfile(2) + (time2-time1)
+        functionCalls(2) = functionCalls(2) + 1
 	end subroutine
 
 !==================== Shock particle BC ====================================
@@ -208,7 +228,9 @@ contains
 		real(mp) :: temp(3)
 		integer :: i, np1
 		real(mp), allocatable :: vec(:), vec2(:,:)
+        real(mp) :: time1, time2
 
+		call CPU_TIME(time1)
 		!apply refluxing BC
 		do i=1,p%np
 			if( p%xp(i).le.0.0_mp ) then
@@ -223,6 +245,9 @@ contains
 				p%xp(i) = 2.0_mp*m%L - p%xp(i)
 			end if			
 		end do
+		call CPU_TIME(time2)
+		timeProfile(2) = timeProfile(2) + (time2-time1)
+        functionCalls(2) = functionCalls(2) + 1
 	end subroutine
 
 !=================== sensitivity particle BC ===============================

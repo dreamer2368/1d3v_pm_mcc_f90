@@ -17,7 +17,6 @@ module modRecord
 		real(mp), allocatable :: PE(:), KE(:,:)
 		integer, allocatable :: n_coll(:,:)               !(species*collision type, time)
 
-		real(mp) :: cpt_temp(10)
 		real(mp), allocatable :: cpt_time(:,:)
 	contains
 		procedure, pass(this) :: buildRecord
@@ -48,7 +47,6 @@ contains
 		allocate(this%rhodata(ng,nr))
 		allocate(this%PE(nr))
 		allocate(this%KE(n,nr))
-		allocate(this%cpt_time(10,nt+1))
 
 		this%np = 0
 		this%phidata = 0.0_mp
@@ -56,7 +54,6 @@ contains
 		this%rhodata = 0.0_mp
 		this%PE = 0.0_mp
 		this%KE = 0.0_mp
-		this%cpt_time = 0.0_mp
 
 		if( present(input_dir) ) then
 			allocate(character(len=len(input_dir)) :: this%dir)
@@ -106,8 +103,6 @@ contains
 		real(mp) :: qe = 1.602176565E-19
         fileUnit = mpih%my_rank+305
 
-		this%cpt_time(:,k+1) = this%cpt_temp
-		this%cpt_temp=0.0_mp
 		if( (this%mod.eq.1) .or. (mod(k,this%mod).eq.0) ) then
 			kr = merge(k,k/this%mod,this%mod.eq.1)
 			do n=1,pm%n
@@ -206,108 +201,107 @@ contains
 		    close(fileUnit)
 		end do
 
-701	FORMAT	(A, F10.3,'	',E10.3,'	', F10.2,'%')
-		if( SUM(this%cpt_time(8,:)).eq.0.0_mp ) then
+701	FORMAT	(A, E10.3,'	', I6,'	', F10.3,'%')
+		if( SUM(functionCalls(8:13)).eq.0 ) then
+            total = SUM(timeProfile)
 			open(unit=fileUnit,file='data/'//this%dir//'/original_cpt_summary.dat',status='replace')
 			write(fileUnit,*) 'Step	Total	Mean	Percentage'
 			print *, "================ Computation Time Summary ==================================="
-			print *, "Original simulation	   	     Total            Mean	 Percentage	"
-			total = SUM(this%cpt_time(1,:))
-			mean = total/this%nt
-			pct = total/SUM(this%cpt_time)*100.0_mp
-			print 701, "Particle Move			", total, mean, pct
-			write(fileUnit,701) 'Particle-Move	', total, mean, pct
-			total = SUM(this%cpt_time(2,:))
-			mean = total/this%nt
-			pct = total/SUM(this%cpt_time)*100.0_mp
-			print 701, "ApplyBC				", total, mean, pct
-			write(fileUnit,701) 'ApplyBC	', total, mean, pct
-			total = SUM(this%cpt_time(3,:))
-			mean = total/this%nt
-			pct = total/SUM(this%cpt_time)*100.0_mp
-			print 701, "ChargeAssign			", total, mean, pct
-			write(fileUnit,701) 'Charge-Assign	', total, mean, pct
-			total = SUM(this%cpt_time(4,:))
-			mean = total/this%nt
-			pct = total/SUM(this%cpt_time)*100.0_mp
-			print 701, "Poisson Solver			", total, mean, pct
-			write(fileUnit,701) 'Poisson-Solver	', total, mean, pct
-			total = SUM(this%cpt_time(5,:))
-			mean = total/this%nt
-			pct = total/SUM(this%cpt_time)*100.0_mp
-			print 701, "Efield Gradient			", total, mean, pct
-			write(fileUnit,701) 'Efield-Gradient	', total, mean, pct
-			total = SUM(this%cpt_time(6,:))
-			mean = total/this%nt
-			pct = total/SUM(this%cpt_time)*100.0_mp
-			print 701, "Force Assign			", total, mean, pct
-			write(fileUnit,701) 'Force-Assign	', total, mean, pct
-			total = SUM(this%cpt_time(7,:))
-			mean = total/this%nt
-			pct = total/SUM(this%cpt_time)*100.0_mp
-			print 701, "Particle Accel			", total, mean, pct
-			write(fileUnit,701) 'Particle-Accel	', total, mean, pct
+			print *, "Original simulation	   	     Total        Calls	 Percentage	"
+
+			pct = timeProfile(1)/total*100.0_mp
+			print 701, "Particle Move			", timeProfile(1), functionCalls(1), pct
+			write(fileUnit,701) 'Particle-Move	', timeProfile(1), functionCalls(1), pct
+
+			pct = timeProfile(2)/total*100.0_mp
+			print 701, "ApplyBC     			", timeProfile(2), functionCalls(2), pct
+			write(fileUnit,701) 'ApplyBC    	', timeProfile(2), functionCalls(2), pct
+
+			pct = timeProfile(3)/total*100.0_mp
+			print 701, "ChargeAssign			", timeProfile(3), functionCalls(3), pct
+			write(fileUnit,701) 'Charge-Assign	', timeProfile(3), functionCalls(3), pct
+
+			pct = timeProfile(4)/total*100.0_mp
+			print 701, "Poisson Solver			", timeProfile(4), functionCalls(4), pct
+			write(fileUnit,701) 'Poisson-Solver	', timeProfile(4), functionCalls(4), pct
+
+			pct = timeProfile(5)/total*100.0_mp
+			print 701, "Efield Gradient			", timeProfile(5), functionCalls(5), pct
+			write(fileUnit,701) 'Efield-Gradient	', timeProfile(5), functionCalls(5), pct
+
+			pct = timeProfile(6)/total*100.0_mp
+			print 701, "Force Assign			", timeProfile(6), functionCalls(6), pct
+			write(fileUnit,701) 'Force-Assign	', timeProfile(6), functionCalls(6), pct
+
+			pct = timeProfile(7)/total*100.0_mp
+			print 701, "Particle Accel			", timeProfile(7), functionCalls(7), pct
+			write(fileUnit,701) 'Particle-Accel	', timeProfile(7), functionCalls(7), pct
 			print *, "============================================================================="
 			close(fileUnit)
 		else
+            total = SUM(timeProfile)
+
 			open(unit=fileUnit,file='data/'//this%dir//'/sensitivity_cpt_summary.dat',status='replace')
 			write(fileUnit,*) 'Step	Total	Mean	Percentage'
 			print *, "================ Computation Time Summary ==================================="
-			print *, "Sensitivity simulation	  	     Total            Mean   	 Percentage	"
-			total = SUM(this%cpt_time(1,:))
-			mean = total/this%nt
-			pct = total/SUM(this%cpt_time)*100.0_mp
-			print 701, "Particle Move			", total, mean, pct
-			write(fileUnit,701) 'Particle-Move	', total, mean, pct
-			total = SUM(this%cpt_time(2,:))
-			mean = total/this%nt
-			pct = total/SUM(this%cpt_time)*100.0_mp
-			print 701, "ApplyBC				", total, mean, pct
-			write(fileUnit,701) 'ApplyBC	', total, mean, pct
-			total = SUM(this%cpt_time(3,:))
-			mean = total/this%nt
-			pct = total/SUM(this%cpt_time)*100.0_mp
-			print 701, "ChargeAssign			", total, mean, pct
-			write(fileUnit,701) 'Charge-Assign	', total, mean, pct
-			total = SUM(this%cpt_time(4,:))
-			mean = total/this%nt
-			pct = total/SUM(this%cpt_time)*100.0_mp
-			print 701, "Poisson Solver			", total, mean, pct
-			write(fileUnit,701) 'Poisson-Solver	', total, mean, pct
-			total = SUM(this%cpt_time(5,:))
-			mean = total/this%nt
-			pct = total/SUM(this%cpt_time)*100.0_mp
-			print 701, "Efield Gradient			", total, mean, pct
-			write(fileUnit,701) 'Efield-Gradient	', total, mean, pct
-			total = SUM(this%cpt_time(6,:))
-			mean = total/this%nt
-			pct = total/SUM(this%cpt_time)*100.0_mp
-			print 701, "Force Assign			", total, mean, pct
-			write(fileUnit,701) 'Force-Assign	', total, mean, pct
-			total = SUM(this%cpt_time(7,:))
-			mean = total/this%nt
-			pct = total/SUM(this%cpt_time)*100.0_mp
-			print 701, "Particle Accel			", total, mean, pct
-			write(fileUnit,701) 'Particle-Accel	', total, mean, pct
-			total = SUM(this%cpt_time(8,:))
-			mean = total/this%nt
-			pct = total/SUM(this%cpt_time)*100.0_mp
-			print 701, "Sensitivity Source		", total, mean, pct
-			write(fileUnit,701) 'Sensitivity-Source	', total, mean, pct
-			total = SUM(this%cpt_time(9,:))
-			mean = total/this%nt
-			pct = total/SUM(this%cpt_time)*100.0_mp
-			print 701, "Injection			", total, mean, pct
-			write(fileUnit,701) 'Injection	', total, mean, pct
-			total = SUM(this%cpt_time(10,:))
-			mean = total/this%nt
-			pct = total/SUM(this%cpt_time)*100.0_mp
-			print 701, "Remeshing			", total, mean, pct
-			write(fileUnit,701) 'Remeshing	', total, mean, pct
+			print *, "Sensitivity simulation	  	     Total        Calls   	 Percentage	"
+
+			pct = timeProfile(1)/total*100.0_mp
+			print 701, "Particle Move			", timeProfile(1), functionCalls(1), pct
+			write(fileUnit,701) 'Particle-Move	', timeProfile(1), functionCalls(1), pct
+
+			pct = timeProfile(2)/total*100.0_mp
+			print 701, "ApplyBC     			", timeProfile(2), functionCalls(2), pct
+			write(fileUnit,701) 'ApplyBC    	', timeProfile(2), functionCalls(2), pct
+
+			pct = timeProfile(3)/total*100.0_mp
+			print 701, "ChargeAssign			", timeProfile(3), functionCalls(3), pct
+			write(fileUnit,701) 'Charge-Assign	', timeProfile(3), functionCalls(3), pct
+
+			pct = timeProfile(4)/total*100.0_mp
+			print 701, "Poisson Solver			", timeProfile(4), functionCalls(4), pct
+			write(fileUnit,701) 'Poisson-Solver	', timeProfile(4), functionCalls(4), pct
+
+			pct = timeProfile(5)/total*100.0_mp
+			print 701, "Efield Gradient			", timeProfile(5), functionCalls(5), pct
+			write(fileUnit,701) 'Efield-Gradient	', timeProfile(5), functionCalls(5), pct
+
+			pct = timeProfile(6)/total*100.0_mp
+			print 701, "Force Assign			", timeProfile(6), functionCalls(6), pct
+			write(fileUnit,701) 'Force-Assign	', timeProfile(6), functionCalls(6), pct
+
+			pct = timeProfile(7)/total*100.0_mp
+			print 701, "Particle Accel			", timeProfile(7), functionCalls(7), pct
+			write(fileUnit,701) 'Particle-Accel	', timeProfile(7), functionCalls(7), pct
+
+			pct = timeProfile(8)/total*100.0_mp
+			print 701, "f Velocity Gradient		", timeProfile(8), functionCalls(8), pct
+			write(fileUnit,701) 'GradVf	', timeProfile(8), functionCalls(8), pct
+
+			pct = timeProfile(9)/total*100.0_mp
+			print 701, "Source Evaluation		", timeProfile(9), functionCalls(9), pct
+			write(fileUnit,701) 'Source-Evaluation	', timeProfile(9), functionCalls(9), pct
+
+			pct = timeProfile(10)/total*100.0_mp
+			print 701, "Number Density			", timeProfile(10), functionCalls(10), pct
+			write(fileUnit,701) 'Number-Density	', timeProfile(10), functionCalls(10), pct
+
+			pct = timeProfile(11)/total*100.0_mp
+			print 701, "HoverN/SourceAssign	", timeProfile(11), functionCalls(11), pct
+			write(fileUnit,701) 'HoverN-SourceAssign	', timeProfile(11), functionCalls(11), pct
+
+			pct = timeProfile(12)/total*100.0_mp
+			print 701, "SourceAssign/Addition   		", timeProfile(12), functionCalls(12), pct
+			write(fileUnit,701) 'SourceAssign-Addition	', timeProfile(12), functionCalls(12), pct
+
+			pct = timeProfile(13)/total*100.0_mp
+			print 701, "Redistribution			", timeProfile(13), functionCalls(13), pct
+			write(fileUnit,701) 'Redistribution	', timeProfile(13), functionCalls(13), pct
+
 			print *, "============================================================================="
 			close(fileUnit)
 
-            print *, "Factor: ", SUM(this%cpt_time)/SUM(this%cpt_time(1:7,:))
+            print *, "Factor: ", SUM(timeProfile)/SUM(timeProfile(1:7))
 		end if
 	end subroutine
 

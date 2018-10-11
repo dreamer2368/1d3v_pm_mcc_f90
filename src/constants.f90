@@ -13,6 +13,10 @@ module constants
     !<< Basic simulation parameter >>
     integer :: numberOfParticles
 
+    !<< Computation Time Profiling >>
+    integer :: functionCalls(13) = 0
+    real(mp) :: timeProfile(13) = 0.0_mp
+
 contains
 
 end module

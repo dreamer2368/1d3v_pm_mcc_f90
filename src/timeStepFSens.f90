@@ -78,6 +78,8 @@ contains
 		grad_hist = 0.0_mp
 		k=0
         fileUnit = mpih%my_rank+305
+        timeProfile = 0.0_mp
+        functionCalls = 0
 
 		!Time stepping
 		call halfStep(this,PtrControl)
@@ -204,54 +206,45 @@ contains
 
 		call PtrSource(dpm,k)
 
-		call CPU_TIME(time1)
 		do i=1,dpm%n
 			call dpm%p(i)%moveSpecies(dt)
 		end do
 
-		call CPU_TIME(time2)
-		r%cpt_temp(1) = r%cpt_temp(1) + (time2-time1)
-
 		do i=1,dpm%n
 			call dpm%applyBC(dpm%p(i),dpm%m,dt,dpm%A0(i))
 		end do
-		call CPU_TIME(time1)
-		r%cpt_temp(2) = r%cpt_temp(2) + (time1-time2)
 
 		!charge assignment
 		dpm%m%rho = 0.0_mp
 		do i=1, dpm%n
 			call dpm%a(i)%chargeAssign(dpm%p(i),dpm%m)
 		end do
-		call CPU_TIME(time2)
-		r%cpt_temp(3) = r%cpt_temp(3) + (time2-time1)
 
 		call PtrControl(dpm,k,'rho_back')
 
 		!for control parameter qp
 !		dpm%m%rho = dpm%m%rho + pm%m%rho/pm%p(1)%qs
 
+        call CPU_TIME(time2)
 		call dpm%m%solveMesh(dpm%eps0)
 		call CPU_TIME(time1)
-		r%cpt_temp(4) = r%cpt_temp(4) + (time1-time2)
+		timeProfile(4) = timeProfile(4) + (time1-time2)
+        functionCalls(4) = functionCalls(4) + 1
 
 		!Electric field : E_A = -D*phi_A
 		dpm%m%E = - multiplyD(dpm%m%phi,dpm%m%dx,dpm%m%BCindex)
 		call CPU_TIME(time2)
-		r%cpt_temp(5) = r%cpt_temp(5) + (time2-time1)
+		timeProfile(5) = timeProfile(5) + (time2-time1)
+        functionCalls(5) = functionCalls(5) + 1
 
 		!Force assignment : mat'*E  (NOT E_A !!)
 		do i=1, dpm%n
 			call dpm%a(i)%forceAssign(dpm%p(i), pm%m)
 		end do
-		call CPU_TIME(time1)
-		r%cpt_temp(6) = r%cpt_temp(6) + (time1-time2)
 
 		do i=1, dpm%n
 			call dpm%p(i)%accelSpecies(dt)
 		end do
-		call CPU_TIME(time2)
-		r%cpt_temp(7) = r%cpt_temp(7) + (time2-time1)
 
 !		if( present(r) ) then
 !			call mcc_collision(this,r%n_coll(:,k))
@@ -283,14 +276,7 @@ contains
 
 		call PtrSource(dpm,k)
 
-		call CPU_TIME(time1)
-
-		call CPU_TIME(time2)
-		r%cpt_temp(1) = r%cpt_temp(1) + (time2-time1)/r%mod
-
-		call CPU_TIME(time1)
-		r%cpt_temp(2) = r%cpt_temp(2) + (time1-time2)/r%mod
-
+        call CPU_TIME(time1)
 		!charge assignment
 		dpm%m%rho = 0.0_mp
 		do i=1, dpm%n
@@ -305,7 +291,8 @@ contains
 !			call dpm%a(i)%chargeAssign(dpm%p(i),dpm%m)
 		end do
 		call CPU_TIME(time2)
-		r%cpt_temp(3) = r%cpt_temp(3) + (time2-time1)/r%mod
+		timeProfile(3) = timeProfile(3) + (time2-time1)
+        functionCalls(3) = functionCalls(3) + 1
 
 		call PtrControl(dpm,k,'rho_back')
 
@@ -314,18 +301,15 @@ contains
 
 		call dpm%m%solveMesh(dpm%eps0)
 		call CPU_TIME(time1)
-		r%cpt_temp(4) = r%cpt_temp(4) + (time1-time2)/r%mod
+		timeProfile(4) = timeProfile(4) + (time1-time2)
+        functionCalls(4) = functionCalls(4) + 1
 
 		!Electric field : E_A = -D*phi_A
 		dpm%m%E = - multiplyD(dpm%m%phi,dpm%m%dx,dpm%m%BCindex)
 		call CPU_TIME(time2)
-		r%cpt_temp(5) = r%cpt_temp(5) + (time2-time1)/r%mod
+		timeProfile(5) = timeProfile(5) + (time2-time1)
+        functionCalls(5) = functionCalls(5) + 1
 
-		call CPU_TIME(time1)
-		r%cpt_temp(6) = r%cpt_temp(6) + (time1-time2)/r%mod
-
-		call CPU_TIME(time2)
-		r%cpt_temp(7) = r%cpt_temp(7) + (time2-time1)/r%mod
 	end subroutine
 
 !=======================integrateG procedure============================
@@ -338,19 +322,11 @@ contains
         real(mp) :: time1, time2
 
 		do i=1,dpm%n
-			call CPU_TIME(time1)
 			call dpm%psM(i)%FVelocityGradient(pm%p(i),pm%a(i))
 			call dpm%psM(i)%FSensSourceTerm(pm%p(i)%qs,pm%p(i)%ms,dpm%m%E,dpm%dt)
-			call CPU_TIME(time2)
-			r%cpt_temp(8) = r%cpt_temp(8) + (time2-time1)
-
-			call CPU_TIME(time1)
-			r%cpt_temp(9) = r%cpt_temp(9) + (time1-time2)
 
 			call dpm%psM(i)%numberDensity(dpm%p(i),dpm%a(i))
 			call dpm%psM(i)%updateWeight(dpm%p(i),dpm%a(i))
-			call CPU_TIME(time2)
-			r%cpt_temp(10) = r%cpt_temp(10) + (time2-time1)
 		end do
     end subroutine
 
@@ -362,20 +338,13 @@ contains
         real(mp) :: time1, time2
 
         do i=1,dpm%n
-			call CPU_TIME(time1)
 			call dpm%psM(i)%FVelocityGradient(pm%p(i),pm%a(i))
 			call dpm%psM(i)%FSensSourceTerm(pm%p(i)%qs,pm%p(i)%ms,dpm%m%E,dpm%dt)
-			call CPU_TIME(time2)
-			r%cpt_temp(8) = r%cpt_temp(8) + (time2-time1)
 
 			!InjectSource+Remeshing
 			call dpm%InjectSource(dpm%L,dpm%psM(i)%Lv,dpm%p(i),dpm%psM(i)%J)
-			call CPU_TIME(time1)
-			r%cpt_temp(9) = r%cpt_temp(9) + (time1-time2)
 
 			call dpm%Redistribute(dpm%p(i),dpm%psM(i)%Lv)
-			call CPU_TIME(time2)
-			r%cpt_temp(10) = r%cpt_temp(10) + (time2-time1)
 		end do
     end subroutine
 
@@ -390,19 +359,11 @@ contains
 			dpm%p(i)%xp=pm%p(i)%xp
 			dpm%p(i)%vp=pm%p(i)%vp
 
-			call CPU_TIME(time1)
 			call dpm%psM(i)%FVelocityGradient(pm%p(i),pm%a(i))
 			call dpm%psM(i)%FSensSourceTerm(pm%p(i)%qs,pm%p(i)%ms,dpm%m%E,dpm%dt)
-			call CPU_TIME(time2)
-			r%cpt_temp(8) = r%cpt_temp(8) + (time2-time1)
-
-			call CPU_TIME(time1)
-			r%cpt_temp(9) = r%cpt_temp(9) + (time1-time2)
 
 			call dpm%psM(i)%numberDensity(dpm%p(i),pm%a(i))
 			call dpm%psM(i)%updateWeight(dpm%p(i),pm%a(i))
-			call CPU_TIME(time2)
-			r%cpt_temp(10) = r%cpt_temp(10) + (time2-time1)
 		end do
     end subroutine
 

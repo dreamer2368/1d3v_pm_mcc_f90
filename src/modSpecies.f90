@@ -69,15 +69,27 @@ contains
 	subroutine moveSpecies(this,dt)
 		class(species), intent(inout) :: this
 		real(mp), intent(in) :: dt
+        real(mp) :: time1, time2
 
+		call CPU_TIME(time1)
 		this%xp = this%xp + dt*this%vp(:,1)
+		call CPU_TIME(time2)
+        timeProfile(1) = timeProfile(1) + (time2-time1)
+        functionCalls(1) = functionCalls(1) + 1
 	end subroutine
 
 	subroutine accelSpecies(this,dt)
 		class(species), intent(inout) :: this
 		real(mp), intent(in) :: dt
+        real(mp) :: time1, time2
+
+		call CPU_TIME(time1)
 
 		this%vp(:,1) = this%vp(:,1) + dt*this%qs/this%ms*this%Ep
+
+		call CPU_TIME(time2)
+        timeProfile(7) = timeProfile(7) + (time2-time1)
+        functionCalls(7) = functionCalls(7) + 1
 	end subroutine
 
 	subroutine appendSpecies(this,dN,xp0,vp0,spwt0)
@@ -86,6 +98,9 @@ contains
 		real(mp), intent(in) :: xp0(dN), vp0(dN,3), spwt0(dN)
 		integer :: newN
 		real(mp), allocatable :: temp_x(:), temp_v(:,:), temp_w(:)
+
+        real(mp) :: time1, time2
+
 		newN = this%np+dN
 		allocate(temp_x(newN))
 		allocate(temp_v(newN,3))
@@ -93,6 +108,8 @@ contains
 		temp_x = 0.0_mp
 		temp_v = 0.0_mp
 		temp_w = 0.0_mp
+
+        call CPU_TIME(time1)
 
 		temp_x(1:this%np) = this%xp
 		temp_x(this%np+1:newN) = xp0
@@ -104,6 +121,10 @@ contains
 		temp_w(this%np+1:newN) = spwt0
 
 		call this%setSpecies(newN,temp_x,temp_v,temp_w)
+
+        call CPU_TIME(time2)
+        timeProfile(12) = timeProfile(12) + (time2-time1)
+        functionCalls(12) = functionCalls(12) + 1
 
 		deallocate(temp_x)
 		deallocate(temp_v)

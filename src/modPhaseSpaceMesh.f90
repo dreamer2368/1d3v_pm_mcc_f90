@@ -65,6 +65,9 @@ contains
 		real(mp), intent(in) :: qs,ms,dt
         real(mp), intent(in) :: E(this%ng)
 		integer :: i,j
+        real(mp) :: time1, time2
+
+        call CPU_TIME(time1)
 
 		!Multiply E_A
 	    do i=1,2*this%ngv+1
@@ -73,6 +76,10 @@ contains
 
 		!Multiply dt
 		this%J = -this%J*qs/ms*dt
+
+        call CPU_TIME(time2)
+        timeProfile(9) = timeProfile(9) + (time2-time1)
+        functionCalls(9) = functionCalls(9) + 1
 	end subroutine
 
 	subroutine createDistribution(this,a,N,xp0,vp0,g,gv,frac)
@@ -199,7 +206,9 @@ contains
 		type(pmAssign), intent(in) :: a
 		integer :: i,k, g(a%order+1), gv(2)
 		real(mp) :: vp, fracv(2)
+        real(mp) :: time1, time2
 
+        call CPU_TIME(time1)
 		!DvF to phase space
 		this%Dvf = 0.0_mp
 		do k = 1, p%np
@@ -219,6 +228,9 @@ contains
         end if
 		this%Dvf(:,1) = this%Dvf(:,1)*2.0_mp
 		this%Dvf(:,2*this%ngv+1) = this%Dvf(:,2*this%ngv+1)*2.0_mp
+        call CPU_TIME(time2)
+        timeProfile(8) = timeProfile(8) + (time2-time1)
+        functionCalls(8) = functionCalls(8) + 1
 	end subroutine
 
 	subroutine numberDensity(this,p,a)
@@ -232,7 +244,9 @@ contains
 		real(mp) :: vp, h
 		integer, dimension(:,:), pointer :: g_x, g_v
 		real(mp), dimension(:,:), pointer :: frac_x, frac_v
-
+        real(mp) :: time1, time2
+        
+        call CPU_TIME(time1)
 		!F_A to phase space
 		g_x=>a%g
 		frac_x=>a%frac
@@ -274,6 +288,9 @@ contains
         n_temp(:,(/1,2*this%ngv+1/)) = n_temp(:,(/1,2*this%ngv+1/))*2.0_mp
         
         this%n_A = n_temp
+        call CPU_TIME(time2)
+        timeProfile(10) = timeProfile(10) + (time2-time1)
+        functionCalls(10) = functionCalls(10) + 1
 	end subroutine
 
 	subroutine updateWeight(this,p,a)
@@ -287,7 +304,14 @@ contains
 		integer, dimension(:,:), pointer :: g_x, g_v
 		real(mp), dimension(:,:), pointer :: frac_x, frac_v
         real(mp), dimension(size(this%J,1),size(this%J,2)) :: H_temp
+
+        real(mp) :: time1, time2
+
+        call CPU_TIME(time1)
         H_temp = this%J/this%n_A
+        call CPU_TIME(time2)
+        timeProfile(11) = timeProfile(11) + (time2-time1)
+        functionCalls(11) = functionCalls(11) + 1
 
 		!Update weight
 		g_x=>a%g
@@ -309,6 +333,10 @@ contains
                 p%spwt(k) = p%spwt(k) + SUM( H_temp(g,g_vp(i))*frac_v(i,k)*frac_x(:,k) )
             end do
 		end do
+
+        call CPU_TIME(time1)
+        timeProfile(12) = timeProfile(12) + (time1-time2)
+        functionCalls(12) = functionCalls(12) + 1
 	end subroutine
 
 end module
