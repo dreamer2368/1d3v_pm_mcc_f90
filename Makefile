@@ -6,8 +6,8 @@ SRCDIR = src
 OBJDIR = obj
 MODDIR = mod
 
-FFTWLIBS=/g/g92/chung28/Programs/fftw-3.3.8/lib/libfftw3.a
-#FFTWLIBS=/Users/Kevin/bin/FFTW/lib/libfftw3.a
+#FFTWLIBS=/g/g92/chung28/Programs/fftw-3.3.8/lib/libfftw3.a
+FFTWLIBS=/Users/Kevin/bin/fftw-3.3.8-build/lib/libfftw3.a
 VECLIBSMACOSX=
 LAPACKLIB=-L/opt/local/lib/lapack-3.5.0 -llapack -lblas
 BLASLIB=/opt/local/lib/lapack-3.5.0/librefblas.a
@@ -15,9 +15,9 @@ PNETCDFLIBS=
 
 LIBS    = $(FFTWLIBS)
 
-EXE = exec
-F90SRC = main.f90 \
-		modInputHelper.f90 \
+EXE = exec scaling
+F90EXE = main.f90 scaling.f90
+F90SRC = modInputHelper.f90 \
 		constants.f90 \
 		modMPI.f90 \
 		MatrixVector.f90 \
@@ -49,7 +49,7 @@ F90OBJ = $(F90SRC:%.f90=$(OBJDIR)/%.o)
 
 ### Targets
 all: dir $(EXE)
-run: $(EXE) 
+run: $(EXE)
 	./$(EXE)
 dir: $(OBJDIR) $(MODDIR)
 
@@ -60,9 +60,13 @@ $(MODDIR):
 	mkdir $(TOPDIR)$(MODDIR)
 
 # Link object files to executables
-$(EXE): $(F90OBJ)
+exec: $(OBJDIR)/main.o $(F90OBJ)
 	@echo $(dir $(firstword $(MAKEFILE_LIST)))
-	$(F90) -o $(EXE) $(F90OBJ) $(LIBS)
+	$(F90) -o exec $(OBJDIR)/main.o $(F90OBJ) $(LIBS)
+
+scaling: $(OBJDIR)/scaling.o $(F90OBJ)
+	@echo $(dir $(firstword $(MAKEFILE_LIST)))
+	$(F90) -o scaling $(OBJDIR)/scaling.o $(F90OBJ) $(LIBS)
 
 # All .o files depend on the corresponding .f90 file
 $(OBJDIR)/%.o: $(SRCDIR)/%.f90
@@ -145,10 +149,15 @@ $(OBJDIR)/main.o : $(OBJDIR)/testmodule.o \
 					$(OBJDIR)/FSensProblems.o \
 					$(OBJDIR)/modMPI.o \
 					$(OBJDIR)/modInputHelper.o
+$(OBJDIR)/scaling.o : $(OBJDIR)/testmodule.o \
+					$(OBJDIR)/PlasmaProblems.o \
+					$(OBJDIR)/AdjointProblems.o \
+					$(OBJDIR)/MCCProblems.o \
+					$(OBJDIR)/FSensProblems.o \
+					$(OBJDIR)/modMPI.o \
+					$(OBJDIR)/modInputHelper.o
 
 clean:
 	rm -rf $(OBJDIR) $(MODDIR) $(EXE)
 
 .PHONY: dir all run clean
-
-
